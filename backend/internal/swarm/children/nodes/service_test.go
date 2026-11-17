@@ -384,8 +384,14 @@ func TestService_EnrollNodeAgent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, enrolled.Token, kit.FromPtr(kept.AccessToken), "a refused enrollment keeps the environment's key")
 
+	managerAgent, err := svc.EnrollNodeAgent(ctx, EnrollNodeAgentParams{ParentEnvironmentID: "parent", NodeID: "managernode1"})
+	require.NoError(t, err, "the parent's node enrolls through the same path as workers")
+	managerEnv, err := envSvc.GetEnvironmentByID(ctx, managerAgent.EnvironmentID)
+	require.NoError(t, err)
+	assert.Equal(t, "managernode1", kit.FromPtr(managerEnv.SwarmNodeID))
+	assert.Equal(t, "parent", kit.FromPtr(managerEnv.ParentEnvironmentID))
 	_, err = svc.EnrollNodeAgent(ctx, EnrollNodeAgentParams{ParentEnvironmentID: "parent", NodeID: "managernode1"})
-	require.ErrorIs(t, err, common.ErrConflict, "the parent's own node is already covered")
+	require.ErrorIs(t, err, common.ErrConflict, "a manager node cannot be enrolled twice")
 
 	startSwarmTestAgent(t, tunnels, "worker2", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -400,7 +406,7 @@ func TestService_EnrollNodeAgent(t *testing.T) {
 	require.ErrorIs(t, err, common.ErrConflict, "a node with a connected agent is not taken over")
 	agentEnvs, err := envSvc.ListSwarmNodeAgentEnvironments(ctx, "parent")
 	require.NoError(t, err)
-	assert.Len(t, agentEnvs, 2, "no second environment is created for a covered node")
+	assert.Len(t, agentEnvs, 3, "no second environment is created for a covered node")
 
 	now := time.Now()
 	require.NoError(t, db.Create(&environment.Environment{
@@ -446,4 +452,35 @@ func TestAggregateJoinCandidatesKeepsManagerBreakdown(t *testing.T) {
 	require.Equal(t, "y", body.Environments[1].Data[0].EnvironmentID)
 	require.Len(t, body.FailedEnvironments, 1)
 	require.Equal(t, "c", body.FailedEnvironments[0].Environment.ID)
+}
+
+func TestNodeAgentCoverage(t *testing.T) {
+	svc := &Service{}
+	for _, role := range []string{"manager", "worker"} {
+		t.Run(role, func(t *testing.T) {
+			node := &types.SwarmNode{
+				ID: "node1", Role: role,
+				Agent: types.NodeAgentStatus{
+					State:         types.NodeAgentStateConnected,
+					BindingKind:   new(types.NodeAgentBindingKindLocal),
+					EnvironmentID: new(environment.LocalEnvironmentID),
+				},
+			}
+			coverage := &swarmNodeAgentCoverage{}
+			svc.applyNodeAgentCoverage(node, coverage)
+			assert.Equal(t, types.NodeAgentStateNone, node.Agent.State)
+			assert.Nil(t, node.Agent.EnvironmentID)
+
+			coverage.boundEnvsByNodeID = map[string][]environment.Environment{
+				"node1": {{BaseModel: database.BaseModel{ID: "node-agent"}, Name: "node-agent"}},
+			}
+			coverage.runtimeByEnvID = map[string]swarmNodeAgentRuntime{
+				"node-agent": {connected: true, identity: &SwarmNodeIdentity{SwarmNodeID: "node1", SwarmActive: true}},
+			}
+			svc.applyNodeAgentCoverage(node, coverage)
+			assert.Equal(t, types.NodeAgentStateConnected, node.Agent.State)
+			assert.Equal(t, "node-agent", kit.FromPtr(node.Agent.EnvironmentID))
+			assert.Equal(t, "agent", kit.FromPtr(node.Agent.EnvironmentType))
+		})
+	}
 }

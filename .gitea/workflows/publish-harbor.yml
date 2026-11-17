@@ -1,0 +1,80 @@
+name: Publish Arcane to Harbor
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-harbor-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and publish ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: manager
+            dockerfile: docker/Dockerfile
+          - image: agent
+            dockerfile: docker/Dockerfile-agent
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Read release metadata
+        id: release
+        run: |
+          value() { awk -F= -v key="$1" '$1 == key { print $2; exit }' RELEASE; }
+          registry="$(value REGISTRY)"
+          repository="$(value REPOSITORY)"
+          version="$(value VERSION)"
+          platforms="$(value PLATFORMS)"
+          provenance="$(value PROVENANCE)"
+          : "${provenance:=true}"
+          test -n "$registry" && test -n "$repository" && test -n "$version" && test -n "$platforms"
+          {
+            printf 'registry=%s\n' "$registry"
+            printf 'repository=%s\n' "$repository"
+            printf 'version=%s\n' "$version"
+            printf 'platforms=%s\n' "$platforms"
+            printf 'provenance=%s\n' "$provenance"
+            printf 'build_time=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Harbor
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ steps.release.outputs.registry }}
+          username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          builder: ${{ steps.buildx.outputs.name }}
+          platforms: ${{ steps.release.outputs.platforms }}
+          push: true
+          provenance: ${{ steps.release.outputs.provenance }}
+          build-args: |
+            VERSION=${{ steps.release.outputs.version }}
+            REVISION=${{ github.sha }}
+            BUILD_TIME=${{ steps.release.outputs.build_time }}
+          tags: |
+            ${{ steps.release.outputs.registry }}/${{ steps.release.outputs.repository }}-${{ matrix.image }}:${{ steps.release.outputs.version }}
+            ${{ steps.release.outputs.registry }}/${{ steps.release.outputs.repository }}-${{ matrix.image }}:latest
+            ${{ steps.release.outputs.registry }}/${{ steps.release.outputs.repository }}-${{ matrix.image }}:sha-${{ github.sha }}
+          cache-from: type=registry,ref=${{ steps.release.outputs.registry }}/${{ steps.release.outputs.repository }}-${{ matrix.image }}:buildcache
+          cache-to: type=registry,ref=${{ steps.release.outputs.registry }}/${{ steps.release.outputs.repository }}-${{ matrix.image }}:buildcache,mode=max

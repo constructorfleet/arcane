@@ -79,10 +79,6 @@ type (
 		runtimeByEnvID     map[string]swarmNodeAgentRuntime
 		boundEnvsByNodeID  map[string][]environment.Environment
 		candidatesByNodeID map[string][]environment.Environment
-		localIdentity      *SwarmNodeIdentity
-		// Resolved once per request rather than per node: the name is user-editable, and
-		// applyNodeAgentCoverage runs in a loop with no context to look it up.
-		localEnvironmentName string
 	}
 )
 
@@ -289,7 +285,7 @@ func (s *Service) enrollNodeAgent(ctx context.Context, p EnrollNodeAgentParams) 
 	agentEnvs = slices.DeleteFunc(agentEnvs, func(bound environment.Environment) bool {
 		return strings.TrimSpace(kit.FromPtr(bound.SwarmNodeID)) != node.ID
 	})
-	coverage, err := s.buildNodeAgentCoverage(ctx, p.ParentEnvironmentID, agentEnvs, liveCandidateEnvs)
+	coverage, err := s.buildNodeAgentCoverage(ctx, agentEnvs, liveCandidateEnvs)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +293,7 @@ func (s *Service) enrollNodeAgent(ctx context.Context, p EnrollNodeAgentParams) 
 	if err != nil {
 		return nil, err
 	}
-	s.applyNodeAgentCoverage(p.ParentEnvironmentID, node, coverage)
+	s.applyNodeAgentCoverage(node, coverage)
 	switch {
 	case node.Agent.State == types.NodeAgentStateConnected, node.Agent.State == types.NodeAgentStateMismatched:
 		return nil, common.Classify(common.ErrConflict, errors.New("this swarm node is already covered by a connected Arcane agent"))
@@ -367,7 +363,7 @@ func (s *Service) enrichNodeAgentStatuses(ctx context.Context, environmentID str
 
 	for index := range items {
 		item := &items[index]
-		s.applyNodeAgentCoverage(environmentID, item, coverage)
+		s.applyNodeAgentCoverage(item, coverage)
 	}
 }
 
@@ -382,10 +378,10 @@ func (s *Service) resolveNodeAgentCoverage(ctx context.Context, environmentID st
 		slog.WarnContext(ctx, "failed to load swarm node agent candidates", "environmentId", environmentID, "error", err.Error())
 		candidateEnvs = nil
 	}
-	return s.buildNodeAgentCoverage(ctx, environmentID, agentEnvs, candidateEnvs)
+	return s.buildNodeAgentCoverage(ctx, agentEnvs, candidateEnvs)
 }
 
-func (s *Service) buildNodeAgentCoverage(ctx context.Context, environmentID string, agentEnvs, candidateEnvs []environment.Environment) (*swarmNodeAgentCoverage, error) {
+func (s *Service) buildNodeAgentCoverage(ctx context.Context, agentEnvs, candidateEnvs []environment.Environment) (*swarmNodeAgentCoverage, error) {
 	probeEnvsByID := make(map[string]environment.Environment, len(agentEnvs)+len(candidateEnvs))
 	for _, env := range candidateEnvs {
 		probeEnvsByID[env.ID] = env
@@ -434,37 +430,20 @@ func (s *Service) buildNodeAgentCoverage(ctx context.Context, environmentID stri
 		}
 	}
 
-	coverage := &swarmNodeAgentCoverage{
+	return &swarmNodeAgentCoverage{
 		runtimeByEnvID:     runtimeByEnvID,
 		boundEnvsByNodeID:  boundEnvsByNodeID,
 		candidatesByNodeID: candidatesByNodeID,
-	}
-	if environmentID == environment.LocalEnvironmentID {
-		identity, identityErr := s.GetLocalNodeIdentity(ctx)
-		if identityErr == nil {
-			coverage.localIdentity = identity
-		}
-		coverage.localEnvironmentName = s.environmentService.ResolveEnvironmentName(ctx, environment.LocalEnvironmentID)
-	}
-	return coverage, nil
+	}, nil
 }
 
-func (s *Service) applyNodeAgentCoverage(environmentID string, item *types.SwarmNode, coverage *swarmNodeAgentCoverage) {
+func (s *Service) applyNodeAgentCoverage(item *types.SwarmNode, coverage *swarmNodeAgentCoverage) {
 	if item == nil || coverage == nil {
 		return
 	}
+	// Node coverage belongs to the control plane, including the manager's own node.
+	item.Agent = types.NodeAgentStatus{State: types.NodeAgentStateNone}
 	nodeID := strings.TrimSpace(item.ID)
-	if environmentID == environment.LocalEnvironmentID && coverage.localIdentity != nil && coverage.localIdentity.SwarmActive && strings.TrimSpace(coverage.localIdentity.SwarmNodeID) == nodeID {
-		item.Agent = types.NodeAgentStatus{
-			State:           types.NodeAgentStateConnected,
-			BindingKind:     new(types.NodeAgentBindingKindLocal),
-			EnvironmentID:   new(environment.LocalEnvironmentID),
-			EnvironmentName: new(environment.DisplayName(environment.LocalEnvironmentID, coverage.localEnvironmentName)),
-			EnvironmentType: new("local"),
-			Connected:       new(true),
-		}
-		return
-	}
 
 	boundEnvs := coverage.boundEnvsByNodeID[nodeID]
 	if len(boundEnvs) > 0 {

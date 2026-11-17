@@ -1,0 +1,42 @@
+# Integration candidate: requires the fork's patched agent image and an existing manager.
+# Create a reusable Arcane enrollment token with enough uses for every node,
+# and store it in the external Docker secret named arcane_agent_enrollment_token.
+# Set ARCANE_AGENT_IMAGE to an immutable patched image tag or digest and
+# ARCANE_MANAGER_API_URL to the reachable HTTPS control-plane URL.
+services:
+  agent:
+    image: ${ARCANE_AGENT_IMAGE:?Set an immutable patched agent image}
+    environment:
+      ARCANE_AGENT: 'true'
+      ARCANE_MANAGER_API_URL: ${ARCANE_MANAGER_API_URL:?Set the HTTPS manager URL}
+      ARCANE_AGENT_TOKEN_FILE: /run/secrets/arcane_agent_enrollment_token
+      ARCANE_AGENT_TRANSPORT: auto
+    secrets:
+      - arcane_agent_enrollment_token
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - agent-data:/app/data
+    stop_grace_period: 30s
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.platform.os == linux
+      update_config:
+        order: stop-first
+        parallelism: 1
+      rollback_config:
+        order: stop-first
+        parallelism: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+
+volumes:
+  # Docker's local driver keeps each node's enrolled identity separate.
+  agent-data:
+    driver: local
+
+secrets:
+  arcane_agent_enrollment_token:
+    external: true
