@@ -39,7 +39,8 @@ import (
 )
 
 type (
-	enrollmentTestScheduler struct{}
+	enrollmentTestVariableSyncer struct{}
+	enrollmentTestScheduler      struct{}
 
 	enrollmentTestHarness struct {
 		db          *database.DB
@@ -51,6 +52,9 @@ type (
 		service     *EnrollmentService
 	}
 )
+
+func (enrollmentTestVariableSyncer) SyncEnvironment(context.Context, string) error { return nil }
+func (enrollmentTestVariableSyncer) ForgetSyncState(string)                        {}
 
 func (enrollmentTestScheduler) Submit(context.Context, types.SchedulerRequest) (types.SchedulerRun, error) {
 	return types.SchedulerRun{}, nil
@@ -88,6 +92,7 @@ func newEnrollmentTestHarness(t *testing.T) enrollmentTestHarness {
 	tunnels := agent.NewTunnelRegistry()
 	eventSvc := event.NewEventService(db, &config.Config{}, nil)
 	envSvc := environment.NewEnvironmentService(environment.EnvironmentServiceParams{
+		VariableSyncer:  enrollmentTestVariableSyncer{},
 		DB:              db,
 		Tunnels:         tunnels,
 		EventService:    eventSvc,
@@ -104,6 +109,7 @@ func newEnrollmentTestHarness(t *testing.T) enrollmentTestHarness {
 	})
 
 	swarmSvc := swarm.NewSwarmService(swarm.SwarmServiceParams{
+		Config:             &config.Config{},
 		SettingsService:    settingsSvc,
 		KVService:          kv.NewKVService(db),
 		EnvironmentService: envSvc,
@@ -125,6 +131,7 @@ func newEnrollmentTestHarness(t *testing.T) enrollmentTestHarness {
 		events:      eventSvc,
 		mtls:        mtls,
 		service: NewEnrollmentService(EnrollmentServiceParams{
+			Config:             &config.Config{},
 			EnvironmentService: envSvc,
 			SwarmService:       swarmSvc,
 			EventService:       eventSvc,
@@ -725,6 +732,7 @@ func TestEnrollmentService_EnrollMTLS_Unavailable(t *testing.T) {
 	h := newEnrollmentTestHarness(t)
 	h.createAgentEnvironment(t, "env-disabled", "Disabled", "disabled-token")
 	service := NewEnrollmentService(EnrollmentServiceParams{
+		Config:             &config.Config{},
 		EnvironmentService: h.environment,
 		SwarmService:       h.swarm,
 		EventService:       h.events,
@@ -866,4 +874,30 @@ func TestEnrollmentService_EnrollMTLS_AllowsRepeatAfterCooldownAndMarksReenrollm
 	assert.Equal(t, event.EventTypeEnvironmentMTLSEnroll, events[3].Type)
 	assert.Equal(t, event.EventSeverityWarning, events[3].Severity)
 	assert.Equal(t, true, events[3].Metadata["reenrollment"])
+}
+
+func TestEnrollmentControlPlaneGlobalNodes(t *testing.T) {
+	h := newEnrollmentTestHarness(t)
+	h.service.config.ControlPlane = true
+	token := h.createToken(t, nil)
+	ids := map[string]bool{}
+	for _, node := range []string{"swarm01", "swarm02", "swarm03", "swarm04", "swarm05"} {
+		req := types.AgentEnrollRequest{Hostname: node, SwarmNodeID: node, SwarmClusterID: "cluster", RequestID: node}
+		first, err := h.service.Enroll(t.Context(), EnrollParams{EnrollmentToken: token.Token, Request: req})
+		require.NoError(t, err)
+		assert.NotEqual(t, environment.LocalEnvironmentID, first.EnvironmentID)
+		assert.False(t, ids[first.EnvironmentID], "each node must have its own removable identity")
+		ids[first.EnvironmentID] = true
+		env, err := h.environment.GetEnvironmentByID(t.Context(), first.EnvironmentID)
+		require.NoError(t, err)
+		assert.False(t, env.Hidden)
+		assert.Equal(t, node, env.Name)
+		restarted, err := h.service.Enroll(t.Context(), EnrollParams{EnrollmentToken: token.Token, AgentToken: first.Token, Request: req})
+		require.NoError(t, err)
+		assert.Equal(t, first.EnvironmentID, restarted.EnvironmentID)
+		require.NoError(t, h.environment.DeleteEnvironment(t.Context(), first.EnvironmentID, nil, nil))
+		_, err = h.environment.ResolveAgentEnvironmentByToken(t.Context(), first.Token)
+		require.Error(t, err, "deletion revokes access for the removed agent")
+	}
+	assert.Equal(t, 5, h.useCount(t, token.ID), "reconnects must not consume another enrollment")
 }

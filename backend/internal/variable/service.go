@@ -30,6 +30,7 @@ import (
 	"kit.getarcane.app/sys/crypto"
 
 	"getarcane.dev/arcane/v3/internal/common"
+	"getarcane.dev/arcane/v3/internal/config"
 	"getarcane.dev/arcane/v3/internal/database"
 	"getarcane.dev/arcane/v3/internal/environment"
 	"getarcane.dev/arcane/v3/internal/kv"
@@ -53,12 +54,14 @@ type (
 		// syncGate skips the agent PUT when the effective variable set is unchanged.
 		syncGate concurrency.SyncGate
 
-		statusMu  sync.RWMutex
-		envFileMu sync.Mutex
+		statusMu     sync.RWMutex
+		envFileMu    sync.Mutex
+		controlPlane bool
 	}
 
 	VariableServiceParams struct {
 		fx.In
+		Config *config.Config
 
 		DB              *database.DB
 		Environments    environment.RemoteProxy
@@ -85,6 +88,7 @@ func validateVariableKey(key string) error {
 
 func NewVariableService(p VariableServiceParams) *VariableService {
 	return &VariableService{
+		controlPlane:    p.Config.ControlPlane,
 		syncGate:        concurrency.SyncGate{Expiry: environment.SyncDeliveryExpiry},
 		db:              p.DB,
 		environments:    p.Environments,
@@ -366,6 +370,9 @@ func (s *VariableService) syncTargets(ctx context.Context) []string {
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to list environments for global variable sync", "error", err)
 	}
+	if s.controlPlane {
+		return remoteIDs
+	}
 	return append([]string{environment.LocalEnvironmentID}, remoteIDs...)
 }
 
@@ -381,8 +388,10 @@ func (s *VariableService) SyncAll(ctx context.Context) []types.EnvironmentSyncSt
 }
 
 func (s *VariableService) SyncAllBackground(ctx context.Context) []types.EnvironmentSyncStatus {
-	if err := s.SyncEnvironment(ctx, environment.LocalEnvironmentID); err != nil {
-		slog.WarnContext(ctx, "Failed to sync global variables locally", "error", err)
+	if !s.controlPlane {
+		if err := s.SyncEnvironment(ctx, environment.LocalEnvironmentID); err != nil {
+			slog.WarnContext(ctx, "Failed to sync global variables locally", "error", err)
+		}
 	}
 
 	remotes := slices.DeleteFunc(s.syncTargets(ctx), func(target string) bool {

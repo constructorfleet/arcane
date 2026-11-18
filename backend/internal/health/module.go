@@ -44,7 +44,7 @@ func (m *Module) RegisterRoutes(api huma.API) {
 		Method:      http.MethodGet,
 		Path:        "/health/ready",
 		Summary:     "Readiness probe",
-		Description: "Report whether the database and Docker daemon are reachable",
+		Description: "Report database readiness and Docker readiness when a local engine is enabled",
 		Tags:        []string{"Health"},
 		Security:    []map[string][]string{},
 	}, handler.ready)

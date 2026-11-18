@@ -370,6 +370,14 @@ func (s *EnvironmentService) ResolveEnvironmentName(ctx context.Context, environ
 }
 
 func (s *EnvironmentService) EnsureLocalEnvironment(ctx context.Context, appUrl string) error {
+	if s.config.ControlPlane {
+		if err := s.db.WithContext(ctx).Model(&Environment{}).Where("id = ?", LocalEnvironmentID).
+			Updates(map[string]any{"hidden": true, "enabled": false, "status": string(EnvironmentStatusOffline)}).Error; err != nil {
+			return fmt.Errorf("retire manager-local environment: %w", err)
+		}
+		s.invalidateEnvironmentCache(LocalEnvironmentID)
+		return nil
+	}
 	hostName := func() string {
 		info, _ := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.SystemInfoResult, error) {
 			return dockerClient.Info(ctx, client.InfoOptions{})

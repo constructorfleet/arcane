@@ -670,3 +670,18 @@ func TestEnvironmentMiddleware_ServesMultiEnvironmentScopeLocally(t *testing.T) 
 	assert.Equal(t, http.StatusOK, recorder.Code)
 	assert.True(t, localHandlerHit)
 }
+
+func TestControlPlaneRejectsLocalEngineRequests(t *testing.T) {
+	for _, path := range []string{"/api/agents/0/containers", "/api/agents/0/volumes", "/api/agents/0/swarm/services"} {
+		t.Run(path, func(t *testing.T) {
+			e := echo.New()
+			response := httptest.NewRecorder()
+			c := e.NewContext(httptest.NewRequest(http.MethodGet, path, http.NoBody), response)
+			called := false
+			middleware := &EnvironmentMiddleware{controlPlane: true, localID: "0", paramName: "id"}
+			require.NoError(t, middleware.Handle(c, func(*echo.Context) error { called = true; return nil }))
+			assert.Equal(t, http.StatusNotFound, response.Code)
+			assert.False(t, called)
+		})
+	}
+}

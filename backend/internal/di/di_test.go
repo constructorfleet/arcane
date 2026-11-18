@@ -200,6 +200,7 @@ func TestDockerEventLifecycle(t *testing.T) {
 			lifecycle := fxtest.NewLifecycle(t)
 			eventService := event.NewEventService(databaseDB, cfg, nil)
 			provideDockerClientService(dockerClientServiceParams{
+				Config:        &config.Config{},
 				Ctx:           t.Context(),
 				Lifecycle:     lifecycle,
 				DB:            databaseDB,

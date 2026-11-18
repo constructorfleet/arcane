@@ -22,9 +22,25 @@ The global agent manifest is an integration candidate. It requires a built image
 containing this patch. It has been parsed with Docker's stack tooling, but has
 not been deployed on a multi-node Swarm or tested against the RBD plugin.
 
-The manager still has local-environment assumptions in bootstrap, scheduling,
-settings, authorization, and frontend selection. Socket-free control-plane mode
-is the next implementation milestone; this patch does not complete it.
+Set `ARCANE_CONTROL_PLANE=true` on the manager to run without a Docker socket.
+This mode retires the old local-agent directory entry without deleting its
+stored data, rejects local-engine resource routes, skips local Docker event and
+refresh workers, and checks database readiness independently of Docker. Agents
+remain in ordinary `ARCANE_AGENT=true` mode.
+
+Control-plane enrollment creates a visible, independent identity for every node
+without first requiring another manager agent to be connected. This removes
+cluster-parent discovery as a bootstrap dependency. Registered node agents,
+including the node hosting the manager, can all be deleted through the ordinary
+agent API. Deletion revokes their credentials; redeployment/re-enrollment is
+needed to bring removed agents back.
+
+Verified with service tests and an isolated running manager using a nonexistent
+Docker socket: readiness reports database health, no local agent appears, five
+nodes enroll with one unlimited token, and all five registrations can be deleted.
+Real-node global deployment and plugin-volume integration still need separate
+verification. Legacy manager-local behavior remains available when this option
+is not enabled, to permit a deliberate migration of existing installations.
 
 ## Initial verification
 
@@ -35,6 +51,20 @@ is the next implementation milestone; this patch does not complete it.
 - Required `just format all` and `just lint all`: attempted, blocked by missing
   Vite Plus (`vp`) and `golangci-lint` tooling. Full checks have not passed.
 - Browser, socket-free runtime, multi-node Swarm, and RBD integration: unverified.
+
+The editable feature scope and progress checklist is [FEATURES.md](FEATURES.md).
+
+## Control-plane verification (2026-11-18)
+
+- Domain tests passed for environments, enrollment, Swarm, health, middleware,
+  variables, configuration/schema, GitOps, bootstrap, and dependency wiring.
+- Go formatting and lint passed for backend, CLI, and shared types using the
+  existing `exclude_frontend` build tag for backend checks.
+- A running isolated control plane with a nonexistent Docker socket passed
+  `/api/health/ready`, listed no local agent, enrolled five independent node
+  identities with one unlimited token, and accepted deletion of all five.
+- Full workspace formatting/lint still requires the missing Vite Plus (`vp`)
+  tool. No frontend source was changed in this increment.
 
 ## Architecture decisions
 

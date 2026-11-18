@@ -78,3 +78,13 @@ func TestService_Ready(t *testing.T) {
 		assert.Equal(t, map[string]string{"shutdown": "in progress"}, result.Checks)
 	})
 }
+
+func TestServiceControlPlaneReadiness(t *testing.T) {
+	svc, db := newReadyTestService(t, make(chan struct{}))
+	svc.controlPlane = true
+	// No Docker client is available: control-plane readiness must not call it.
+	svc.docker = &docker.DockerClientService{}
+	assert.Equal(t, types.ReadinessResponse{Status: readyStatus, Checks: map[string]string{"database": checkOK}}, svc.Ready(t.Context()))
+	require.NoError(t, db.Close())
+	assert.Equal(t, notReadyStatus, svc.Ready(t.Context()).Status)
+}

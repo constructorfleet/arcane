@@ -14,6 +14,7 @@ import (
 	"kit.getarcane.app"
 
 	"getarcane.dev/arcane/v3/internal/common"
+	"getarcane.dev/arcane/v3/internal/config"
 	"getarcane.dev/arcane/v3/internal/database"
 	"getarcane.dev/arcane/v3/internal/environment"
 	"getarcane.dev/arcane/v3/internal/event"
@@ -24,6 +25,7 @@ import (
 
 type (
 	EnrollmentService struct {
+		config             *config.Config
 		environmentService *environment.EnvironmentService
 		swarmService       *swarm.SwarmService
 		eventService       *event.EventService
@@ -32,6 +34,7 @@ type (
 
 	EnrollmentServiceParams struct {
 		fx.In
+		Config *config.Config
 
 		EnvironmentService *environment.EnvironmentService
 		SwarmService       *swarm.SwarmService
@@ -63,6 +66,7 @@ var (
 
 func NewEnrollmentService(p EnrollmentServiceParams) *EnrollmentService {
 	return &EnrollmentService{
+		config:             p.Config,
 		environmentService: p.EnvironmentService,
 		swarmService:       p.SwarmService,
 		eventService:       p.EventService,
@@ -139,7 +143,7 @@ func (s *EnrollmentService) Enroll(ctx context.Context, p EnrollParams) (enrolle
 		}, nil
 	}
 
-	if p.Request.SwarmNodeID != "" && p.Request.SwarmClusterID != "" {
+	if !s.config.ControlPlane && p.Request.SwarmNodeID != "" && p.Request.SwarmClusterID != "" {
 		parent, findErr := s.swarmService.FindClusterManagerEnvironment(ctx, p.Request.SwarmClusterID)
 		if findErr != nil {
 			return nil, findErr

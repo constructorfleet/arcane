@@ -29,6 +29,7 @@ import (
 	"kit.getarcane.app/concurrency"
 
 	"getarcane.dev/arcane/v3/internal/common"
+	"getarcane.dev/arcane/v3/internal/config"
 	"getarcane.dev/arcane/v3/internal/docker"
 	"getarcane.dev/arcane/v3/internal/environment"
 	"getarcane.dev/arcane/v3/internal/kv"
@@ -49,6 +50,7 @@ import (
 
 type (
 	SwarmService struct {
+		config             *config.Config
 		dockerService      *docker.DockerClientService
 		kvService          *kv.KVService
 		environmentService *environment.EnvironmentService
@@ -69,6 +71,7 @@ type (
 
 	SwarmServiceParams struct {
 		fx.In
+		Config *config.Config
 
 		DockerService      *docker.DockerClientService
 		SettingsService    *settings.SettingsService
@@ -109,6 +112,7 @@ var (
 
 func NewSwarmService(p SwarmServiceParams) *SwarmService {
 	s := &SwarmService{
+		config:             p.Config,
 		dockerService:      p.DockerService,
 		kvService:          p.KVService,
 		environmentService: p.EnvironmentService,
@@ -154,12 +158,17 @@ func (s *SwarmService) EnrollNodeAgent(ctx context.Context, p EnrollNodeAgentPar
 }
 
 func (s *SwarmService) FindClusterManagerEnvironment(ctx context.Context, clusterID string) (mo.Option[string], error) {
-	local, err := s.GetStatus(ctx)
-	if err != nil {
-		return mo.None[string](), err
+	if clusterID == "" {
+		return mo.None[string](), nil
 	}
-	if local.ClusterID == clusterID {
-		return mo.Some(types.LocalDockerEnvironmentID), nil
+	if !s.config.ControlPlane {
+		local, err := s.GetStatus(ctx)
+		if err != nil {
+			return mo.None[string](), err
+		}
+		if local.ClusterID == clusterID {
+			return mo.Some(types.LocalDockerEnvironmentID), nil
+		}
 	}
 
 	remotes, err := s.environmentService.ListActiveRemoteEnvironments(ctx)
@@ -181,7 +190,9 @@ func (s *SwarmService) FindClusterManagerEnvironment(ctx context.Context, cluste
 			probeErr := s.environmentService.ProxyJSONRequest(probeCtx, env.ID, http.MethodGet, "/api/agents/0/swarm/status", nil, &remote)
 			statusErr, rejected := errors.AsType[*agent.StatusError](probeErr)
 			probeErrs[index] = kit.Ternary(rejected && statusErr.StatusCode < http.StatusInternalServerError, nil, probeErr)
-			clusterIDs[index] = remote.Data.ClusterID
+			if probeErr == nil && remote.Success && remote.Data.Enabled {
+				clusterIDs[index] = remote.Data.ClusterID
+			}
 			return nil
 		})
 	}
@@ -189,8 +200,7 @@ func (s *SwarmService) FindClusterManagerEnvironment(ctx context.Context, cluste
 		return mo.None[string](), waitErr
 	}
 	if index := slices.Index(clusterIDs, clusterID); index >= 0 {
-		parentID := kit.FromPtr(remotes[index].ParentEnvironmentID)
-		return mo.Some(kit.Ternary(parentID == types.LocalDockerEnvironmentID || s.tunnels.Active(parentID).IsPresent(), parentID, remotes[index].ID)), nil
+		return mo.Some(remotes[index].ID), nil
 	}
 	if probeErr := errors.Join(probeErrs...); probeErr != nil {
 		slog.WarnContext(ctx, "Could not reach every environment while matching a swarm cluster", "clusterId", clusterID, "error", probeErr)

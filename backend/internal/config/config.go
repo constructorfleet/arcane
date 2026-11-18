@@ -83,6 +83,7 @@ type (
 		LogJson                 bool          `env:"ARCANE_LOG_JSON" default:"false"`
 		UIConfigurationDisabled bool          `env:"ARCANE_UI_CONFIGURATION_DISABLED" default:"false"`
 
+		ControlPlane         bool `env:"ARCANE_CONTROL_PLANE" default:"false"`
 		AgentEnabled         bool `env:"ARCANE_AGENT" default:"false"`
 		UpgradeKeepContainer bool `env:"ARCANE_UPGRADE_KEEP_CONTAINER" default:"false"`
 	}
@@ -308,6 +309,9 @@ func (c *Config) ListenAddr() string {
 }
 
 func (c *Config) Validate() error {
+	if c.ControlPlane && c.AgentEnabled {
+		return errors.New("ARCANE_CONTROL_PLANE and ARCANE_AGENT cannot both be enabled")
+	}
 	if DirectAgentRequested(os.Getenv) && !c.AgentEnabled {
 		return ErrDirectAgentRemoved
 	}

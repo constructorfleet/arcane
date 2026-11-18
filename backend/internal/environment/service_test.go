@@ -2142,3 +2142,23 @@ func (*environmentTestVariableSyncer) SyncEnvironment(context.Context, string) e
 }
 
 func (*environmentTestVariableSyncer) ForgetSyncState(string) {}
+
+func TestEnsureLocalEnvironmentControlPlane(t *testing.T) {
+	db := setupEnvironmentServiceTestDB(t)
+	svc := NewEnvironmentService(EnvironmentServiceParams{DB: db, Config: &config.Config{ControlPlane: true}, Ctx: t.Context()})
+	require.NoError(t, svc.EnsureLocalEnvironment(t.Context(), "http://control-plane"))
+	var count int64
+	require.NoError(t, db.Model(&Environment{}).Count(&count).Error)
+	assert.Zero(t, count, "a fresh control plane must not register itself as an agent")
+	createTestEnvironment(t, db, LocalEnvironmentID, "http://old-manager", nil)
+	createTestEnvironment(t, db, "node-agent", "agent://node", new("node-token"))
+	require.NoError(t, svc.EnsureLocalEnvironment(t.Context(), "http://control-plane"))
+	var local Environment
+	require.NoError(t, db.First(&local, "id = ?", LocalEnvironmentID).Error)
+	assert.True(t, local.Hidden)
+	assert.False(t, local.Enabled)
+	var node Environment
+	require.NoError(t, db.First(&node, "id = ?", "node-agent").Error)
+	assert.False(t, node.Hidden)
+	assert.True(t, node.Enabled)
+}

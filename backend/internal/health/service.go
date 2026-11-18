@@ -7,6 +7,7 @@ import (
 
 	"github.com/moby/moby/client"
 
+	"getarcane.dev/arcane/v3/internal/config"
 	"getarcane.dev/arcane/v3/internal/database"
 	"getarcane.dev/arcane/v3/internal/docker"
 	"getarcane.dev/arcane/v3/pkg/francis"
@@ -15,9 +16,10 @@ import (
 
 type (
 	Service struct {
-		db       *database.DB
-		docker   *docker.DockerClientService
-		shutdown <-chan struct{}
+		db           *database.DB
+		docker       *docker.DockerClientService
+		shutdown     <-chan struct{}
+		controlPlane bool
 	}
 )
 
@@ -28,11 +30,12 @@ const (
 	checkTimeout   = 2 * time.Second
 )
 
-func NewService(db *database.DB, dockerService *docker.DockerClientService, actors *francis.Runtime) *Service {
+func NewService(db *database.DB, dockerService *docker.DockerClientService, actors *francis.Runtime, cfg *config.Config) *Service {
 	return &Service{
-		db:       db,
-		docker:   dockerService,
-		shutdown: actors.Done(),
+		db:           db,
+		docker:       dockerService,
+		shutdown:     actors.Done(),
+		controlPlane: cfg.ControlPlane,
 	}
 }
 
@@ -59,7 +62,9 @@ func (s *Service) Ready(ctx context.Context) types.ReadinessResponse {
 			}
 			return checkOK
 		}(),
-		"docker": func() string {
+	}
+	if !s.controlPlane {
+		checks["docker"] = func() string {
 			pingCtx, cancel := context.WithTimeout(ctx, checkTimeout)
 			defer cancel()
 			dockerClient, err := s.docker.GetClient(pingCtx)
@@ -70,7 +75,7 @@ func (s *Service) Ready(ctx context.Context) types.ReadinessResponse {
 				return pingErr.Error()
 			}
 			return checkOK
-		}(),
+		}()
 	}
 	for _, result := range checks {
 		if result != checkOK {

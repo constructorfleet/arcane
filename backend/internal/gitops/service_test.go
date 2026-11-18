@@ -2161,6 +2161,7 @@ func setupGitOpsDeleteSwarmStackTest(t *testing.T, gate *runs.Admission) (*GitOp
 	settingsService, err := newGitOpsSettingsServiceForTest(t, t.Context(), db)
 	require.NoError(t, err)
 	svc.swarmService = swarm.NewSwarmService(swarm.SwarmServiceParams{
+		Config:          &config.Config{},
 		DockerService:   dockerInternal.NewDockerClientService(t.Context(), db, settingsService, bus.Config{}).WithClient(cli),
 		SettingsService: settingsService,
 	})

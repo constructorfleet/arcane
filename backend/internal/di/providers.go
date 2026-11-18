@@ -82,6 +82,7 @@ type (
 		Ctx           context.Context
 		Lifecycle     fx.Lifecycle
 		DB            *database.DB
+		Config        *config.Config
 		LocalSettings *settings.SettingsService
 		EventService  *event.EventService
 	}
@@ -198,6 +199,9 @@ func provideDockerClientService(p dockerClientServiceParams) *docker.DockerClien
 	var unsubscribe func()
 	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(startCtx context.Context) error {
+			if p.Config.ControlPlane {
+				return nil
+			}
 			run, cleanup := p.EventService.SubscribeDockerEvents(service.EventBus())
 			unsubscribe = cleanup
 			stopLog = concurrency.Supervise(p.Ctx, concurrency.SuperviseConfig{

@@ -283,6 +283,9 @@ func applicationOptions(
 				}})
 			},
 			func(lc fx.Lifecycle, dockerService *docker.DockerClientService, swarmService *swarm.SwarmService, _ *http.Server) {
+				if cfg.ControlPlane {
+					return
+				}
 				lc.Append(fx.Hook{OnStart: func(context.Context) error {
 					go func() {
 						dockerCtx, cancelDocker := context.WithTimeout(appCtx, startupTaskTimeout)
@@ -317,6 +320,9 @@ func applicationOptions(
 				}})
 			},
 			func(lc fx.Lifecycle, projectService *project.ProjectService, _ *http.Server) {
+				if cfg.ControlPlane {
+					return
+				}
 				var stop func(context.Context) error
 				lc.Append(fx.Hook{
 					OnStart: func(context.Context) error {
@@ -358,9 +364,11 @@ func initializeStartupState(p initializeStartupStateParams) error {
 		p.Event.PublishChange(environmentID, "activity")
 	})
 
-	helperCtx, cancelHelpers := context.WithTimeout(p.AppCtx, startupTaskTimeout)
-	startup.CleanupOrphanedVolumeHelpers(helperCtx, p.Volume.CleanupOrphanedVolumeHelpers)
-	cancelHelpers()
+	if !p.Config.ControlPlane {
+		helperCtx, cancelHelpers := context.WithTimeout(p.AppCtx, startupTaskTimeout)
+		startup.CleanupOrphanedVolumeHelpers(helperCtx, p.Volume.CleanupOrphanedVolumeHelpers)
+		cancelHelpers()
+	}
 
 	for _, task := range []struct {
 		run  func(context.Context) error

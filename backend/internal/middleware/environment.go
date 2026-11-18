@@ -35,9 +35,10 @@ type (
 		registry      *agent.TunnelRegistry
 		matcher       *authz.PermissionMatcher
 		// checkOrigin is the local WebSocket Origin validator, so proxied upgrades cannot ride a cross-origin session.
-		checkOrigin func(*http.Request) bool
-		localID     string
-		paramName   string
+		checkOrigin  func(*http.Request) bool
+		localID      string
+		paramName    string
+		controlPlane bool
 	}
 
 	proxyRoute struct {
@@ -56,6 +57,7 @@ type (
 		CheckOrigin   func(*http.Request) bool
 		LocalID       string
 		ParamName     string
+		ControlPlane  bool
 	}
 )
 
@@ -75,6 +77,7 @@ var managementEndpointSet = map[string]struct{}{
 
 func NewEnvironmentProxyMiddleware(cfg EnvironmentProxyConfig) echo.MiddlewareFunc {
 	m := &EnvironmentMiddleware{
+		controlPlane:  cfg.ControlPlane,
 		localID:       cfg.LocalID,
 		paramName:     cfg.ParamName,
 		resolver:      cfg.Resolver,
@@ -100,6 +103,13 @@ func (m *EnvironmentMiddleware) Handle(c *echo.Context, next echo.HandlerFunc) e
 	_, rest, hasMarker := strings.Cut(req.URL.Path, environmentsPathMarker)
 	pathEnvID, _, _ := strings.Cut(rest, "/")
 	envID := cmp.Or(c.Param(m.paramName), pathEnvID)
+	if m.controlPlane && hasMarker && envID == m.localID {
+		suffix := strings.TrimPrefix(req.URL.Path, apiEnvironmentsPrefix+envID)
+		if suffix == "/settings" || strings.HasPrefix(suffix, "/settings/") {
+			return next(c)
+		}
+		return writeProxyError(c, http.StatusNotFound, "the control plane has no local Docker agent")
+	}
 	if !hasMarker || envID == "" || envID == m.localID {
 		return next(c)
 	}

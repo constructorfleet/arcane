@@ -255,6 +255,9 @@ func newRouter(p RouterParams) *echo.Echo {
 		p.HandlerDeps.Environment.Service().IsKnownAccessToken,
 	))
 	envResolver := func(ctx context.Context, id string) (*string, bool, error) {
+		if id == types.LocalDockerEnvironmentID && p.Config.ControlPlane {
+			return nil, false, environment.ErrEnvironmentNotFound
+		}
 		env, err := p.HandlerDeps.Environment.Service().GetEnvironmentByIDCached(ctx, id)
 		if err != nil {
 			return nil, false, err
@@ -265,6 +268,7 @@ func newRouter(p RouterParams) *echo.Echo {
 	permissionMatcher := authz.NewPermissionMatcher()
 
 	envProxyMiddleware := middleware.NewEnvironmentProxyMiddleware(middleware.EnvironmentProxyConfig{
+		ControlPlane:  p.Config.ControlPlane,
 		LocalID:       types.LocalDockerEnvironmentID,
 		ParamName:     "id",
 		Resolver:      envResolver,
