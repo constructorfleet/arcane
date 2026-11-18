@@ -682,7 +682,14 @@ func enrichVolumesWithUsageData(dockerVolumes, usageVolumes []volume.Volume) []v
 	}
 
 	result := make([]volume.Volume, 0, len(dockerVolumes))
+	seen := make(map[string]struct{}, len(dockerVolumes))
 	for _, v := range dockerVolumes {
+		// Plugins can repeat a volume in List. Docker addresses volumes by name
+		// within one daemon, so repeated names must not become duplicate table IDs.
+		if _, exists := seen[v.Name]; exists {
+			continue
+		}
+		seen[v.Name] = struct{}{}
 		if usageData, exists := usageByName[v.Name]; exists {
 			v.UsageData = usageData
 		}

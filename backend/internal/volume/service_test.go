@@ -63,8 +63,9 @@ func TestEnrichVolumesWithUsageData(t *testing.T) {
 			},
 		},
 		{
-			name: "keeps first usage entry when duplicate usage names exist",
+			name: "keeps one volume and first usage entry for repeated names",
 			volumes: []volume.Volume{
+				{Name: "vol-dup"},
 				{Name: "vol-dup"},
 			},
 			usageVolumes: []volume.Volume{
