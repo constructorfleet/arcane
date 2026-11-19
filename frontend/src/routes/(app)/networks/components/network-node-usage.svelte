@@ -1,58 +1,22 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { createQuery } from '@tanstack/svelte-query';
+	import type { CreateQueryResult } from '@tanstack/svelte-query';
 
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import { AlertIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
-	import { queryKeys } from '#lib/query/query-keys.js';
-	import { networkService } from '#lib/services/network-service.js';
-	import { environmentStore } from '#lib/stores/environment.store.svelte.js';
+	import type { NetworkInspect } from '#lib/types/network.js';
 	import { extractApiErrorMessage } from '#lib/utils/api.js';
-	import { hasPermission } from '#lib/utils/auth.js';
-	import { collectAcrossEnvironments } from '#lib/utils/environments.js';
+	import type { collectAcrossEnvironments } from '#lib/utils/environments.js';
 
-	let { networkId, clusterId, agentIds }: { networkId: string; clusterId: string; agentIds: string[] } = $props();
-	const requested = $derived([...new Set(agentIds)]);
-	const agents = $derived(
-		environmentStore.available.filter((agent) => requested.includes(agent.id) && hasPermission('networks:read', agent.id))
-	);
-	const excluded = $derived(requested.filter((id) => !agents.some((agent) => agent.id === id)));
-	const observations = createQuery(() => {
-		const expectedNetworkId = networkId;
-		const expectedClusterId = clusterId;
-		const targets = agents.map(({ id, name }) => ({ id, name }));
-		return {
-			queryKey: [
-				...queryKeys.networks.detail(targets.map((agent) => agent.id).join(','), expectedNetworkId),
-				'observations',
-				expectedClusterId
-			],
-			queryFn: async ({ signal }) => {
-				await environmentStore.ready;
-				return collectAcrossEnvironments(targets, async (agentId, config) => {
-					const network = await networkService.getNetworkForEnvironment(agentId, expectedNetworkId, undefined, {
-						...config,
-						signal,
-						timeout: 15_000
-					});
-					if (
-						network.id !== expectedNetworkId ||
-						network.clusterId !== expectedClusterId ||
-						!network.nodeId ||
-						network.scope !== 'swarm' ||
-						network.driver !== 'overlay'
-					) {
-						throw new Error(m.network_identity_unavailable());
-					}
-					return network;
-				});
-			},
-			retry: false
-		};
-	});
+	type NetworkObservations = Awaited<ReturnType<typeof collectAcrossEnvironments<NetworkInspect>>>;
+	let {
+		clusterId,
+		excluded,
+		observations
+	}: { clusterId: string; excluded: string[]; observations: CreateQueryResult<NetworkObservations> } = $props();
 </script>
 
 <section class="space-y-3" aria-label={m.nodes()}>

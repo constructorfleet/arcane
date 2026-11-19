@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { createQuery } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
 
 	import type { ActionButton } from '#lib/components/action-button-group/types.js';
@@ -26,11 +27,14 @@
 	} from '#lib/icons/index.js';
 	import { ResourceDetailLayout } from '#lib/layouts/index.js';
 	import { m } from '#lib/paraglide/messages.js';
+	import { queryKeys } from '#lib/query/query-keys.js';
 	import { networkService } from '#lib/services/network-service.js';
 	import { environmentStore } from '#lib/stores/environment.store.svelte.js';
 	import type { NetworkInspect, NetworkIPAMConfig } from '#lib/types/network.js';
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
+	import { hasPermission } from '#lib/utils/auth.js';
+	import { collectAcrossEnvironments } from '#lib/utils/environments.js';
 	import { formatDateTimeShort } from '#lib/utils/formatting.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
@@ -53,6 +57,58 @@
 	const inUse = $derived(connectedContainers.length > 0);
 	const observationAgents = $derived((page.url.searchParams.get('agents') ?? '').split(',').filter(Boolean));
 	const observationCluster = $derived(page.url.searchParams.get('cluster') ?? '');
+	const requested = $derived([...new Set(observationAgents)]);
+	const agents = $derived(
+		environmentStore.available.filter((agent) => requested.includes(agent.id) && hasPermission('networks:read', agent.id))
+	);
+	const excluded = $derived(requested.filter((id) => !agents.some((agent) => agent.id === id)));
+	const hasObservations = $derived(requested.length > 0 && observationCluster !== '');
+	const observations = createQuery(() => {
+		const expectedNetworkId = network?.id ?? '';
+		const expectedClusterId = observationCluster;
+		const targets = agents.map(({ id, name }) => ({ id, name }));
+		return {
+			queryKey: [
+				...queryKeys.networks.detail(targets.map((agent) => agent.id).join(','), expectedNetworkId),
+				'observations',
+				expectedClusterId
+			],
+			enabled: hasObservations && agents.length > 0,
+			queryFn: async ({ signal }) => {
+				await environmentStore.ready;
+				return collectAcrossEnvironments(targets, async (agentId, config) => {
+					const observedNetwork = await networkService.getNetworkForEnvironment(agentId, expectedNetworkId, undefined, {
+						...config,
+						signal,
+						timeout: 15_000
+					});
+					if (
+						observedNetwork.id !== expectedNetworkId ||
+						observedNetwork.clusterId !== expectedClusterId ||
+						!observedNetwork.nodeId ||
+						observedNetwork.scope !== 'swarm' ||
+						observedNetwork.driver !== 'overlay'
+					) {
+						throw new Error(m.network_identity_unavailable());
+					}
+					return observedNetwork;
+				});
+			},
+			retry: false
+		};
+	});
+	const observedInUse = $derived(observations.data?.values.some(({ value }) => value.containersList.length > 0) ?? false);
+	const observationsIncomplete = $derived(
+		hasObservations &&
+			(excluded.length > 0 ||
+				observations.isPending ||
+				observations.isFetching ||
+				!!observations.error ||
+				!observations.data ||
+				observations.data.failures.length > 0)
+	);
+	const removalBlocked = $derived(inUse || observedInUse || observationsIncomplete);
+
 	const swarmScoped = $derived(network?.scope === 'swarm');
 	const isPredefined = $derived(network?.name === 'bridge' || network?.name === 'host' || network?.name === 'none');
 
@@ -62,12 +118,20 @@
 		sortDir = newSortDir;
 
 		if (data.network?.id) {
+			const target = { networkId: data.network.id, environmentId: data.envId, column: sortCol, direction: sortDir };
 			const operationResult = await tryCatch(
 				(async () =>
-					networkService.getNetworkForEnvironment(data.envId, data.network.id, {
-						sort: { column: sortCol, direction: sortDir }
+					networkService.getNetworkForEnvironment(target.environmentId, target.networkId, {
+						sort: { column: target.column, direction: target.direction }
 					}))()
 			);
+			if (
+				data.envId !== target.environmentId ||
+				data.network.id !== target.networkId ||
+				sortCol !== target.column ||
+				sortDir !== target.direction
+			)
+				return;
 			if (operationResult.error !== null) {
 				const err = operationResult.error;
 
@@ -80,8 +144,12 @@
 	}
 
 	function triggerRemove() {
-		if (inUse) {
+		if (inUse || observedInUse) {
 			toast.error(m.network_has_observed_consumers());
+			return;
+		}
+		if (observationsIncomplete) {
+			toast.error(m.network_observations_not_ready());
 			return;
 		}
 		if (isPredefined) {
@@ -142,7 +210,7 @@
 			placement: 'secondary',
 			label: m.common_remove(),
 			loading: isRemoving,
-			disabled: isRemoving || isPredefined || inUse,
+			disabled: isRemoving || isPredefined || removalBlocked,
 			onclick: triggerRemove
 		}
 	]);
@@ -347,6 +415,7 @@
 			<Badge variant={inUse ? 'green' : 'amber'} minWidth="20"
 				>{inUse ? m.network_in_use_on_node() : m.network_no_local_containers()}</Badge
 			>
+			{#if !inUse && observedInUse}<Badge variant="green" minWidth="20">{m.network_used_on_observed_nodes()}</Badge>{/if}
 		{:else if inUse}
 			<Badge variant="green" minWidth="20">{m.networks_in_use_count({ count: connectedContainers.length })}</Badge>
 		{:else}
@@ -369,7 +438,7 @@
 	{#if network}
 		<div class="space-y-6">
 			{#if observationAgents.length > 0 && observationCluster}
-				<NetworkNodeUsage networkId={network.id} clusterId={observationCluster} agentIds={observationAgents} />
+				<NetworkNodeUsage clusterId={observationCluster} {excluded} {observations} />
 			{/if}
 			{#if swarmScoped}
 				<Alert.Root variant="warning-subtle" size="sm" icon={AlertIcon}>
