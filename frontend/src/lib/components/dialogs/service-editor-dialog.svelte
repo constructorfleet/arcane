@@ -292,7 +292,18 @@
 			return;
 		}
 
+		let replicas = 0;
+		if (form.mode === 'replicated') {
+			replicas = Number(form.replicas.value);
+			if (!form.replicas.value.trim() || !Number.isSafeInteger(replicas) || replicas < 0) {
+				form.replicas.error = m.whole_number_range({ min: 0, max: Number.MAX_SAFE_INTEGER });
+				return;
+			}
+			form.replicas.error = '';
+		}
+
 		const spec: Record<string, unknown> = $state.snapshot(form.baseSpec);
+		const initial = createFormState(spec as SwarmServiceSpecRaw);
 		spec['Name'] = form.name.value.trim();
 
 		const taskTemplate = ensureRecord(spec, 'TaskTemplate');
@@ -300,50 +311,65 @@
 		containerSpec['Image'] = form.image.value.trim();
 
 		const baseMode = asRecord(spec['Mode']);
-		if (form.mode === 'replicated') {
-			spec['Mode'] = { Replicated: { Replicas: Math.max(0, parseInt(form.replicas.value, 10) || 1) } };
-		} else if (form.mode === 'global') {
-			spec['Mode'] = { Global: {} };
-		} else if (form.mode === 'replicated-job') {
-			spec['Mode'] = { ReplicatedJob: structuredClone(asRecord(baseMode?.['ReplicatedJob']) ?? {}) };
-		} else {
-			spec['Mode'] = { GlobalJob: structuredClone(asRecord(baseMode?.['GlobalJob']) ?? {}) };
+		if (
+			!baseMode ||
+			Object.keys(baseMode).length === 0 ||
+			form.mode !== initial.mode ||
+			form.replicas.value !== initial.replicas.value
+		) {
+			if (form.mode === 'replicated') {
+				spec['Mode'] = { Replicated: { Replicas: replicas } };
+			} else if (form.mode === 'global') {
+				spec['Mode'] = { Global: {} };
+			} else if (form.mode === 'replicated-job') {
+				spec['Mode'] = { ReplicatedJob: structuredClone(asRecord(baseMode?.['ReplicatedJob']) ?? {}) };
+			} else {
+				spec['Mode'] = { GlobalJob: structuredClone(asRecord(baseMode?.['GlobalJob']) ?? {}) };
+			}
 		}
 
-		const commandParts = form.command.value.trim().split(' ').filter(Boolean);
-		if (commandParts.length > 0) {
-			containerSpec['Command'] = commandParts;
-		} else {
-			delete containerSpec['Command'];
+		if (form.command.value !== initial.command.value) {
+			const commandParts = form.command.value.trim().split(' ').filter(Boolean);
+			if (commandParts.length > 0) {
+				containerSpec['Command'] = commandParts;
+			} else {
+				delete containerSpec['Command'];
+			}
 		}
 
-		const argParts = form.args.value.trim().split(' ').filter(Boolean);
-		if (argParts.length > 0) {
-			containerSpec['Args'] = argParts;
-		} else {
-			delete containerSpec['Args'];
+		if (form.args.value !== initial.args.value) {
+			const argParts = form.args.value.trim().split(' ').filter(Boolean);
+			if (argParts.length > 0) {
+				containerSpec['Args'] = argParts;
+			} else {
+				delete containerSpec['Args'];
+			}
 		}
 
-		assignOptional(containerSpec, 'Dir', form.workingDir.value);
-		assignOptional(containerSpec, 'User', form.user.value);
-		assignOptional(containerSpec, 'Hostname', form.hostname.value);
+		if (form.workingDir.value !== initial.workingDir.value) assignOptional(containerSpec, 'Dir', form.workingDir.value);
+		if (form.user.value !== initial.user.value) assignOptional(containerSpec, 'User', form.user.value);
+		if (form.hostname.value !== initial.hostname.value) assignOptional(containerSpec, 'Hostname', form.hostname.value);
 
-		const filteredEnvVars = form.envVars.filter((entry) => entry.key.trim());
-		if (filteredEnvVars.length > 0) {
-			containerSpec['Env'] = filteredEnvVars.map((entry) => `${entry.key}=${entry.value}`);
-		} else {
-			delete containerSpec['Env'];
+		if (JSON.stringify(form.envVars) !== JSON.stringify(initial.envVars)) {
+			const filteredEnvVars = form.envVars.filter((entry) => entry.key.trim());
+			if (filteredEnvVars.length > 0) {
+				containerSpec['Env'] = filteredEnvVars.map((entry) => `${entry.key}=${entry.value}`);
+			} else {
+				delete containerSpec['Env'];
+			}
 		}
 
-		const filteredMounts = form.mounts.filter((mount) => mount.source.trim() && mount.target.trim());
-		if (filteredMounts.length > 0) {
-			containerSpec['Mounts'] = filteredMounts.map((mount) => ({
-				Type: mount.type,
-				Source: mount.source,
-				Target: mount.target
-			}));
-		} else {
-			delete containerSpec['Mounts'];
+		if (JSON.stringify(form.mounts) !== JSON.stringify(initial.mounts)) {
+			const filteredMounts = form.mounts.filter((mount) => mount.source.trim() && mount.target.trim());
+			if (filteredMounts.length > 0) {
+				containerSpec['Mounts'] = filteredMounts.map((mount) => ({
+					Type: mount.type,
+					Source: mount.source,
+					Target: mount.target
+				}));
+			} else {
+				delete containerSpec['Mounts'];
+			}
 		}
 
 		const filteredLabels = form.labels.filter((label) => label.key.trim());
@@ -357,18 +383,20 @@
 			delete spec['Labels'];
 		}
 
-		const filteredPorts = form.ports.filter((port) => port.target.trim());
-		if (filteredPorts.length > 0) {
-			const endpointSpec = ensureRecord(spec, 'EndpointSpec');
-			endpointSpec['Ports'] = filteredPorts.map((port) => ({
-				TargetPort: parseInt(port.target, 10),
-				PublishedPort: port.published ? parseInt(port.published, 10) : undefined,
-				Protocol: port.protocol
-			}));
-		} else {
-			const endpointSpec = asRecord(spec['EndpointSpec']);
-			if (endpointSpec) {
-				delete endpointSpec['Ports'];
+		if (JSON.stringify(form.ports) !== JSON.stringify(initial.ports)) {
+			const filteredPorts = form.ports.filter((port) => port.target.trim());
+			if (filteredPorts.length > 0) {
+				const endpointSpec = ensureRecord(spec, 'EndpointSpec');
+				endpointSpec['Ports'] = filteredPorts.map((port) => ({
+					TargetPort: parseInt(port.target, 10),
+					PublishedPort: port.published ? parseInt(port.published, 10) : undefined,
+					Protocol: port.protocol
+				}));
+			} else {
+				const endpointSpec = asRecord(spec['EndpointSpec']);
+				if (endpointSpec) {
+					delete endpointSpec['Ports'];
+				}
 			}
 		}
 
