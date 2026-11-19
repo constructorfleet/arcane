@@ -87,7 +87,10 @@ acceptance across remote and manager-host agents remains open. A cf.31 owned
 local-file edit saved and reloaded its bytes but changed UID/GID from 501:10 to
 0:0 (#86); the original bytes, owner and mode were restored. cf.33 packages an
 ownership-preserving ACFS companion and rejects unsafe legacy updates. Live
-acceptance of that fix and upload/lifecycle coverage remain pending. The pagination/sorting crash reported on 2026-11-18 was caused by duplicate
+cf.33 Save retained 501:10/0644 and the exact persisted 102 bytes on the owned
+local fixture; native guards restored its original 60 bytes after browser
+interruption. Cold UI reload, upload/lifecycle and broader RBD coverage remain
+unaccepted. The pagination/sorting crash reported on 2026-11-18 was caused by duplicate
 same-node volume names (`each_key_duplicate`). Release `3.0.1-cf.3` deduplicates
 per daemon before pagination/counting. Its SwarmCD rollout and five-agent/manager
 health were verified. Browser verification passed saved-preference
@@ -298,3 +301,9 @@ operator-facing documentation, including
 Changes to scope should be reflected here before the documentation agent presents
 them as committed behavior. Checking off a feature should cite its implementation
 and relevant verification in the change that completes it.
+
+Stack source-persistence follow-up (#88 / CMP-07): an isolated storage failure
+previously allowed fake Docker network/service creation and a success response
+without saved source. cf.34 returns the persistence error before deployment.
+The negative case and related stack-source/Swarm business coverage pass; normal
+release rollout acceptance and broader source/GitOps behavior remain separate.

@@ -1,8 +1,7 @@
-# 3.0.1-cf.33
+# 3.0.1-cf.34
 
-- Preserve an existing volume file's UID/GID and mode when publishing an atomic workspace edit; refuse publication if ownership or mode cannot be restored (#86, VOL-05/VOL-07).
-- Package the corrected Constructorfleet ACFS companion in both release images. Selected agents copy it into each helper's private filesystem; existing helper utilities, mount scope and execution identity remain intact.
-- Require an advertised ownership-preservation capability before updating existing files. Legacy helper reads remain available when a companion is absent; unsafe updates fail before staging or backup mutation.
-- Validate the dependency's Linux suite, ownership behavior, helper installation and existing volume coverage before publication. Runtime acceptance remains pending the normal SwarmCD rollout and owned local-volume UI save.
+- Stop stack deployment when its Compose, environment or supporting source files cannot be persisted (#88, CMP-07). Return the storage error before any Docker deployment request instead of reporting a managed stack without saved source.
+- Extend existing stack-source business coverage with an owned temporary storage failure and fake Docker endpoint. Before the fix, network/service creation and a success response continued; after the fix, the source error is returned with no Docker requests.
+- Related stack-source and native Swarm library coverage passes. Full checks and runtime release acceptance are recorded in the fixing PR and issue.
 
-No production or RBD file is used as a test fixture. Independent RBD lifecycle and scoped-login QA remain open.
+The failure case uses local temporary files and an in-process fake Docker endpoint. No production source directory, stack or service is changed to induce a failure. Broader Compose/GitOps design remains tracked separately.

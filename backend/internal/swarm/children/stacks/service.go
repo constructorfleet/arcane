@@ -239,7 +239,7 @@ func (s *Service) DeployStack(ctx context.Context, environmentID string, req typ
 		}
 	}
 	if upsertStackSourceErr := s.upsertStackSource(ctx, environmentID, stackName, req.ComposeContent, overrideContent, envContent, req.Files); upsertStackSourceErr != nil {
-		slog.WarnContext(ctx, "failed to persist swarm stack source", "environmentId", cmp.Or(strings.TrimSpace(environmentID), "0"), "stackName", stackName, "error", upsertStackSourceErr)
+		return nil, fmt.Errorf("failed to persist swarm stack source: %w", upsertStackSourceErr)
 	}
 
 	workingDir := req.WorkingDir

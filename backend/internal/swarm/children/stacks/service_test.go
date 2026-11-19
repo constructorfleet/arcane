@@ -6,9 +6,11 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/containerd/errdefs"
@@ -157,6 +159,59 @@ func TestService_UpdateAndGetStackSource_UsesStoredFilesWithoutSwarmManager(t *t
 	require.NoError(t, err)
 	require.Len(t, source.Files, 1)
 	require.Equal(t, []byte("worker_processes auto;"), source.Files[0].Content)
+	t.Run("source persistence failure stops Docker deployment", func(t *testing.T) {
+		failureCtx := t.Context()
+		blocked := filepath.Join(t.TempDir(), "not-a-directory")
+		require.NoError(t, os.WriteFile(blocked, []byte("owned source-storage failure fixture"), 0o600))
+		t.Setenv("ARCANE_SWARM_STACK_SOURCES_DIRECTORY", blocked)
+		failureDB := setupSwarmServiceTestDB(t)
+		failureSettings, setupErr := newSettingsServiceForSwarmTest(t, failureCtx, failureDB)
+		require.NoError(t, setupErr)
+		var requests []string
+		var requestsMu sync.Mutex
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requestsMu.Lock()
+			requests = append(requests, r.Method+" "+r.URL.Path)
+			requestsMu.Unlock()
+			w.Header().Set("Content-Type", "application/json")
+			resource := strings.TrimPrefix(r.URL.Path, "/v1.41")
+			switch {
+			case r.Method == http.MethodGet && ((strings.HasPrefix(resource, "/networks/") && resource != "/networks") || (strings.HasPrefix(resource, "/containers/") && resource != "/containers/json")):
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write([]byte(`{"message":"owned fake resource not found"}`))
+			case r.Method == http.MethodGet:
+				_, _ = w.Write([]byte(`[]`))
+			case r.Method == http.MethodPost && resource == "/networks/create":
+				_, _ = w.Write([]byte(`{"Id":"owned-fake-network","Warning":""}`))
+			case r.Method == http.MethodPost && resource == "/services/create":
+				_, _ = w.Write([]byte(`{"ID":"owned-fake-service","Warnings":[]}`))
+			default:
+				http.Error(w, "unexpected fake Docker request", http.StatusInternalServerError)
+			}
+		}))
+		t.Cleanup(server.Close)
+		dockerClient, setupErr := client.New(client.WithHost(server.URL), client.WithAPIVersion("1.41"), client.WithHTTPClient(server.Client()))
+		require.NoError(t, setupErr)
+		t.Cleanup(func() { _ = dockerClient.Close() })
+		service := NewService(ServiceParams{
+			DockerService:   dockerInternal.NewDockerClientService(failureCtx, failureDB, failureSettings, bus.Config{}).WithClient(dockerClient),
+			EnsureManager:   func(context.Context) error { return nil },
+			SettingsService: failureSettings,
+		})
+		response, deployErr := service.DeployStack(failureCtx, "0", types.SwarmStackDeployRequest{
+			Name:           "owned-storage-failure",
+			ComposeContent: "services:\n  web:\n    image: nginx:alpine\n    deploy:\n      replicas: 0\n",
+			WorkingDir:     t.TempDir(),
+			ResolveImage:   "never",
+		})
+		requestsMu.Lock()
+		t.Logf("source-storage failure response=%+v error=%v fake-Docker requests=%v", response, deployErr, requests)
+		observed := slices.Clone(requests)
+		requestsMu.Unlock()
+		require.ErrorContains(t, deployErr, "failed to create swarm stack source root")
+		require.Nil(t, response)
+		require.Empty(t, observed, "source persistence failure must stop before Docker calls")
+	})
 }
 
 func TestService_UpdateAndGetStackSource_RoundTripsOverride(t *testing.T) {
