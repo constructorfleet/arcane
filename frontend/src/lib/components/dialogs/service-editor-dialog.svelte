@@ -34,8 +34,8 @@
 		onSubmit: (payload: ServiceEditorPayload) => void;
 	};
 
-	type TextFieldState = {
-		value: string;
+	type TextFieldState<T = string> = {
+		value: T;
 		error: string;
 	};
 
@@ -110,7 +110,7 @@
 		name: TextFieldState;
 		image: TextFieldState;
 		mode: ServiceEditorMode;
-		replicas: TextFieldState;
+		replicas: TextFieldState<number | null | undefined>;
 		command: TextFieldState;
 		args: TextFieldState;
 		workingDir: TextFieldState;
@@ -151,7 +151,7 @@
 			name: createTextField(),
 			image: createTextField(),
 			mode: 'replicated',
-			replicas: createTextField('1'),
+			replicas: { value: 1, error: '' },
 			command: createTextField(),
 			args: createTextField(),
 			workingDir: createTextField(),
@@ -205,7 +205,7 @@
 			name: createTextField(spec.Name),
 			image: createTextField(containerSpec.Image),
 			mode,
-			replicas: createTextField(String(serviceMode.Replicated?.Replicas ?? 1)),
+			replicas: { value: serviceMode.Replicated?.Replicas ?? 1, error: '' },
 			command: createTextField(containerSpec.Command?.join(' ')),
 			args: createTextField(containerSpec.Args?.join(' ')),
 			workingDir: createTextField(containerSpec.Dir),
@@ -292,10 +292,9 @@
 			return;
 		}
 
-		let replicas = 0;
+		const replicas = form.replicas.value;
 		if (form.mode === 'replicated') {
-			replicas = Number(form.replicas.value);
-			if (!form.replicas.value.trim() || !Number.isSafeInteger(replicas) || replicas < 0) {
+			if (replicas === undefined || replicas === null || !Number.isSafeInteger(replicas) || replicas < 0) {
 				form.replicas.error = m.whole_number_range({ min: 0, max: Number.MAX_SAFE_INTEGER });
 				return;
 			}

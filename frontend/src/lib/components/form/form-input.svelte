@@ -25,7 +25,7 @@
 		autocomplete = 'off',
 		...restProps
 	}: HTMLAttributes<HTMLDivElement> & {
-		input?: FormInput<string | boolean | number | Temporal.PlainDate | undefined>;
+		input?: FormInput<string | boolean | number | Temporal.PlainDate | null | undefined>;
 		label?: string;
 		description?: string;
 		helpText?: string;

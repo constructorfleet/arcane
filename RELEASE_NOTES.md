@@ -1,12 +1,12 @@
-# 3.0.1-cf.31
+# 3.0.1-cf.32
 
-## Preserve native service settings during edits
+## Service replica input validation
 
-- Keep zero replicas when saving unrelated service metadata. Explicit replica changes accept zero and reject empty, negative, fractional or unsafe counts before submission.
-- Preserve untouched Command/Args arrays exactly, including argument boundaries and empty strings. Label-only edits also retain untouched environment, mount and port settings, including native options the simple form does not expose.
-- Refs #80 and #81, reproduced with an owned Docker-CLI-created service through swarm03. Its original native ID survived the edit, but cf.28 changed zero replicas to one and split an untouched argument. The harmless exit-only fixture was restored to zero and its original argument array.
+- Model replicas as a number or an empty numeric input, matching Svelte’s number binding. Keep numeric initial values and validate them without calling string methods.
+- Preserve valid zero replicas, show validation feedback for empty/negative/fractional/unsafe counts, and allow correcting an invalid draft before Save. Refs #84 and #28.
+- This follows cf.31 live acceptance of metadata-only editing: the owned Docker-created service retained its original ID, zero replicas, exact Args and complete remaining spec, with no new tasks. Numeric editing exposed the separate validation mismatch fixed here.
 
-## Validation scope
+## Validation
 
-- Twenty checks executing the existing component submission functions against synthetic native specs passed, along with all eight existing frontend tests and the production frontend build. Formatting, full lint and release contract also passed.
-- Live acceptance uses only the owned zero-replica fixture. Production service configuration, RBD volumes and node roles are unchanged. Intentional command editing retains the existing whitespace syntax; this fix preserves untouched arrays without reinterpreting them.
+- Thirty source-executed component checks cover proxy-backed numeric/empty inputs and exact native-field preservation. Existing frontend tests, production frontend build, formatting, full lint and release contract passed.
+- Live acceptance uses the retained owned service only: invalid input must show feedback without native mutation, then an edited zero and a label must save while preserving the exact remaining native spec. No production service, node role, port or RBD mount is changed.
