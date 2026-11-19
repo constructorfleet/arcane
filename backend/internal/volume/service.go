@@ -52,7 +52,7 @@ import (
 type (
 	VolumeService struct {
 		workspaceLocks concurrency.KeyedMutex
-		// helperGroup deduplicates concurrent read-only helper creation per volume.
+		// helperGroup deduplicates helper creation and companion installation.
 		// Without it two simultaneous browse requests each create a helper and the
 		// second overwrites the first in helperByVolume, orphaning a `sleep infinity`
 		// container that pins the volume until restart.
@@ -145,6 +145,7 @@ func NewVolumeService(p VolumeServiceParams) *VolumeService {
 		Locks:              &service.workspaceLocks,
 		AcquireHelper:      service.acquireVolumeHelper,
 		RequireACFS:        service.requireVolumeHelperACFS,
+		ACFSExecutable:     service.volumeACFSExecutable,
 		Exec:               service.execInContainer,
 		HelperImage:        service.getVolumeHelperImage,
 		BackupStorageMount: service.backup.StorageMount,

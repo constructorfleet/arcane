@@ -83,8 +83,11 @@ nodes have manager role; worker-role, migration and failure/disconnect cases rem
 - [x] VOL-10 — Preview supported raster images read-only, with explicit type/size limits and download states for unsupported files.
 
 Status: the user confirmed RBD volume browsing on 2026-11-18. Full VOL-01
-acceptance across remote and manager-host agents remains open; uploading and
-editing remain unverified. The pagination/sorting crash reported on 2026-11-18 was caused by duplicate
+acceptance across remote and manager-host agents remains open. A cf.31 owned
+local-file edit saved and reloaded its bytes but changed UID/GID from 501:10 to
+0:0 (#86); the original bytes, owner and mode were restored. cf.33 packages an
+ownership-preserving ACFS companion and rejects unsafe legacy updates. Live
+acceptance of that fix and upload/lifecycle coverage remain pending. The pagination/sorting crash reported on 2026-11-18 was caused by duplicate
 same-node volume names (`each_key_duplicate`). Release `3.0.1-cf.3` deduplicates
 per daemon before pagination/counting. Its SwarmCD rollout and five-agent/manager
 health were verified. Browser verification passed saved-preference

@@ -313,3 +313,5 @@ require (
 	modernc.org/memory v1.12.1 // indirect
 	tags.cncf.io/container-device-interface v1.1.1 // indirect
 )
+
+replace kit.getarcane.app/acfs => github.com/constructorfleet/kit/acfs v0.10.3-cf.1

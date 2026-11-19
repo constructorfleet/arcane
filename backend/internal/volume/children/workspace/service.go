@@ -47,7 +47,8 @@ type (
 		Events             *event.EventService
 		Locks              *concurrency.KeyedMutex
 		AcquireHelper      func(ctx context.Context, volumeName string) (string, func(), error)
-		RequireACFS        func(ctx context.Context, volumeName, containerID string) (bool, error)
+		ACFSExecutable     func(ctx context.Context, containerID string) (string, error)
+		RequireACFS        func(ctx context.Context, volumeName, containerID string, requirements types.VolumeHelperRequirements) (bool, error)
 		Exec               func(ctx context.Context, containerID, execUser string, cmd []string) (string, string, error)
 		HelperImage        func(ctx context.Context) (string, error)
 		BackupStorageMount func(ctx context.Context, dockerClient *client.Client, target string, readOnly bool) (mount.Mount, error)
@@ -193,7 +194,7 @@ func (s *Service) GetVolumeWorkspace(ctx context.Context, volumeName, folderPath
 		return nil, err
 	}
 	defer cleanup()
-	listLimit, err := s.deps.RequireACFS(ctx, volumeName, containerID)
+	listLimit, err := s.deps.RequireACFS(ctx, volumeName, containerID, types.VolumeHelperRequirements{})
 	if err != nil {
 		return nil, err
 	}
@@ -210,6 +211,10 @@ func (s *Service) GetVolumeWorkspace(ctx context.Context, volumeName, folderPath
 
 func (s *Service) listVolumeWorkspaceFolder(ctx context.Context, containerID, relativePath string, listLimit bool) (*types.Workspace, error) {
 	dockerClient, err := s.deps.Docker.GetClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	executable, err := s.deps.ACFSExecutable(ctx, containerID)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +235,7 @@ func (s *Service) listVolumeWorkspaceFolder(ctx context.Context, containerID, re
 			Options: client.ExecCreateOptions{
 				AttachStdout: true,
 				AttachStderr: true,
-				Cmd:          slices.Concat([]string{"acfs", "list", "--root", "/volume", "--path", "/" + relativePath}, kit.Ternary(listLimit, []string{"--limit", strconv.Itoa(maxEntries)}, nil)),
+				Cmd:          slices.Concat([]string{executable, "list", "--root", "/volume", "--path", "/" + relativePath}, kit.Ternary(listLimit, []string{"--limit", strconv.Itoa(maxEntries)}, nil)),
 			},
 		})
 		if execErr == nil && exitCode != 0 {
@@ -272,7 +277,7 @@ func (s *Service) GetVolumeWorkspaceFile(ctx context.Context, volumeName, relati
 		return nil, err
 	}
 	defer cleanup()
-	if _, requireVolumeHelperACFSErr := s.deps.RequireACFS(ctx, volumeName, containerID); requireVolumeHelperACFSErr != nil {
+	if _, requireVolumeHelperACFSErr := s.deps.RequireACFS(ctx, volumeName, containerID, types.VolumeHelperRequirements{}); requireVolumeHelperACFSErr != nil {
 		return nil, requireVolumeHelperACFSErr
 	}
 	stdout, stderr, err := s.deps.Exec(ctx, containerID, "", []string{
@@ -345,7 +350,7 @@ func (s *Service) DownloadVolumeWorkspaceFile(ctx context.Context, volumeName, r
 		cleanup()
 		unlock()
 	}
-	if _, requireVolumeHelperACFSErr := s.deps.RequireACFS(ctx, volumeName, containerID); requireVolumeHelperACFSErr != nil {
+	if _, requireVolumeHelperACFSErr := s.deps.RequireACFS(ctx, volumeName, containerID, types.VolumeHelperRequirements{}); requireVolumeHelperACFSErr != nil {
 		cleanupAndUnlock()
 		return nil, 0, requireVolumeHelperACFSErr
 	}
@@ -399,12 +404,17 @@ func (s *Service) startVolumeWorkspaceRead(ctx context.Context, containerID, rel
 		cleanup()
 		return nil, 0, err
 	}
+	executable, err := s.deps.ACFSExecutable(ctx, containerID)
+	if err != nil {
+		cleanup()
+		return nil, 0, err
+	}
 	workCtx, cancel := context.WithCancel(ctx)
 	pipeReader, pipeWriter := io.Pipe()
 	// io.PipeReader.CloseWithError always returns nil.
 	stopClose := context.AfterFunc(workCtx, func() { _ = pipeReader.CloseWithError(workCtx.Err()) })
 	done := make(chan error, 1)
-	cmd := []string{"acfs", "read", "--root", "/volume", "--path", "/" + relativePath}
+	cmd := []string{executable, "read", "--root", "/volume", "--path", "/" + relativePath}
 	if limit > 0 {
 		cmd = append(cmd, "--limit", strconv.FormatInt(limit, 10))
 	}
@@ -517,7 +527,10 @@ func (s *Service) UpdateVolumeWorkspace(
 		return err
 	}
 	defer cleanup()
-	if _, requireVolumeHelperACFSErr := s.deps.RequireACFS(ctx, volumeName, containerID); requireVolumeHelperACFSErr != nil {
+	requirements := types.VolumeHelperRequirements{PreserveOwnership: slices.ContainsFunc(manifest.FileChanges, func(change types.VolumeWorkspaceFileChange) bool {
+		return change.Operation == types.FileOpUpdateFile
+	})}
+	if _, requireVolumeHelperACFSErr := s.deps.RequireACFS(ctx, volumeName, containerID, requirements); requireVolumeHelperACFSErr != nil {
 		return requireVolumeHelperACFSErr
 	}
 	slog.DebugContext(ctx, "volume workspace mutation helper acquired", "volume", volumeName, "containerId", containerID, "dedicated", needsBackups, "duration", time.Since(helperStartedAt))

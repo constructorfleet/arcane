@@ -146,3 +146,5 @@ require (
 	google.golang.org/grpc v1.85.0 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 )
+
+replace kit.getarcane.app/acfs => github.com/constructorfleet/kit/acfs v0.10.3-cf.1

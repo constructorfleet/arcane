@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -31,20 +32,24 @@ import (
 type (
 	// inUse counts active holds so the reaper never removes a helper mid-request.
 	volumeHelper struct {
-		lastUsedAt time.Time
-		id         string
-		inUse      int
-		protocol   int
-		listLimit  bool
+		lastUsedAt    time.Time
+		id            string
+		inUse         int
+		protocol      int
+		listLimit     bool
+		preserveOwner bool
 	}
 )
 
-func (s *VolumeService) requireVolumeHelperACFS(ctx context.Context, volumeName, containerID string) (bool, error) {
+func (s *VolumeService) requireVolumeHelperACFS(ctx context.Context, volumeName, containerID string, requirements types.VolumeHelperRequirements) (bool, error) {
 	s.helperMu.Lock()
 	helper := s.helperByVolume[volumeName]
 	if helper != nil && helper.id == containerID && helper.protocol >= acfstypes.ProtocolVersion {
-		listLimit := helper.listLimit
+		listLimit, preserveOwner := helper.listLimit, helper.preserveOwner
 		s.helperMu.Unlock()
+		if requirements.PreserveOwnership && !preserveOwner {
+			return false, errors.New("saving existing files requires an ownership-preserving ACFS helper; update the agent image")
+		}
 		return listLimit, nil
 	}
 	s.helperMu.Unlock()
@@ -60,14 +65,19 @@ func (s *VolumeService) requireVolumeHelperACFS(ctx context.Context, volumeName,
 	if response.Protocol < acfstypes.ProtocolVersion {
 		return false, fmt.Errorf("volume workspace requires ACFS protocol %d, tools image provides protocol %d", acfstypes.ProtocolVersion, response.Protocol)
 	}
+	preserveOwner := slices.Contains(response.Capabilities, acfstypes.CapabilityPreserveUpdateOwner)
 	listLimit := semver.Compare(kit.EnsurePrefix(strings.TrimSpace(response.Version), "v"), "v0.9.0") >= 0
 
 	s.helperMu.Lock()
 	if helper = s.helperByVolume[volumeName]; helper != nil && helper.id == containerID {
 		helper.protocol = response.Protocol
 		helper.listLimit = listLimit
+		helper.preserveOwner = preserveOwner
 	}
 	s.helperMu.Unlock()
+	if requirements.PreserveOwnership && !preserveOwner {
+		return false, errors.New("saving existing files requires an ownership-preserving ACFS helper; update the agent image")
+	}
 	return listLimit, nil
 }
 
@@ -408,6 +418,14 @@ func (s *VolumeService) execInContainer(ctx context.Context, containerID, execUs
 		return "", "", err
 	}
 
+	if len(cmd) > 0 && cmd[0] == "acfs" {
+		executable, executableErr := s.volumeACFSExecutable(ctx, containerID)
+		if executableErr != nil {
+			return "", "", executableErr
+		}
+		cmd = slices.Clone(cmd)
+		cmd[0] = executable
+	}
 	var stdout, stderr bytes.Buffer
 	exitCode, err := docker.ExecInContainer(ctx, dockerClient, docker.ExecRequest{
 		Stdout:      &stdout,

@@ -398,7 +398,7 @@ func TestUpdateVolumeWorkspaceRejectsChangedFileBeforeStaging(t *testing.T) {
 			_ = json.MarshalWrite(w, map[string]string{"Id": fmt.Sprintf("workspace-exec-%d", len(execCommands)-1)})
 		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/exec/workspace-exec-") && strings.HasSuffix(r.URL.Path, "/start"):
 			_, _ = io.Copy(io.Discard, r.Body)
-			output := "{\"version\":\"0.2.0\",\"revision\":\"test\",\"buildTime\":\"test\",\"protocol\":2}\n"
+			output := "{\"version\":\"0.2.0\",\"revision\":\"test\",\"buildTime\":\"test\",\"protocol\":2,\"capabilities\":[\"preserve-update-owner\"]}\n"
 			if strings.Contains(r.URL.Path, "workspace-exec-1") {
 				var content bytes.Buffer
 				if err := acfs.WriteStreamHeader(&content, 8); err != nil {

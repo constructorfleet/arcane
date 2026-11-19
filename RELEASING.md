@@ -41,3 +41,18 @@ The release Dockerfiles use `GOMAXPROCS=4` and `go build -p 2`, matching the Go 
 Control planes and detected Swarm tasks report `deploymentManaged: true`, link their running Gitea release, and leave image refresh to the service/stack deployment owner. The in-app container-recreation updater refuses these targets before pulling images or changing deployments. In this homelab, SwarmCD owns the stack and mutable image refresh.
 
 Standalone release checks read the fork's published Gitea releases, including prereleases; draft and invalid tags are excluded. The repository currently requires authentication, so anonymous standalone polling is unavailable. No personal Git credentials are copied into Arcane. Dedicated private-feed authentication remains a follow-up; Gitea remains authoritative for release notes and artifacts.
+
+## Volume helper companion
+
+The release Dockerfiles also build ACFS from the pinned Constructorfleet Kit
+module and package it beside the manager/agent binary. Keep its version and the
+module replacement aligned. Volume operations install this immutable companion
+into the helper's private `/tmp` filesystem, never the mounted volume. The tools
+image continues to supply shell, archive and scanning utilities. No extra helper
+privileges or execution-user changes are required.
+
+Custom binary/static-image distributions must also ship the matching Linux ACFS
+companion beside the executable. Without it, legacy helper reads can work, but
+existing-file writes require the ownership-preservation capability and fail
+closed when it is absent. Run the volume tests and validate an owned local-file
+edit's content, UID/GID and mode before marking workspace write QA accepted.

@@ -1,12 +1,8 @@
-# 3.0.1-cf.32
+# 3.0.1-cf.33
 
-## Service replica input validation
+- Preserve an existing volume file's UID/GID and mode when publishing an atomic workspace edit; refuse publication if ownership or mode cannot be restored (#86, VOL-05/VOL-07).
+- Package the corrected Constructorfleet ACFS companion in both release images. Selected agents copy it into each helper's private filesystem; existing helper utilities, mount scope and execution identity remain intact.
+- Require an advertised ownership-preservation capability before updating existing files. Legacy helper reads remain available when a companion is absent; unsafe updates fail before staging or backup mutation.
+- Validate the dependency's Linux suite, ownership behavior, helper installation and existing volume coverage before publication. Runtime acceptance remains pending the normal SwarmCD rollout and owned local-volume UI save.
 
-- Model replicas as a number or an empty numeric input, matching Svelte’s number binding. Keep numeric initial values and validate them without calling string methods.
-- Preserve valid zero replicas, show validation feedback for empty/negative/fractional/unsafe counts, and allow correcting an invalid draft before Save. Refs #84 and #28.
-- This follows cf.31 live acceptance of metadata-only editing: the owned Docker-created service retained its original ID, zero replicas, exact Args and complete remaining spec, with no new tasks. Numeric editing exposed the separate validation mismatch fixed here.
-
-## Validation
-
-- Thirty source-executed component checks cover proxy-backed numeric/empty inputs and exact native-field preservation. Existing frontend tests, production frontend build, formatting, full lint and release contract passed.
-- Live acceptance uses the retained owned service only: invalid input must show feedback without native mutation, then an edited zero and a label must save while preserving the exact remaining native spec. No production service, node role, port or RBD mount is changed.
+No production or RBD file is used as a test fixture. Independent RBD lifecycle and scoped-login QA remain open.

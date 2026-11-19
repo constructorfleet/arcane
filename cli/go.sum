@@ -118,6 +118,8 @@ github.com/codahale/rfc6979 v0.0.0-20141003034818-6a90f24967eb h1:EDmT6Q9Zs+SbUo
 github.com/codahale/rfc6979 v0.0.0-20141003034818-6a90f24967eb/go.mod h1:ZjrT6AXHbDs86ZSdt/osfBi5qfexBrKUdONk989Wnk4=
 github.com/compose-spec/compose-go/v2 v2.16.2 h1:pTp1DqQwJzFd85GzlWsSszKA1ABrV/ySqsClujIcWA8=
 github.com/compose-spec/compose-go/v2 v2.16.2/go.mod h1:Q1+qtN4vhzEjGrnqRtzx1xa8raDZQlMUe3WJxndYNiQ=
+github.com/constructorfleet/kit/acfs v0.10.3-cf.1 h1:MQEgdGCkokygFP5Wej8SVu8OGujntw/qroLV4ixeXTg=
+github.com/constructorfleet/kit/acfs v0.10.3-cf.1/go.mod h1:04DpHMKY7OEfVqeHgZhP4z07nhY10RHSdF0LqNnOEf0=
 github.com/containerd/errdefs v1.0.0 h1:tg5yIfIlQIrxYtu9ajqY42W3lpS19XqdxRQeEwYG8PI=
 github.com/containerd/errdefs v1.0.0/go.mod h1:+YBYIdtsnF4Iw6nWZhJcqGSg/dwvV7tyJ/kCkyJ2k+M=
 github.com/containerd/errdefs/pkg v0.3.0 h1:9IKJ06FvyNlexW690DXuQNx2KA2cUJXx151Xdx3ZPPE=

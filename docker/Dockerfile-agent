@@ -44,7 +44,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     -ldflags "-w -s -X 'getarcane.dev/arcane/v3/buildables.EnabledFeatures=${ENABLED_FEATURES}' -X getarcane.dev/arcane/v3/internal/config.Version=${VERSION} -X getarcane.dev/arcane/v3/internal/config.Revision=${REVISION} -X getarcane.dev/arcane/v3/internal/config.BuildTime=${BUILD_TIME}" \
     -trimpath \
     -o /out/arcane-agent \
-    ./cmd/main.go
+    ./cmd/main.go && \
+    CGO_ENABLED=0 GOOS=linux GOMAXPROCS=4 \
+    go build -p 2 -trimpath \
+    -ldflags "-w -s -X kit.getarcane.app/acfs/internal/version.Version=0.10.3-cf.1" \
+    -o /out/acfs \
+    kit.getarcane.app/acfs/cmd
 
 RUN mkdir -p /out/rootfs/app/data
 
@@ -56,6 +61,7 @@ WORKDIR /app
 USER 0:0
 COPY --from=agent-builder --chown=65532:65532 /out/rootfs/app/ /app/
 COPY --from=agent-builder --chown=65532:65532 /out/arcane-agent ./arcane-agent
+COPY --from=agent-builder --chmod=0555 /out/acfs ./acfs
 
 ARG VERSION="dev"
 ARG REVISION="unknown"

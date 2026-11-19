@@ -11,6 +11,10 @@ import (
 )
 
 type (
+	VolumeHelperRequirements struct {
+		PreserveOwnership bool
+	}
+
 	Volume struct {
 		Options    map[string]string `json:"options" required:"false"`
 		Labels     map[string]string `json:"labels" required:"false"`

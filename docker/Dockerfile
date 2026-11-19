@@ -68,7 +68,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     -ldflags "-w -s -X 'getarcane.dev/arcane/v3/buildables.EnabledFeatures=${ENABLED_FEATURES}' -X getarcane.dev/arcane/v3/internal/config.Version=${VERSION} -X getarcane.dev/arcane/v3/internal/config.Revision=${REVISION} -X getarcane.dev/arcane/v3/internal/config.BuildTime=${BUILD_TIME} -X getarcane.dev/arcane/v3/internal/config.NodeVersion=${NODE_VERSION} -X getarcane.dev/arcane/v3/internal/config.SvelteKitVersion=${SVELTEKIT_VERSION}" \
     -trimpath \
     -o /build/arcane \
-    ./cmd/main.go
+    ./cmd/main.go && \
+    CGO_ENABLED=0 GOOS=linux GOMAXPROCS=4 \
+    go build -p 2 -trimpath \
+    -ldflags "-w -s -X kit.getarcane.app/acfs/internal/version.Version=0.10.3-cf.1" \
+    -o /build/acfs \
+    kit.getarcane.app/acfs/cmd
 
 RUN mkdir -p /build/rootfs/app/data /build/rootfs/builds
 
@@ -99,6 +104,7 @@ ENV PATH="/app:$PATH"
 COPY --from=backend-builder --chown=65532:65532 /build/rootfs/app/ /app/
 COPY --from=backend-builder --chown=65532:65532 /build/rootfs/builds/ /builds/
 COPY --from=backend-builder --chown=65532:65532 /build/arcane .
+COPY --from=backend-builder --chmod=0555 /build/acfs ./acfs
 EXPOSE 3552
 VOLUME ["/app/data"]
 
