@@ -4,7 +4,8 @@
 	import { toast } from 'svelte-sonner';
 
 	import CreateNetworkSheet from '#lib/components/sheets/create-network-sheet.svelte';
-	import { NetworksIcon, ConnectionIcon } from '#lib/icons/index.js';
+	import * as Alert from '#lib/components/ui/alert/index.js';
+	import { NetworksIcon, ConnectionIcon, AlertIcon } from '#lib/icons/index.js';
 	import { ResourcePageLayout, type ActionButton, type StatCardConfig } from '#lib/layouts/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { networkListQuery } from '#lib/query/networks.js';
@@ -106,7 +107,7 @@
 			iconColor: 'text-info'
 		},
 		{
-			title: networkUsageCounts.unused === 1 ? m.unused_networks_one() : m.unused_networks(),
+			title: m.no_observed_container_use(),
 			value: networkUsageCounts.unused,
 			icon: ConnectionIcon,
 			iconColor: 'text-warning'
@@ -116,6 +117,9 @@
 
 <ResourcePageLayout title={m.resource_networks_cap()} subtitle={m.networks_subtitle()} {actionButtons} {statCards}>
 	{#snippet mainContent()}
+		<Alert.Root variant="warning-subtle" size="sm" icon={AlertIcon}>
+			<Alert.Description>{m.network_list_usage_scope()}</Alert.Description>
+		</Alert.Root>
 		{#if resourcesReady}
 			{#key pageState.scope}
 				<NetworkTable

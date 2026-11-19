@@ -1,4 +1,7 @@
 export interface NetworkSummary {
+	clusterId?: string;
+	nodeId?: string;
+	nodes?: NetworkNodeUsage[];
 	id: string;
 	name: string;
 	driver: string;
@@ -9,6 +12,13 @@ export interface NetworkSummary {
 	ipam: NetworkIPAM;
 	inUse: boolean;
 	isDefault: boolean;
+}
+
+export interface NetworkNodeUsage {
+	id: string;
+	name: string;
+	nodeId: string;
+	inUse: boolean;
 }
 
 export interface NetworkContainerEndpoint {
@@ -50,6 +60,8 @@ export interface ServiceInfo {
 }
 
 export interface NetworkInspect {
+	clusterId?: string;
+	nodeId?: string;
 	id: string;
 	name: string;
 	driver: string;

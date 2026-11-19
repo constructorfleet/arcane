@@ -4,6 +4,15 @@
 	import type { NetworkSummary } from '#lib/types/network.js';
 	import type { NetworksPaginatedResponse } from '#lib/types/ui/network.js';
 
+	function networkDetailHref(item: NetworkSummary & { environmentId: string }) {
+		const params = new URLSearchParams({ env: item.environmentId });
+		if (item.clusterId && item.nodes?.length) {
+			params.set('cluster', item.clusterId);
+			params.set('agents', item.nodes.map((node) => node.id).join(','));
+		}
+		return resolve(`/(app)/networks/[networkId]?${params}`, { networkId: item.id });
+	}
+
 	function ipamValues(item: NetworkSummary, key: 'subnet' | 'gateway'): string[] {
 		return (item.ipam?.config ?? []).map((c) => c[key]).filter((v): v is string => !!v);
 	}
@@ -15,7 +24,6 @@
 	import { toast } from 'svelte-sonner';
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
-	import InUseStatus from '#lib/components/arcane-table/cells/in-use-status.svelte';
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
 	import type { ColumnSpec, BulkAction } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
@@ -63,15 +71,24 @@
 		remove: false
 	});
 
-	async function handleDeleteNetwork(id: string, name: string, environmentId: string) {
+	async function handleDeleteNetwork(item: NetworkRow) {
+		const { id, name, environmentId } = item;
 		const safeName = name?.trim() || m.common_unknown();
+		if (item.inUse) {
+			toast.error(m.network_has_observed_consumers());
+			return;
+		}
 		if (DEFAULT_NETWORK_NAMES.has(name)) {
 			toast.error(m.networks_cannot_delete_default({ name: safeName }));
 			return;
 		}
 		openConfirmDialog({
 			title: m.common_delete_title({ resource: m.resource_network() }),
-			message: m.networks_delete_confirm_message({ name: safeName }),
+			message: [
+				m.networks_delete_confirm_message({ name: safeName }),
+				m.network_query_agent_target({ agent: item.environmentName, agentId: environmentId }),
+				...(item.scope === 'swarm' ? [m.swarm_network_usage_warning()] : [])
+			].join('\n\n'),
 			confirm: {
 				label: m.common_delete(),
 				destructive: true,
@@ -96,6 +113,10 @@
 
 	function handleDeleteSelectedNetworks(ids: string[]) {
 		const selectedNetworkList = networks.data.filter((n) => ids.includes(rowKey(n)));
+		if (selectedNetworkList.some((item) => item.inUse)) {
+			toast.error(m.network_has_observed_consumers());
+			return;
+		}
 		const defaultNetworks = selectedNetworkList.filter((n) => n.isDefault);
 
 		if (defaultNetworks.length > 0) {
@@ -107,7 +128,10 @@
 		bulkConfirmAndRun({
 			ids,
 			title: m.networks_delete_selected_title({ count: ids.length }),
-			message: m.networks_delete_selected_message({ count: ids.length }),
+			message: [
+				m.networks_delete_selected_message({ count: ids.length }),
+				...(selectedNetworkList.some((item) => item.scope === 'swarm') ? [m.swarm_network_usage_warning()] : [])
+			].join('\n\n'),
 			confirmLabel: m.common_delete(),
 			destructive: true,
 			runInEnvironment: (id, environmentId) => networkService.deleteNetwork(id, environmentId),
@@ -137,12 +161,25 @@
 		if ((item.isDefault ?? false) || DEFAULT_NETWORK_NAMES.has(item.name)) {
 			return { variant: 'gray', text: m.networks_predefined() };
 		}
+		if (item.nodes?.length) {
+			if (item.inUse) return { variant: 'green', text: m.network_used_on_observed_nodes() };
+			return { variant: 'amber', text: m.network_no_observed_containers() };
+		}
+		if (item.scope === 'swarm') {
+			if (item.inUse) return { variant: 'green', text: m.network_in_use_on_node() };
+			return { variant: 'amber', text: m.network_no_local_containers() };
+		}
 		if (item.inUse) return { variant: 'green', text: m.common_in_use() };
 		return { variant: 'amber', text: m.common_unused() };
 	}
 
 	const columns = $derived([
-		...environmentColumns<NetworkRow>(),
+		...environmentColumns<NetworkRow>().map((column) => ({ ...column, title: m.query_agent() })),
+		{
+			id: 'nodes',
+			accessorFn: (item) => item.nodes?.map((node) => node.name).join(', ') ?? item.environmentName,
+			title: m.nodes()
+		},
 		{ accessorKey: 'id', title: m.common_id(), cell: IdCell, hidden: true },
 		{ accessorKey: 'name', title: m.common_name(), sortable: true, cell: NameCell },
 		{ accessorKey: 'inUse', title: m.common_status(), sortable: true, cell: StatusCell },
@@ -166,6 +203,7 @@
 
 	const mobileFields = [
 		{ id: 'id', label: m.common_id(), defaultVisible: false },
+		{ id: 'nodes', label: m.nodes(), defaultVisible: true },
 		{ id: 'inUse', label: m.common_status(), defaultVisible: true },
 		{ id: 'driver', label: m.common_driver(), defaultVisible: true },
 		{ id: 'scope', label: m.common_scope(), defaultVisible: true },
@@ -192,11 +230,7 @@
 </script>
 
 {#snippet NameCell({ item }: { item: NetworkRow })}
-	<a
-		class="font-medium hover:underline"
-		href={resolve(`/(app)/networks/[networkId]?env=${encodeURIComponent(item.environmentId)}`, { networkId: item.id })}
-		>{item.name}</a
-	>
+	<a class="font-medium hover:underline" href={networkDetailHref(item)}>{item.name}</a>
 {/snippet}
 
 {#snippet IdCell({ item }: { item: NetworkRow })}
@@ -238,11 +272,8 @@
 {/snippet}
 
 {#snippet StatusCell({ item }: { item: NetworkRow })}
-	{#if item.isDefault}
-		<Badge variant="sky" minWidth="20">{m.networks_predefined()}</Badge>
-	{:else}
-		<InUseStatus inUse={item.inUse} />
-	{/if}
+	{@const status = getNetworkStatusBadge(item, true)}
+	{#if status}<Badge variant={status.variant} minWidth="20">{status.text}</Badge>{/if}
 {/snippet}
 
 {#snippet NetworkMobileCardSnippet({ item, mobileFieldVisibility }: { item: NetworkRow; mobileFieldVisibility: FieldVisibility })}
@@ -256,6 +287,11 @@
 		subtitle={(item: NetworkRow) => ((mobileFieldVisibility['id'] ?? true) ? item.id : null)}
 		badges={[(item: NetworkRow) => getNetworkStatusBadge(item, mobileFieldVisibility['inUse'] ?? true)]}
 		fields={[
+			{
+				label: m.nodes(),
+				getValue: (item: NetworkRow) => item.nodes?.map((node) => node.name).join(', ') ?? item.environmentName,
+				show: mobileFieldVisibility['nodes'] ?? true
+			},
 			{
 				label: m.common_driver(),
 				getValue: (item: NetworkRow) => capitalizeFirstLetter(item.driver),
@@ -288,17 +324,13 @@
 			}
 		]}
 		rowActions={RowActions}
-		href={() => resolve(`/(app)/networks/[networkId]?env=${encodeURIComponent(item.environmentId)}`, { networkId: item.id })}
+		href={() => networkDetailHref(item)}
 	/>
 {/snippet}
 
 {#snippet RowActions({ item }: { item: NetworkRow })}
 	<RowActionsMenu name={item.name}>
-		<DropdownMenu.Item
-			onclick={() =>
-				goto(resolve(`/(app)/networks/[networkId]?env=${encodeURIComponent(item.environmentId)}`, { networkId: item.id }))}
-			disabled={isAnyLoading}
-		>
+		<DropdownMenu.Item onclick={() => goto(networkDetailHref(item))} disabled={isAnyLoading}>
 			<InspectIcon class="size-4" />
 			{m.common_inspect()}
 		</DropdownMenu.Item>
@@ -308,8 +340,8 @@
 
 			<DropdownMenu.Item
 				variant="destructive"
-				onclick={() => handleDeleteNetwork(item.id, item.name, item.environmentId)}
-				disabled={isAnyLoading || item.isDefault || DEFAULT_NETWORK_NAMES.has(item.name)}
+				onclick={() => handleDeleteNetwork(item)}
+				disabled={isAnyLoading || item.inUse || item.isDefault || DEFAULT_NETWORK_NAMES.has(item.name)}
 			>
 				<TrashIcon class="size-4" />
 				{m.common_delete()}

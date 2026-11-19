@@ -119,6 +119,47 @@ func TestAggregateNetworksMergesEnvironments(t *testing.T) {
 		require.Equal(t, []string{"a/bridge", "a/frontend", "b/backend", "b/bridge"}, rowLabels(body.Data))
 	})
 
+	t.Run("groups confirmed overlays before usage filtering and pagination", func(t *testing.T) {
+		pages := map[string]any{
+			"a": types.PaginatedWithCounts[types.NetworkSummary, types.NetworkUsageCounts]{Success: true, Data: []types.NetworkSummary{
+				{ID: "shared", Name: "frontend", Scope: "swarm", Driver: "overlay", ClusterID: "cluster", NodeID: "node-a"},
+				{ID: "local-a", Name: "bridge", Scope: "local", Driver: "bridge"},
+			}},
+			"b": types.PaginatedWithCounts[types.NetworkSummary, types.NetworkUsageCounts]{Success: true, Data: []types.NetworkSummary{
+				{ID: "shared", Name: "frontend", Scope: "swarm", Driver: "overlay", ClusterID: "cluster", NodeID: "node-b", InUse: true},
+			}},
+		}
+		ctx, queries := networkScopeContext(t, "/api/agents/a,b,c/networks?inUse=true&search=frontend", pages)
+		body, err := svc.AggregateNetworks(ctx, pagination.QueryParams{
+			Filters:     map[string]string{"inUse": "true"},
+			SearchQuery: pagination.SearchQuery{Search: "frontend"},
+			Params:      pagination.Params{Limit: 1},
+		})
+		require.NoError(t, err)
+		require.Len(t, body.Data, 1)
+		require.Equal(t, "shared", body.Data[0].ID)
+		require.True(t, body.Data[0].InUse)
+		require.Len(t, body.Data[0].Nodes, 2)
+		require.Equal(t, "b", body.Data[0].Nodes[1].ID)
+		require.EqualValues(t, 1, body.Pagination.TotalItems)
+		require.Equal(t, types.NetworkUsageCounts{Inuse: 1, Unused: 1, Total: 2}, body.Counts)
+		require.Len(t, body.FailedEnvironments, 1)
+		stalePage, staleErr := svc.AggregateNetworks(ctx, pagination.QueryParams{
+			Filters:     map[string]string{"inUse": "true"},
+			SearchQuery: pagination.SearchQuery{Search: "frontend"},
+			Params:      pagination.Params{Start: 20, Limit: 1},
+		})
+		require.NoError(t, staleErr)
+		require.Len(t, stalePage.Data, 1)
+		require.Equal(t, "shared", stalePage.Data[0].ID)
+		require.Equal(t, 1, stalePage.Pagination.CurrentPage)
+		for _, id := range []string{"a", "b"} {
+			value, _ := queries.Load(id)
+			require.Empty(t, value.(url.Values).Get("inUse"))
+			require.Empty(t, value.(url.Values).Get("search"))
+		}
+	})
+
 	t.Run("all environments failing returns empty data", func(t *testing.T) {
 		ctx, _ := networkScopeContext(t, "/api/agents/a,b,c/networks", map[string]any{})
 		body, err := svc.AggregateNetworks(ctx, pagination.QueryParams{Params: pagination.Params{Limit: 20}})
@@ -130,20 +171,13 @@ func TestAggregateNetworksMergesEnvironments(t *testing.T) {
 
 func TestAggregateNetworkCountsSumsEnvironments(t *testing.T) {
 	ctx, _ := networkScopeContext(t, "/api/agents/a,b,c/networks/counts", map[string]any{
-		"a": types.ApiResponse[types.NetworkUsageCounts]{
-			Success: true,
-			Data: types.NetworkUsageCounts{
-				Inuse:  1,
-				Unused: 1,
-				Total:  2,
-			},
+		"a": types.PaginatedWithCounts[types.NetworkSummary, types.NetworkUsageCounts]{
+			Success: true, Data: []types.NetworkSummary{{ID: "a1", InUse: true}, {ID: "a2"}},
+			Counts: types.NetworkUsageCounts{Inuse: 1, Unused: 1, Total: 2},
 		},
-		"b": types.ApiResponse[types.NetworkUsageCounts]{
-			Success: true,
-			Data: types.NetworkUsageCounts{
-				Inuse: 3,
-				Total: 3,
-			},
+		"b": types.PaginatedWithCounts[types.NetworkSummary, types.NetworkUsageCounts]{
+			Success: true, Data: []types.NetworkSummary{{ID: "b1", InUse: true}, {ID: "b2", InUse: true}, {ID: "b3", InUse: true}},
+			Counts: types.NetworkUsageCounts{Inuse: 3, Total: 3},
 		},
 	})
 

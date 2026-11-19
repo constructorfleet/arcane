@@ -31,10 +31,11 @@ class NetworkService extends BaseAPIService {
 	async getNetworkForEnvironment(
 		environmentId: string,
 		networkId: string,
-		options?: SearchPaginationSortRequest
+		options?: SearchPaginationSortRequest,
+		config?: APIRequestConfig
 	): Promise<NetworkInspect> {
 		const params = transformPaginationParams(options);
-		return this.handleResponse(this.api.get(`/agents/${environmentId}/networks/${networkId}`, { params }));
+		return this.handleResponse(this.api.get(`/agents/${environmentId}/networks/${networkId}`, { ...config, params }));
 	}
 
 	async getNetworkTopology(environmentId: string, config?: APIRequestConfig): Promise<NetworkTopology> {

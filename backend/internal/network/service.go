@@ -70,15 +70,41 @@ func NewNetworkService(db *database.DB, dockerService *dockerInternal.DockerClie
 	}
 }
 
-func (s *NetworkService) GetNetworkByID(ctx context.Context, id string) (*network.Inspect, error) {
-	networkInspect, err := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.NetworkInspectResult, error) {
-		return compat.NetworkInspectWithCompatibility(ctx, dockerClient, id, client.NetworkInspectOptions{})
+func (s *NetworkService) GetNetworkByID(ctx context.Context, id string, order pagination.SortParams) (*types.NetworkInspect, error) {
+	inspected, err := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.NetworkInspectResult, error) {
+		return compat.NetworkInspectWithCompatibility(ctx, dockerClient, id, client.NetworkInspectOptions{Verbose: true})
 	})
 	if err != nil {
 		return nil, fmt.Errorf("network not found: %w", err)
 	}
-
-	return new(networkInspect.Network), nil
+	out, err := mapping.MapOne[network.Inspect, types.NetworkInspect](inspected.Network)
+	if err != nil {
+		return nil, fmt.Errorf("map network: %w", err)
+	}
+	info, infoErr := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.SystemInfoResult, error) {
+		return dockerClient.Info(ctx, client.InfoOptions{})
+	})
+	if infoErr != nil {
+		slog.WarnContext(ctx, "network cluster identity unavailable", "error", infoErr)
+	}
+	out.ID = cmp.Or(out.ID, inspected.Network.ID)           // keep: enriches the mapped DTO
+	out.ClusterID = kit.FromPtr(info.Info.Swarm.Cluster).ID // keep: enriches the mapped DTO
+	out.NodeID = info.Info.Swarm.NodeID                     // keep: enriches the mapped DTO
+	for containerID, endpoint := range networkContainerEndpoints(out.Containers) {
+		out.ContainersList = append(out.ContainersList, types.NetworkContainerEndpoint{
+			ID: containerID, Name: endpoint.Name, EndpointID: endpoint.EndpointID,
+			IPv4Address: kit.Ternary(endpoint.IPv4Address.IsValid(), endpoint.IPv4Address.String(), ""),
+			IPv6Address: kit.Ternary(endpoint.IPv6Address.IsValid(), endpoint.IPv6Address.String(), ""),
+			MacAddress:  endpoint.MacAddress.String(),
+		})
+	}
+	slices.SortFunc(out.ContainersList, func(a, b types.NetworkContainerEndpoint) int {
+		if order.Sort == "ip" {
+			return kit.Ternary(order.Order == pagination.SortDesc, -1, 1) * kit.CompareAddresses(cmp.Or(a.IPv4Address, a.IPv6Address), cmp.Or(b.IPv4Address, b.IPv6Address))
+		}
+		return kit.Ternary(order.Order == pagination.SortDesc, -1, 1) * strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+	})
+	return &out, nil
 }
 
 func (s *NetworkService) GetNetworkTopology(ctx context.Context) (*types.NetworkTopology, error) {
@@ -270,7 +296,36 @@ func (s *NetworkService) RemoveNetwork(ctx context.Context, id string, user type
 	networkInfo, err := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.NetworkInspectResult, error) {
 		return compat.NetworkInspectWithCompatibility(ctx, dockerClient, id, client.NetworkInspectOptions{})
 	})
-	networkName := kit.Ternary(err == nil, networkInfo.Network.Name, id)
+	if err != nil {
+		return fmt.Errorf("inspect network before removal: %w", err)
+	}
+	networkName := networkInfo.Network.Name
+	if len(networkContainerEndpoints(networkInfo.Network.Containers)) > 0 {
+		return common.Classify(common.ErrConflict, errors.New("network still has container endpoints"))
+	}
+	if networkInfo.Network.Scope == "swarm" {
+		if networkInfo.Network.ID == "" {
+			return common.Classify(common.ErrConflict, errors.New("swarm network identity is unavailable"))
+		}
+		info, infoErr := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.SystemInfoResult, error) {
+			return dockerClient.Info(ctx, client.InfoOptions{})
+		})
+		if infoErr != nil {
+			return fmt.Errorf("verify Swarm manager before network removal: %w", infoErr)
+		}
+		if !info.Info.Swarm.ControlAvailable {
+			return common.Classify(common.ErrConflict, errors.New("swarm network removal requires a manager agent; node-local absence of containers is insufficient"))
+		}
+		services, listErr := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.ServiceListResult, error) {
+			return dockerClient.ServiceList(ctx, client.ServiceListOptions{})
+		})
+		if listErr != nil {
+			return fmt.Errorf("verify Swarm network service references: %w", listErr)
+		}
+		if references := networkServiceReferences(networkInfo.Network.ID, networkName, services.Items); len(references) > 0 {
+			return common.Classify(common.ErrConflict, fmt.Errorf("network is referenced by Swarm services: %s", strings.Join(references, ", ")))
+		}
+	}
 
 	defer s.eventService.BeginDockerResourceSuppressionWindow("network", id, networkName)()
 	if _, networkRemoveErr := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.NetworkRemoveResult, error) {
@@ -447,6 +502,18 @@ func (s *NetworkService) ListNetworksPaginated(ctx context.Context, params pagin
 	g, groupCtx := errgroup.WithContext(ctx)
 	var containers []container.Summary
 	var networkList client.NetworkListResult
+	var info client.SystemInfoResult
+	g.Go(func() (workerErr error) {
+		defer concurrency.RecoverToError(&workerErr, "network identity worker")
+		var err error
+		info, err = s.dockerService.Call(groupCtx, func(ctx context.Context, dockerClient *client.Client) (client.SystemInfoResult, error) {
+			return dockerClient.Info(ctx, client.InfoOptions{})
+		})
+		if err != nil {
+			slog.WarnContext(groupCtx, "network cluster identity unavailable", "error", err)
+		}
+		return nil
+	})
 	g.Go(func() (workerErr error) {
 		defer concurrency.RecoverToError(&workerErr, "network container list worker")
 		var err error
@@ -479,6 +546,8 @@ func (s *NetworkService) ListNetworksPaginated(ctx context.Context, params pagin
 		if mapErr != nil {
 			return nil, pagination.Response{}, types.NetworkUsageCounts{}, fmt.Errorf("failed to map network: %w", mapErr)
 		}
+		netDto.ClusterID = kit.FromPtr(info.Info.Swarm.Cluster).ID
+		netDto.NodeID = info.Info.Swarm.NodeID
 		netDto.InUse = inUseByID[netDto.ID] || inUseByName[netDto.Name] // keep: enriches the mapped DTO
 		netDto.IsDefault = docker.IsDefaultNetwork(netDto.Name)         // keep: enriches the mapped DTO
 		items = append(items, netDto)
@@ -496,34 +565,22 @@ func (s *NetworkService) ListNetworksPaginated(ctx context.Context, params pagin
 }
 
 func (s *NetworkService) AggregateNetworks(ctx context.Context, params pagination.QueryParams) (types.PaginatedWithCounts[types.NetworkSummary, types.NetworkUsageCounts], error) {
-	collection, err := httpx.CollectEnvironments[types.PaginatedWithCounts[types.NetworkSummary, types.NetworkUsageCounts]](ctx, url.Values{"start": {"0"}, "limit": {"-1"}})
+	collection, err := httpx.CollectEnvironments[types.PaginatedWithCounts[types.NetworkSummary, types.NetworkUsageCounts]](ctx, url.Values{
+		"start": {"0"}, "limit": {"-1"}, "search": nil, "inUse": nil, "label": nil,
+	})
 	if err != nil {
 		return types.PaginatedWithCounts[types.NetworkSummary, types.NetworkUsageCounts]{}, err
 	}
-
-	pages := make([]pagination.EnvironmentPage[types.NetworkSummary], 0, len(collection.Results))
-	inUse, unused, total := 0, 0, 0
-	for _, result := range collection.Results {
-		pages = append(pages, pagination.EnvironmentPage[types.NetworkSummary]{
-			Environment:    result.Environment,
-			Items:          result.Value.Data,
-			TotalAvailable: cmp.Or(result.Value.Pagination.GrandTotalItems, result.Value.Pagination.TotalItems),
-		})
-		inUse += result.Value.Counts.Inuse
-		unused += result.Value.Counts.Unused
-		total += result.Value.Counts.Total
+	overview := mergeNetworkOverview(collection.Results)
+	paginationConfig := pagination.WithEnvironment(s.buildNetworkPaginationConfig())
+	result := paginationConfig.SearchOrderAndPaginate(overview.Items, params)
+	if params.Limit > 0 && int64(params.Start) >= result.TotalCount {
+		params.Start = int(max(result.TotalCount-1, 0)) / params.Limit * params.Limit
+		result = paginationConfig.SearchOrderAndPaginate(overview.Items, params)
 	}
-	data, resp := pagination.MergeEnvironmentPages(s.buildNetworkPaginationConfig(), pages, params)
-
 	return types.PaginatedWithCounts[types.NetworkSummary, types.NetworkUsageCounts]{
-		Success: true,
-		Data:    data,
-		Counts: types.NetworkUsageCounts{
-			Inuse:  inUse,
-			Unused: unused,
-			Total:  total,
-		},
-		Pagination:         handlerutil.PaginationResponse(resp),
+		Success: true, Data: result.Items, Counts: overview.Counts,
+		Pagination:         handlerutil.PaginationResponse(pagination.BuildResponse(result.TotalCount, result.TotalAvailable+overview.Unseen, params)),
 		FailedEnvironments: collection.Failures,
 	}, nil
 }
@@ -568,17 +625,20 @@ func (s *NetworkService) AggregateNetworkTopology(ctx context.Context) (types.Ap
 }
 
 func (s *NetworkService) AggregateNetworkCounts(ctx context.Context) (types.ApiResponse[types.NetworkUsageCounts], error) {
-	return httpx.CollectEnvironmentData(ctx, nil, func(environments []types.EnvironmentData[types.NetworkUsageCounts]) types.NetworkUsageCounts {
-		var counts types.NetworkUsageCounts
-		for _, environment := range environments {
-			counts = types.NetworkUsageCounts{
-				Inuse:  counts.Inuse + environment.Data.Inuse,
-				Unused: counts.Unused + environment.Data.Unused,
-				Total:  counts.Total + environment.Data.Total,
-			}
-		}
-		return counts
-	})
+	scope, ok := httpx.EnvironmentScopeFromContext(ctx)
+	if !ok {
+		return types.ApiResponse[types.NetworkUsageCounts]{}, errors.New("request has no environment scope")
+	}
+	listScope := *scope
+	listScope.Path = "/networks"
+	collection, err := httpx.CollectEnvironments[types.PaginatedWithCounts[types.NetworkSummary, types.NetworkUsageCounts]](
+		httpx.WithEnvironmentScope(ctx, &listScope), url.Values{"start": {"0"}, "limit": {"-1"}, "search": nil, "inUse": nil, "label": nil},
+	)
+	if err != nil {
+		return types.ApiResponse[types.NetworkUsageCounts]{}, err
+	}
+	overview := mergeNetworkOverview(collection.Results)
+	return types.ApiResponse[types.NetworkUsageCounts]{Success: true, Data: overview.Counts, Environments: overview.Environments, FailedEnvironments: collection.Failures}, nil
 }
 
 func (s *NetworkService) buildNetworkPaginationConfig() pagination.Config[types.NetworkSummary] {

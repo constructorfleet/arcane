@@ -1,9 +1,7 @@
 package network
 
 import (
-	"cmp"
 	"context"
-	"slices"
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -11,7 +9,6 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/samber/mo"
 
-	"kit.getarcane.app"
 	"kit.getarcane.app/mapping"
 
 	"getarcane.dev/arcane/v3/internal/activity"
@@ -21,6 +18,7 @@ import (
 	activitylib "getarcane.dev/arcane/v3/pkg/activity"
 	"getarcane.dev/arcane/v3/pkg/handlerutil"
 	"getarcane.dev/arcane/v3/pkg/httpx"
+	"getarcane.dev/arcane/v3/pkg/pagination"
 	"getarcane.dev/types/v3"
 )
 
@@ -193,46 +191,12 @@ func (h *NetworkHandler) CreateNetwork(ctx context.Context, input *CreateNetwork
 }
 
 func (h *NetworkHandler) GetNetwork(ctx context.Context, input *GetNetworkInput) (*handlerutil.Out[types.NetworkInspect], error) {
-	networkInspect, err := h.networkService.GetNetworkByID(ctx, input.NetworkID)
+	out, err := h.networkService.GetNetworkByID(ctx, input.NetworkID, pagination.SortParams{Sort: input.Sort, Order: pagination.SortOrder(input.Order)})
 	if err != nil {
 		apiErr := common.ToAPIError(common.ClassifyDockerError(err))
 		return nil, huma.NewError(apiErr.HTTPStatus(), "Failed to retrieve network: "+apiErr.Message)
 	}
-
-	out, err := mapping.MapOne[network.Inspect, types.NetworkInspect](*networkInspect)
-	if err != nil {
-		return nil, huma.Error500InternalServerError("Failed to map network: " + err.Error())
-	}
-
-	out.ID = cmp.Or(out.ID, networkInspect.ID) // keep: enriches the mapped DTO
-
-	containers := make([]types.NetworkContainerEndpoint, 0, len(out.Containers))
-	for id, container := range out.Containers {
-		containers = append(containers, types.NetworkContainerEndpoint{
-			ID:          id,
-			Name:        container.Name,
-			EndpointID:  container.EndpointID,
-			IPv4Address: kit.Ternary(container.IPv4Address.IsValid(), container.IPv4Address.String(), ""),
-			IPv6Address: kit.Ternary(container.IPv6Address.IsValid(), container.IPv6Address.String(), ""),
-			MacAddress:  container.MacAddress.String(),
-		})
-	}
-
-	slices.SortFunc(containers, func(a, b types.NetworkContainerEndpoint) int {
-		if input.Sort == "ip" {
-			return kit.Ternary(input.Order == "desc", -1, 1) * kit.CompareAddresses(cmp.Or(a.IPv4Address, a.IPv6Address), cmp.Or(b.IPv4Address, b.IPv6Address))
-		}
-
-		return kit.Ternary(input.Order == "desc", -1, 1) * strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
-	})
-	out.ContainersList = containers // keep: enriches the mapped DTO
-
-	return &handlerutil.Out[types.NetworkInspect]{
-		Body: types.ApiResponse[types.NetworkInspect]{
-			Success: true,
-			Data:    out,
-		},
-	}, nil
+	return &handlerutil.Out[types.NetworkInspect]{Body: types.ApiResponse[types.NetworkInspect]{Success: true, Data: *out}}, nil
 }
 
 func (h *NetworkHandler) GetNetworkTopology(ctx context.Context, input *types.EnvironmentInput) (*handlerutil.Out[types.NetworkTopology], error) {

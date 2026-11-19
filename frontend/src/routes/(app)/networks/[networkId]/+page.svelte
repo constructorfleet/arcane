@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { toast } from 'svelte-sonner';
 
 	import type { ActionButton } from '#lib/components/action-button-group/types.js';
@@ -26,12 +27,14 @@
 	import { ResourceDetailLayout } from '#lib/layouts/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { networkService } from '#lib/services/network-service.js';
+	import { environmentStore } from '#lib/stores/environment.store.svelte.js';
 	import type { NetworkInspect, NetworkIPAMConfig } from '#lib/types/network.js';
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { formatDateTimeShort } from '#lib/utils/formatting.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
+	import NetworkNodeUsage from '../components/network-node-usage.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -48,6 +51,9 @@
 	const connectedContainers = $derived(network?.containersList ?? []);
 
 	const inUse = $derived(connectedContainers.length > 0);
+	const observationAgents = $derived((page.url.searchParams.get('agents') ?? '').split(',').filter(Boolean));
+	const observationCluster = $derived(page.url.searchParams.get('cluster') ?? '');
+	const swarmScoped = $derived(network?.scope === 'swarm');
 	const isPredefined = $derived(network?.name === 'bridge' || network?.name === 'host' || network?.name === 'none');
 
 	async function handleSort(column: string) {
@@ -74,6 +80,10 @@
 	}
 
 	function triggerRemove() {
+		if (inUse) {
+			toast.error(m.network_has_observed_consumers());
+			return;
+		}
 		if (isPredefined) {
 			toast.error(m.networks_cannot_delete_default({ name: network?.name ?? m.common_unknown() }));
 			console.warn('Cannot remove predefined network');
@@ -89,7 +99,14 @@
 		const target = { id: network.id, environmentId: data.envId };
 		openConfirmDialog({
 			title: m.common_remove_title({ resource: m.resource_network() }),
-			message: m.networks_remove_confirm_message({ name: network?.name ?? shortId }),
+			message: [
+				m.networks_remove_confirm_message({ name: network?.name ?? shortId }),
+				m.network_query_agent_target({
+					agent: environmentStore.available.find((agent) => agent.id === target.environmentId)?.name ?? target.environmentId,
+					agentId: target.environmentId
+				}),
+				...(swarmScoped ? [m.swarm_network_usage_warning()] : [])
+			].join('\n\n'),
 			confirm: {
 				label: m.common_remove(),
 				destructive: true,
@@ -125,7 +142,7 @@
 			placement: 'secondary',
 			label: m.common_remove(),
 			loading: isRemoving,
-			disabled: isRemoving || isPredefined,
+			disabled: isRemoving || isPredefined || inUse,
 			onclick: triggerRemove
 		}
 	]);
@@ -326,7 +343,11 @@
 	{actions}
 >
 	{#snippet badges()}
-		{#if inUse}
+		{#if swarmScoped}
+			<Badge variant={inUse ? 'green' : 'amber'} minWidth="20"
+				>{inUse ? m.network_in_use_on_node() : m.network_no_local_containers()}</Badge
+			>
+		{:else if inUse}
 			<Badge variant="green" minWidth="20">{m.networks_in_use_count({ count: connectedContainers.length })}</Badge>
 		{:else}
 			<Badge variant="amber" minWidth="20">{m.common_unused()}</Badge>
@@ -347,6 +368,14 @@
 
 	{#if network}
 		<div class="space-y-6">
+			{#if observationAgents.length > 0 && observationCluster}
+				<NetworkNodeUsage networkId={network.id} clusterId={observationCluster} agentIds={observationAgents} />
+			{/if}
+			{#if swarmScoped}
+				<Alert.Root variant="warning-subtle" size="sm" icon={AlertIcon}>
+					<Alert.Description>{m.swarm_network_usage_warning()}</Alert.Description>
+				</Alert.Root>
+			{/if}
 			<DetailMetaStrip
 				items={[
 					{ icon: VolumesIcon, label: m.common_driver(), value: network.driver ?? m.common_unknown() },

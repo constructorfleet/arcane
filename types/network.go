@@ -9,16 +9,25 @@ import (
 type (
 	NetworkSummary struct {
 		EnvironmentTag
-		ID        string            `json:"id"`
-		Name      string            `json:"name"`
-		Driver    string            `json:"driver"`
-		Scope     string            `json:"scope"`
-		Created   time.Time         `json:"created"`
-		Options   map[string]string `json:"options"`
-		Labels    map[string]string `json:"labels"`
-		IPAM      NetworkIPAM       `json:"ipam"`
-		InUse     bool              `json:"inUse"`
-		IsDefault bool              `json:"isDefault"`
+		ClusterID string             `json:"clusterId,omitempty"`
+		NodeID    string             `json:"nodeId,omitempty"`
+		Nodes     []NetworkNodeUsage `json:"nodes,omitempty"`
+		ID        string             `json:"id"`
+		Name      string             `json:"name"`
+		Driver    string             `json:"driver"`
+		Scope     string             `json:"scope"`
+		Created   time.Time          `json:"created"`
+		Options   map[string]string  `json:"options"`
+		Labels    map[string]string  `json:"labels"`
+		IPAM      NetworkIPAM        `json:"ipam"`
+		InUse     bool               `json:"inUse"`
+		IsDefault bool               `json:"isDefault"`
+	}
+
+	NetworkNodeUsage struct {
+		EnvironmentRef
+		NodeID string `json:"nodeId"`
+		InUse  bool   `json:"inUse"`
 	}
 
 	NetworkContainerEndpoint struct {
@@ -37,6 +46,8 @@ type (
 	}
 
 	NetworkInspect struct {
+		ClusterID      string                              `json:"clusterId,omitempty"`
+		NodeID         string                              `json:"nodeId,omitempty"`
 		ID             string                              `json:"id"`
 		Name           string                              `json:"name"`
 		Driver         string                              `json:"driver"`
