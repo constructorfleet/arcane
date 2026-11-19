@@ -32,7 +32,7 @@
 	}));
 
 	const versionInfo = $derived(versionQuery.data ?? null);
-	const updateAvailable = $derived(!!versionInfo?.updateAvailable);
+	const updateAvailable = $derived(!!versionInfo?.updateAvailable && !versionInfo.deploymentManaged);
 
 	const itemLabel = $derived.by(() => {
 		if (isUpgradingThis) return m.upgrade_in_progress();

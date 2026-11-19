@@ -37,6 +37,7 @@
 	bind:open={upgradeCheck.showConfirmDialog}
 	{versionInformation}
 	canConfirm={upgradeCheck.shouldShowUpgrade}
+	unavailableMessage={upgradeCheck.unavailableMessage}
 	debugDemo={debug}
 />
 

@@ -36,12 +36,14 @@
 		open = $bindable(undefined),
 		versionInformation,
 		canConfirm = true,
+		unavailableMessage,
 		debugDemo = false,
 		onFinished
 	}: {
 		open?: boolean;
 		versionInformation?: VersionInfo;
 		canConfirm?: boolean;
+		unavailableMessage?: string;
 		/** Dev-only: run a scripted fake set of environments instead of calling the API. */
 		debugDemo?: boolean;
 		onFinished?: () => void | Promise<void>;
@@ -116,6 +118,7 @@
 	};
 
 	async function handleConfirm(environmentIds?: string[]) {
+		if (versionInformation?.deploymentManaged) return;
 		const attempt = ++startAttempt;
 		starting = true;
 
@@ -378,6 +381,10 @@
 				</Dialog.Header>
 			</div>
 
+			{#if !canConfirm && unavailableMessage}
+				<p class="border-t border-border/60 px-6 py-3 text-sm text-muted-foreground">{unavailableMessage}</p>
+			{/if}
+
 			{#if planEnvironments.length > 0}
 				<div class="shrink-0 border-t border-border/60">
 					<button
@@ -569,11 +576,11 @@
 			{#if phase === 'confirm'}
 				<p class="text-xs text-muted-foreground sm:mr-auto sm:self-center">{m.manager_updates_last()}</p>
 				<Button variant="outline" onclick={() => (open = false)}>{m.common_cancel()}</Button>
-				{#if canConfirm}
+				{#if canConfirm && !versionInformation?.deploymentManaged}
 					<Button onclick={() => handleConfirm()}>{m.update_all()}</Button>
 				{/if}
 			{:else}
-				{#if phase === 'finished' && canConfirm && !debugDemo && failedIds.length > 0}
+				{#if phase === 'finished' && canConfirm && !versionInformation?.deploymentManaged && !debugDemo && failedIds.length > 0}
 					<Button variant="outline" disabled={starting} onclick={() => handleConfirm(failedIds)}>
 						{m.environments_update_all_retry_failed()}
 					</Button>

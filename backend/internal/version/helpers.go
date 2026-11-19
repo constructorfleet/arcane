@@ -34,8 +34,8 @@ type (
 )
 
 const (
-	repoURL              = "https://github.com/getarcaneapp/arcane"
-	commitCompareURLBase = "https://api.github.com/repos/getarcaneapp/arcane/compare/"
+	repoURL              = "https://gitea.home.prettybaked.com/constructorfleet/arcane"
+	commitCompareURLBase = "https://gitea.home.prettybaked.com/api/v1/repos/constructorfleet/arcane/compare/"
 )
 
 var (
@@ -88,7 +88,7 @@ func (s *VersionService) commitNotes(ctx context.Context, base, head string) str
 func (s *VersionService) fetchCommitComparison(ctx context.Context, commitRange string) (commitComparison, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, commitCompareURLBase+commitRange, http.NoBody)
 	if err != nil {
-		return commitComparison{}, fmt.Errorf("create GitHub compare request: %w", err)
+		return commitComparison{}, fmt.Errorf("create release compare request: %w", err)
 	}
 
 	resp, err := s.httpClient.Do(req)
@@ -98,7 +98,7 @@ func (s *VersionService) fetchCommitComparison(ctx context.Context, commitRange 
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return commitComparison{}, fmt.Errorf("GitHub compare API returned status %d", resp.StatusCode)
+		return commitComparison{}, fmt.Errorf("release compare API returned status %d", resp.StatusCode)
 	}
 
 	var comparison commitComparison
@@ -142,7 +142,7 @@ func formatCommitNotes(comparison commitComparison, diffURL string) string {
 
 func commitLink(pr []string, sha string) string {
 	if pr != nil {
-		return fmt.Sprintf("[#%s](%s/pull/%s)", pr[2], repoURL, pr[2])
+		return fmt.Sprintf("[#%s](%s/pulls/%s)", pr[2], repoURL, pr[2])
 	}
 	return fmt.Sprintf("[%s](%s/commit/%s)", sha[:min(7, len(sha))], repoURL, sha)
 }

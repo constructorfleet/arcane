@@ -48,18 +48,14 @@
 
 	const debugReleaseEnabled = $derived(open && debug && !versionInformation?.releaseNotes);
 	const debugReleaseQuery = createQuery(() => ({
-		queryKey: ['github', 'getarcaneapp', 'arcane', 'latest-release'],
+		queryKey: ['system', 'debug-release'],
 		queryFn: async () => {
-			const res = await fetch('https://api.github.com/repos/getarcaneapp/arcane/releases/latest', {
-				headers: { Accept: 'application/vnd.github+json' }
-			});
-			if (!res.ok) throw new Error(`GitHub returned ${res.status}`);
-			const data = await res.json();
+			const info = await systemUpgradeService.getVersionInfo();
 			return {
-				tag: (data.tag_name as string | undefined) ?? '',
-				body: (data.body as string | undefined) ?? '',
-				publishedAt: (data.published_at as string | undefined) ?? '',
-				url: (data.html_url as string | undefined) ?? ''
+				tag: info.newestVersion ?? '',
+				body: info.releaseNotes ?? '',
+				publishedAt: info.releasedAt ?? '',
+				url: info.releaseUrl ?? ''
 			};
 		},
 		enabled: debugReleaseEnabled,
@@ -117,6 +113,7 @@
 	}
 
 	async function handleConfirm() {
+		if (versionInformation?.deploymentManaged) return;
 		const attempt = ++startAttempt;
 		upgrading = true;
 
@@ -163,6 +160,9 @@
 		{#if upgrading}
 			<div class="px-6 pt-6 pb-2">
 				<Dialog.Header>
+					{#if versionInformation?.deploymentManaged}<p class="text-sm text-muted-foreground">
+							{m.updates_managed_by_deployment()}
+						</p>{/if}
 					<Dialog.Title>{installingTitle}</Dialog.Title>
 				</Dialog.Header>
 			</div>
@@ -270,7 +270,7 @@
 
 			<Dialog.Footer>
 				<ArcaneButton action="cancel" customLabel={m.update_center_later()} onclick={() => (open = false)} />
-				{#if canInstall}
+				{#if canInstall && !versionInformation?.deploymentManaged}
 					<ArcaneButton action="update" customLabel={installLabel} onclick={handleConfirm} />
 				{/if}
 			</Dialog.Footer>

@@ -38,7 +38,9 @@
 		upgrading?: boolean;
 	} = $props();
 
-	const shouldCheckUpgrade = $derived(!!(versionInfo.updateAvailable && canUpgradePermission && !debug));
+	const shouldCheckUpgrade = $derived(
+		!!(versionInfo.updateAvailable && canUpgradePermission && !versionInfo.deploymentManaged && !debug)
+	);
 	const isLocalEnvironment = $derived(environment.id === '0');
 
 	const upgradeCheckEnvironments = $derived(
@@ -63,6 +65,7 @@
 	});
 
 	const upgradeIsAvailable = $derived.by(() => {
+		if (versionInfo.deploymentManaged) return false;
 		if (debug) return true;
 		const result = upgradeAvailabilityQuery.data?.byEnvironment.find((entry) => entry.environment.id === environment.id)?.data;
 		return !!result?.canUpgrade && !result?.error;

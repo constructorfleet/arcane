@@ -155,6 +155,7 @@ func NewSystemService(p SystemServiceParams) *SystemService {
 			RegistryService:       p.RegistryService,
 			ResolveRuntimeOptions: resolveUpgraderRuntimeOptions,
 			KeepUpgrader:          p.Config.UpgradeKeepContainer,
+			ControlPlane:          p.Config.ControlPlane,
 		}),
 	}
 	s.backup = systembackup.NewService(systembackup.Dependencies{

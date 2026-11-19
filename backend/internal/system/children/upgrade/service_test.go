@@ -80,6 +80,12 @@ func TestResolveSelfUpgradeTargetImage(t *testing.T) {
 		wantErr      string
 	}{
 		{
+			name:         "fork repository is retained",
+			currentImage: "registry.example.test/fleet/arcane-agent:v3.0.1-cf.9",
+			info:         &types.VersionInfo{NewestVersion: "v3.0.1-cf.10"},
+			want:         "registry.example.test/fleet/arcane-agent:v3.0.1-cf.10",
+		},
+		{
 			name:         "agent pinned to an older release moves to the newest",
 			currentImage: "ghcr.io/getarcaneapp/arcane-agent:v2.8.0",
 			info:         &types.VersionInfo{NewestVersion: "v2.9.0"},

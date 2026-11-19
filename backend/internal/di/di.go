@@ -189,6 +189,7 @@ var (
 				return version.NewVersionService(version.VersionServiceParams{
 					HTTPClient:               httpClient,
 					AppVersion:               config.Version,
+					ControlPlane:             cfg.ControlPlane,
 					Revision:                 config.Revision,
 					ContainerRegistryService: localRegistry,
 					DockerService:            localDocker,

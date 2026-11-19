@@ -95,6 +95,7 @@ type (
 		upgrading    atomic.Bool
 		startingJob  atomic.Bool
 		keepUpgrader bool
+		controlPlane bool
 	}
 
 	remoteAgent struct {
@@ -144,6 +145,7 @@ type (
 			selectReachableNetwork func(context.Context, *container.InspectResponse, string) string,
 		) ([]string, []mount.Mount, container.NetworkMode, error)
 		KeepUpgrader bool
+		ControlPlane bool
 	}
 
 	progressSink struct {
@@ -181,6 +183,7 @@ var (
 	upgradeLogName           = regexp.MustCompile(`^arcane-upgrade-\d+\.log$`)
 	exactReleaseTag          = regexp.MustCompile(`^v?\d+\.\d+\.\d+(?:[-+].*)?$`)
 	activeUpgradeJobStatuses = []UpgradeJobStatus{UpgradeJobStatusPendingRestart, UpgradeJobStatusRunning}
+	errControlPlaneUpgrade   = common.Classify(common.ErrConflict, errors.New("control-plane updates are managed through the deployment configuration"))
 	errUpgradeJobInProgress  = common.Classify(common.ErrUpgradeJobInProgress, errors.New("an upgrade job is already in progress"))
 )
 
@@ -195,6 +198,7 @@ func NewService(p ServiceParams) *Service {
 		registryService:       p.RegistryService,
 		resolveRuntimeOptions: p.ResolveRuntimeOptions,
 		keepUpgrader:          p.KeepUpgrader,
+		controlPlane:          p.ControlPlane,
 		progress:              &progressFeed{subscribers: map[chan types.UpgradeProgressEvent]struct{}{}},
 		jobHub:                &agg.Hub[types.UpgradeJob]{},
 		jobChanged:            make(chan struct{}, 1),
@@ -240,6 +244,9 @@ func (s *Service) AggregateUpgradeChecks(ctx context.Context) (types.UpgradeChec
 }
 
 func (s *Service) CanUpgrade(ctx context.Context) (bool, error) {
+	if s.controlPlane {
+		return false, errControlPlaneUpgrade
+	}
 	dockerClient, err := s.dockerService.GetClient(ctx)
 	if err != nil {
 		return false, errors.New("docker socket is not accessible")
@@ -248,8 +255,8 @@ func (s *Service) CanUpgrade(ctx context.Context) (bool, error) {
 	if inspectErr != nil {
 		return false, errors.New("arcane is not running in a Docker container")
 	}
-	if unit := types.QuadletUnit(kit.FromPtr(self.Config).Labels); unit != "" {
-		return false, fmt.Errorf("arcane runs from the Quadlet unit %s; update it with podman auto-update instead", unit)
+	if policyErr := selfUpgradeRestriction(kit.FromPtr(self.Config).Labels); policyErr != nil {
+		return false, policyErr
 	}
 	return true, nil
 }
@@ -301,6 +308,9 @@ func (s *Service) TriggerUpgradeAsync(ctx context.Context, user types.Actor, tar
 }
 
 func (s *Service) prepareUpgrade(ctx context.Context, user types.Actor, target updater.SelfUpdateTarget, targetVersion string) (prepared *preparedUpgrade, err error) {
+	if s.controlPlane {
+		return nil, errControlPlaneUpgrade
+	}
 	if !s.upgrading.CompareAndSwap(false, true) {
 		return nil, common.Classify(common.ErrUpgradeInProgress, errors.New("an upgrade is already in progress"))
 	}
@@ -360,8 +370,8 @@ func (s *Service) prepareUpgrade(ctx context.Context, user types.Actor, target u
 	if err != nil {
 		return nil, err
 	}
-	if unit := types.QuadletUnit(kit.FromPtr(current.Config).Labels); unit != "" {
-		return nil, fmt.Errorf("systemd unit %s: %w", unit, common.ErrContainerQuadletManaged)
+	if policyErr := selfUpgradeRestriction(kit.FromPtr(current.Config).Labels); policyErr != nil {
+		return nil, policyErr
 	}
 
 	containerName := strings.TrimPrefix(current.Name, "/")
@@ -716,6 +726,9 @@ func resolveSelfUpgradeTargetImage(currentImageRef string, info *types.VersionIn
 }
 
 func (s *Service) StartUpgradeJob(ctx context.Context, user types.Actor, environmentIDs []string) (*UpgradeJob, error) {
+	if _, err := s.CanUpgrade(ctx); err != nil {
+		return nil, fmt.Errorf("cannot start an in-app upgrade: %w", err)
+	}
 	// Closes the in-process check-then-create window (e.g. a double-click); the job row is the durable guard.
 	if !s.startingJob.CompareAndSwap(false, true) {
 		return nil, errUpgradeJobInProgress

@@ -8,25 +8,26 @@ import (
 
 type (
 	VersionInfo struct {
-		CurrentVersion   string   `json:"currentVersion"`
-		CurrentTag       string   `json:"currentTag,omitempty"`
-		CurrentDigest    string   `json:"currentDigest,omitempty"`
-		Revision         string   `json:"revision"`
-		ShortRevision    string   `json:"shortRevision"`
-		GoVersion        string   `json:"goVersion"`
-		NodeVersion      string   `json:"nodeVersion"`
-		SvelteKitVersion string   `json:"svelteKitVersion"`
-		BuildTime        string   `json:"buildTime,omitempty"`
-		DisplayVersion   string   `json:"displayVersion"`
-		NewestVersion    string   `json:"newestVersion,omitempty"`
-		NewestDigest     string   `json:"newestDigest,omitempty"`
-		ReleaseURL       string   `json:"releaseUrl,omitempty"`
-		ReleaseNotes     string   `json:"releaseNotes,omitempty"`
-		ReleasedAt       string   `json:"releasedAt,omitempty"`
-		EnabledFeatures  []string `json:"enabledFeatures,omitempty"`
-		IsSemverVersion  bool     `json:"isSemverVersion"`
-		IsStableVersion  bool     `json:"isStableVersion"`
-		UpdateAvailable  bool     `json:"updateAvailable"`
+		CurrentVersion    string   `json:"currentVersion"`
+		CurrentTag        string   `json:"currentTag,omitempty"`
+		CurrentDigest     string   `json:"currentDigest,omitempty"`
+		Revision          string   `json:"revision"`
+		ShortRevision     string   `json:"shortRevision"`
+		GoVersion         string   `json:"goVersion"`
+		NodeVersion       string   `json:"nodeVersion"`
+		SvelteKitVersion  string   `json:"svelteKitVersion"`
+		BuildTime         string   `json:"buildTime,omitempty"`
+		DisplayVersion    string   `json:"displayVersion"`
+		NewestVersion     string   `json:"newestVersion,omitempty"`
+		NewestDigest      string   `json:"newestDigest,omitempty"`
+		ReleaseURL        string   `json:"releaseUrl,omitempty"`
+		ReleaseNotes      string   `json:"releaseNotes,omitempty"`
+		ReleasedAt        string   `json:"releasedAt,omitempty"`
+		EnabledFeatures   []string `json:"enabledFeatures,omitempty"`
+		IsSemverVersion   bool     `json:"isSemverVersion"`
+		IsStableVersion   bool     `json:"isStableVersion"`
+		UpdateAvailable   bool     `json:"updateAvailable"`
+		DeploymentManaged bool     `json:"deploymentManaged"`
 	}
 
 	VersionCheck struct {

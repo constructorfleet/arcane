@@ -1,5 +1,6 @@
 import { createQuery, keepPreviousData, useQueryClient } from '@tanstack/svelte-query';
 
+import { m } from '#lib/paraglide/messages.js';
 import { queryKeys } from '#lib/query/query-keys.js';
 import systemUpgradeService from '#lib/services/api/system-upgrade-service.js';
 import { environmentManagementService } from '#lib/services/env-mgmt-service.js';
@@ -55,7 +56,13 @@ export function useUpgradeCheck({ queryScope, getVersionInformation, getDebug = 
 	);
 	const updateCount = $derived(agentUpdates.length + (getVersionInformation()?.updateAvailable ? 1 : 0));
 	const shouldCheckUpgrade = $derived(
-		!!(updateCount > 0 && canInstallUpdates && hasPermission('system:read', LOCAL_DOCKER_ENVIRONMENT_ID) && !getDebug())
+		!!(
+			updateCount > 0 &&
+			canInstallUpdates &&
+			hasPermission('system:read', LOCAL_DOCKER_ENVIRONMENT_ID) &&
+			!getVersionInformation()?.deploymentManaged &&
+			!getDebug()
+		)
 	);
 	const upgradeAvailabilityQuery = createQuery(() => ({
 		queryKey: queryKeys.system.upgradeAvailable(queryScope),
@@ -65,6 +72,7 @@ export function useUpgradeCheck({ queryScope, getVersionInformation, getDebug = 
 	}));
 
 	const canUpgrade = $derived.by(() => {
+		if (getVersionInformation()?.deploymentManaged) return false;
 		if (getDebug()) return true;
 		const result = upgradeAvailabilityQuery.data;
 		return !!result?.canUpgrade && !result?.error;
@@ -112,6 +120,11 @@ export function useUpgradeCheck({ queryScope, getVersionInformation, getDebug = 
 		},
 		get shouldShowUpgrade() {
 			return shouldShowUpgrade;
+		},
+		get unavailableMessage() {
+			return getVersionInformation()?.deploymentManaged
+				? m.updates_managed_by_deployment()
+				: upgradeAvailabilityQuery.data?.message;
 		},
 		get versionChip() {
 			return versionChip;

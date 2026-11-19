@@ -3,7 +3,6 @@ package version
 import (
 	"cmp"
 	"context"
-	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -48,11 +47,12 @@ type (
 	}
 
 	currentImageInfo struct {
-		Tag          string
-		Digest       string
-		ImageRef     string
-		ImageID      string
-		DigestPinned bool
+		Tag               string
+		Digest            string
+		ImageRef          string
+		ImageID           string
+		DigestPinned      bool
+		DeploymentManaged bool
 	}
 
 	VersionService struct {
@@ -67,6 +67,7 @@ type (
 		currentImage             *cache.Cache[struct{}, currentImageInfo]
 		version                  string
 		revision                 string
+		controlPlane             bool
 	}
 
 	VersionServiceParams struct {
@@ -77,13 +78,13 @@ type (
 		SettingsService          *settings.SettingsService
 		AppVersion               string
 		Revision                 string
+		ControlPlane             bool
 	}
 )
 
 const (
 	versionStreamPollInterval = 5 * time.Minute
 	versionTTL                = 3 * time.Hour
-	versionCheckURL           = "https://api.github.com/repos/getarcaneapp/arcane/releases/latest"
 	commitNotesTTL            = 24 * time.Hour
 	defaultRequestTimeout     = 15 * time.Second
 )
@@ -120,6 +121,7 @@ func NewVersionService(p VersionServiceParams) *VersionService {
 			RevalidateAfter: 24 * time.Hour,
 		},
 		version:                  p.AppVersion,
+		controlPlane:             p.ControlPlane,
 		revision:                 p.Revision,
 		containerRegistryService: p.ContainerRegistryService,
 		dockerService:            p.DockerService,
@@ -167,41 +169,6 @@ func (s *VersionService) getLatestRelease(ctx context.Context) (latestRelease, e
 	}
 }
 
-func (s *VersionService) fetchLatestRelease(ctx context.Context) (latestRelease, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, versionCheckURL, http.NoBody)
-	if err != nil {
-		return latestRelease{}, fmt.Errorf("create GitHub request: %w", err)
-	}
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return latestRelease{}, fmt.Errorf("get latest release: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return latestRelease{}, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
-	}
-
-	var payload struct {
-		TagName     string `json:"tag_name"`
-		Body        string `json:"body"`
-		PublishedAt string `json:"published_at"`
-	}
-	if unmarshalReadErr := json.UnmarshalRead(resp.Body, &payload); unmarshalReadErr != nil {
-		return latestRelease{}, fmt.Errorf("decode payload: %w", unmarshalReadErr)
-	}
-	if payload.TagName == "" {
-		return latestRelease{}, errors.New("GitHub API returned empty tag name")
-	}
-
-	return latestRelease{
-		TagName:     payload.TagName,
-		Body:        payload.Body,
-		PublishedAt: payload.PublishedAt,
-	}, nil
-}
-
 func (s *VersionService) GetLatestVersion(ctx context.Context) (string, error) {
 	rel, err := s.getLatestRelease(ctx)
 	if err != nil {
@@ -242,14 +209,17 @@ func (s *VersionService) normalizeVersion(ver string) string {
 
 func (s *VersionService) ReleaseURL(localVersion string) string {
 	if strings.TrimSpace(localVersion) == "" {
-		return "https://github.com/getarcaneapp/arcane/releases/latest"
+		return repoURL + "/releases"
 	}
 
-	return "https://github.com/getarcaneapp/arcane/releases/tag/" + kit.EnsurePrefix(localVersion, "v")
+	return repoURL + "/releases/tag/" + kit.EnsurePrefix(localVersion, "v")
 }
 
 func (s *VersionService) GetVersionInformation(ctx context.Context, currentVersion string) (*types.VersionCheck, error) {
 	cur := s.normalizeVersion(cmp.Or(currentVersion, s.version))
+	if s.controlPlane {
+		return &types.VersionCheck{CurrentVersion: cur, ReleaseURL: s.ReleaseURL(cur)}, nil
+	}
 
 	latest, err := func() (string, error) {
 		if !s.settingsService.GetBoolSetting(ctx, "updateCheckEnabled") {
@@ -334,10 +304,16 @@ func (s *VersionService) GetAppVersionInfo(ctx context.Context) *types.VersionIn
 	// Semver versions (including prereleases like 2.4.0-next.1) display as v<version>.
 	displayVersion := strings.TrimPrefix(strings.TrimSpace(s.version), "v")
 
-	current := s.detectCurrentImageInfo(ctx)
+	current := currentImageInfo{}
+	if !s.controlPlane {
+		current = s.detectCurrentImageInfo(ctx)
+	}
 
 	// Update fields stay empty when update checks are disabled.
 	update := func() types.VersionInfo {
+		if s.controlPlane || current.DeploymentManaged {
+			return types.VersionInfo{ReleaseURL: s.ReleaseURL(ver)}
+		}
 		if !s.settingsService.GetBoolSetting(ctx, "updateCheckEnabled") {
 			return types.VersionInfo{}
 		}
@@ -396,25 +372,26 @@ func (s *VersionService) GetAppVersionInfo(ctx context.Context) *types.VersionIn
 	}()
 
 	return &types.VersionInfo{
-		CurrentVersion:   ver,
-		CurrentTag:       current.Tag,
-		CurrentDigest:    current.Digest,
-		DisplayVersion:   kit.Ternary(isSemver, "v"+displayVersion, displayVersion),
-		Revision:         s.revision,
-		ShortRevision:    config.ShortRevision(),
-		GoVersion:        runtime.Version(),
-		NodeVersion:      config.NodeVersion,
-		SvelteKitVersion: config.SvelteKitVersion,
-		EnabledFeatures:  append(kit.Unique(kit.TrimNonEmpty(strings.Split(strings.ToLower(buildables.EnabledFeatures), ","))), apns.FeatureName),
-		BuildTime:        config.BuildTime,
-		IsSemverVersion:  isSemver,
-		IsStableVersion:  isSemver && semver.Prerelease(kit.EnsurePrefix(s.version, "v")) == "",
-		NewestVersion:    update.NewestVersion,
-		NewestDigest:     update.NewestDigest,
-		UpdateAvailable:  update.UpdateAvailable,
-		ReleaseURL:       update.ReleaseURL,
-		ReleaseNotes:     update.ReleaseNotes,
-		ReleasedAt:       update.ReleasedAt,
+		CurrentVersion:    ver,
+		DeploymentManaged: s.controlPlane || current.DeploymentManaged,
+		CurrentTag:        current.Tag,
+		CurrentDigest:     current.Digest,
+		DisplayVersion:    kit.Ternary(isSemver, "v"+displayVersion, displayVersion),
+		Revision:          s.revision,
+		ShortRevision:     config.ShortRevision(),
+		GoVersion:         runtime.Version(),
+		NodeVersion:       config.NodeVersion,
+		SvelteKitVersion:  config.SvelteKitVersion,
+		EnabledFeatures:   append(kit.Unique(kit.TrimNonEmpty(strings.Split(strings.ToLower(buildables.EnabledFeatures), ","))), apns.FeatureName),
+		BuildTime:         config.BuildTime,
+		IsSemverVersion:   isSemver,
+		IsStableVersion:   isSemver && semver.Prerelease(kit.EnsurePrefix(s.version, "v")) == "",
+		NewestVersion:     update.NewestVersion,
+		NewestDigest:      update.NewestDigest,
+		UpdateAvailable:   update.UpdateAvailable,
+		ReleaseURL:        update.ReleaseURL,
+		ReleaseNotes:      update.ReleaseNotes,
+		ReleasedAt:        update.ReleasedAt,
 	}
 }
 
@@ -493,7 +470,12 @@ func (s *VersionService) detectCurrentImageInfo(ctx context.Context) (detected c
 		slog.DebugContext(ctx, "detectCurrentImageInfo: failed to inspect container", "containerId", containerId, "error", err)
 		return currentImageInfo{}
 	}
-	configImage := kit.FromPtr(inspectResult.Container.Config).Image
+	containerConfig := kit.FromPtr(inspectResult.Container.Config)
+	configImage := containerConfig.Image
+	swarmService := cmp.Or(
+		strings.TrimSpace(containerConfig.Labels["com.docker.swarm.service.id"]),
+		strings.TrimSpace(containerConfig.Labels["com.docker.swarm.service.name"]),
+	)
 
 	// The tag comes from the user-specified config image; the repository falls back to it too.
 	tag, imageRef := "latest", configImage
@@ -506,10 +488,11 @@ func (s *VersionService) detectCurrentImageInfo(ctx context.Context) (detected c
 	}
 	_, digestPinned := named.(reference.Digested)
 	base := currentImageInfo{
-		Tag:          tag,
-		ImageRef:     imageRef,
-		ImageID:      inspectResult.Container.Image,
-		DigestPinned: digestPinned,
+		Tag:               tag,
+		ImageRef:          imageRef,
+		ImageID:           inspectResult.Container.Image,
+		DigestPinned:      digestPinned,
+		DeploymentManaged: swarmService != "",
 	}
 
 	if base.ImageID == "" {
@@ -528,11 +511,12 @@ func (s *VersionService) detectCurrentImageInfo(ctx context.Context) (detected c
 		}
 		if digested, ok := repoNamed.(reference.Digested); ok {
 			return currentImageInfo{
-				Tag:          base.Tag,
-				Digest:       string(digested.Digest()),
-				ImageRef:     repoNamed.Name(),
-				ImageID:      base.ImageID,
-				DigestPinned: base.DigestPinned,
+				Tag:               base.Tag,
+				Digest:            string(digested.Digest()),
+				ImageRef:          repoNamed.Name(),
+				ImageID:           base.ImageID,
+				DigestPinned:      base.DigestPinned,
+				DeploymentManaged: base.DeploymentManaged,
 			}
 		}
 	}

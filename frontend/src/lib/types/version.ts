@@ -15,6 +15,7 @@ export type VersionInfo = {
 	newestVersion?: string;
 	newestDigest?: string;
 	updateAvailable: boolean;
+	deploymentManaged?: boolean;
 	releaseUrl?: string;
 	releaseNotes?: string;
 	releasedAt?: string;

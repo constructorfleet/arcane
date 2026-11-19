@@ -358,7 +358,7 @@ func TestVersionService_GetAppVersionInfoNextChannelUsesImageLabel(t *testing.T)
 		return &http.Response{
 			StatusCode: http.StatusOK,
 			Header:     make(http.Header),
-			Body:       io.NopCloser(strings.NewReader(`{"tag_name":"v2.7.0"}`)),
+			Body:       io.NopCloser(strings.NewReader(`[{"tag_name":"v2.7.0"}]`)),
 			Request:    req,
 		}, nil
 	})}
@@ -448,7 +448,7 @@ func TestVersionService_GetAppVersionInfoSuppressesOlderStableForPrerelease(t *t
 		return &http.Response{
 			StatusCode: http.StatusOK,
 			Header:     make(http.Header),
-			Body:       io.NopCloser(strings.NewReader(`{"tag_name":"v2.7.0","body":"notes","published_at":"2026-08-05T22:21:04Z"}`)),
+			Body:       io.NopCloser(strings.NewReader(`[{"tag_name":"v2.7.0","body":"notes","published_at":"2026-08-05T22:21:04Z"}]`)),
 			Request:    req,
 		}, nil
 	})}
@@ -493,11 +493,11 @@ func TestVersionService_GetAppVersionInfoChannelCommitNotes(t *testing.T) {
 			imageRevision: targetRevision,
 			status:        http.StatusOK,
 			wantNotes: []string{
-				"### New features\n\n- feat: redesigned activity center ([#42](https://github.com/getarcaneapp/arcane/pull/42) by @octo)",
-				"### Bug fixes\n\n- fix: correct e2e test ([3333333](https://github.com/getarcaneapp/arcane/commit/3333333333333333333333333333333333333333))",
-				"[And 1 more commits](https://github.com/getarcaneapp/arcane/compare/" + runningRevision + "..." + targetRevision + ")",
+				"### New features\n\n- feat: redesigned activity center ([#42](https://gitea.home.prettybaked.com/constructorfleet/arcane/pulls/42) by @octo)",
+				"### Bug fixes\n\n- fix: correct e2e test ([3333333](https://gitea.home.prettybaked.com/constructorfleet/arcane/commit/3333333333333333333333333333333333333333))",
+				"[And 1 more commits](https://gitea.home.prettybaked.com/constructorfleet/arcane/compare/" + runningRevision + "..." + targetRevision + ")",
 			},
-			wantURL:       "https://github.com/getarcaneapp/arcane/compare/" + runningRevision + "..." + targetRevision,
+			wantURL:       "https://gitea.home.prettybaked.com/constructorfleet/arcane/compare/" + runningRevision + "..." + targetRevision,
 			wantGitHubHit: true,
 		},
 		{
@@ -509,7 +509,7 @@ func TestVersionService_GetAppVersionInfoChannelCommitNotes(t *testing.T) {
 			name:          "compare failure keeps the diff link only",
 			imageRevision: targetRevision,
 			status:        http.StatusForbidden,
-			wantURL:       "https://github.com/getarcaneapp/arcane/compare/" + runningRevision + "..." + targetRevision,
+			wantURL:       "https://gitea.home.prettybaked.com/constructorfleet/arcane/compare/" + runningRevision + "..." + targetRevision,
 			wantGitHubHit: true,
 		},
 	}
@@ -559,7 +559,7 @@ func TestVersionService_GetAppVersionInfoChannelCommitNotes(t *testing.T) {
 			githubHit := false
 			httpClient := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				githubHit = true
-				assert.Equal(t, "/repos/getarcaneapp/arcane/compare/"+runningRevision+"..."+targetRevision, req.URL.Path)
+				assert.Equal(t, "/api/v1/repos/constructorfleet/arcane/compare/"+runningRevision+"..."+targetRevision, req.URL.Path)
 				return &http.Response{
 					StatusCode: tt.status,
 					Header:     make(http.Header),
@@ -599,4 +599,14 @@ func TestVersionService_GetAppVersionInfoChannelCommitNotes(t *testing.T) {
 			assert.Equal(t, tt.wantGitHubHit, githubHit)
 		})
 	}
+}
+
+func TestVersionServiceControlPlaneInformation(t *testing.T) {
+	svc := NewVersionService(VersionServiceParams{ControlPlane: true, AppVersion: "3.0.1-cf.17", SettingsService: newVersionSettingsService(t, true)})
+	info := svc.GetAppVersionInfo(t.Context())
+	require.True(t, info.DeploymentManaged)
+	require.False(t, info.UpdateAvailable)
+	require.Empty(t, info.NewestVersion)
+	require.Equal(t, "https://gitea.home.prettybaked.com/constructorfleet/arcane/releases/tag/v3.0.1-cf.17", info.ReleaseURL)
+	require.Equal(t, "v3.0.1-cf.17", info.CurrentVersion)
 }

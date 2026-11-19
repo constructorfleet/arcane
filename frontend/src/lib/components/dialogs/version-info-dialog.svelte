@@ -39,7 +39,7 @@
 		buildTime: '2026-04-15T12:00:00Z',
 		enabledFeatures: ['autologin'],
 		currentDigest: 'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-		releaseUrl: 'https://github.com/getarcaneapp/arcane/releases/tag/v1.2.4'
+		releaseUrl: 'https://gitea.home.prettybaked.com/constructorfleet/arcane/releases/tag/v3.0.1-cf.17'
 	} as VersionInfo;
 
 	const displayInfo = $derived(debugMode ? mockVersionInfo : versionInfo);
@@ -93,6 +93,9 @@
 	{/snippet}
 
 	<div class="flex flex-col gap-0 py-2">
+		{#if displayInfo.deploymentManaged}
+			<p class="border-b border-border/50 py-3 text-sm text-muted-foreground">{m.updates_managed_by_deployment()}</p>
+		{/if}
 		{#if displayInfo.currentTag}
 			{@render infoRow(m.version_info_tag(), displayInfo.currentTag)}
 		{/if}

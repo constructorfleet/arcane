@@ -35,3 +35,9 @@ Maintain squash-only merging, automatic branch deletion, issues/releases enabled
 ## Build concurrency
 
 The release Dockerfiles use `GOMAXPROCS=4` and `go build -p 2`, matching the Go validation job. These settings bound compilation within each manager/agent build stage; they do not set runtime container limits. The swarm05 resource-pressure incident remains tracked separately in #42 until its initiating cause is established.
+
+## Deployment-owned updates
+
+Control planes and detected Swarm tasks report `deploymentManaged: true`, link their running Gitea release, and leave image refresh to the service/stack deployment owner. The in-app container-recreation updater refuses these targets before pulling images or changing deployments. In this homelab, SwarmCD owns the stack and mutable image refresh.
+
+Standalone release checks read the fork's published Gitea releases, including prereleases; draft and invalid tags are excluded. The repository currently requires authentication, so anonymous standalone polling is unavailable. No personal Git credentials are copied into Arcane. Dedicated private-feed authentication remains a follow-up; Gitea remains authoritative for release notes and artifacts.
