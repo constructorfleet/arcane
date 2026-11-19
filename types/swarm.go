@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"encoding/json/jsontext"
 	"fmt"
 	"time"
@@ -249,7 +250,7 @@ type (
 	}
 
 	SwarmServiceInspect struct {
-		Spec           swarm.ServiceSpec                    `json:"spec"`
+		Spec           jsontext.Value                       `json:"spec" doc:"Native Docker service specification"`
 		CreatedAt      time.Time                            `json:"createdAt"`
 		UpdatedAt      time.Time                            `json:"updatedAt"`
 		UpdateStatus   *swarm.UpdateStatus                  `json:"updateStatus,omitempty"`
@@ -622,16 +623,21 @@ func NewSwarmServiceSummary(service swarm.Service, nodeNames []string, networkNa
 	}
 }
 
-func NewSwarmServiceInspect(service swarm.Service) SwarmServiceInspect {
+func NewSwarmServiceInspect(service swarm.Service) (SwarmServiceInspect, error) {
+	// Docker's SDK tags use JSON v1 semantics, including empty mode discriminators.
+	spec, err := json.Marshal(service.Spec)
+	if err != nil {
+		return SwarmServiceInspect{}, fmt.Errorf("encode native service specification: %w", err)
+	}
 	return SwarmServiceInspect{
 		ID:           service.ID,
 		Version:      service.Version,
 		CreatedAt:    service.CreatedAt,
 		UpdatedAt:    service.UpdatedAt,
-		Spec:         service.Spec,
+		Spec:         spec,
 		Endpoint:     service.Endpoint,
 		UpdateStatus: service.UpdateStatus,
-	}
+	}, nil
 }
 
 func NewSwarmTaskSummary(task swarm.Task, serviceName, nodeName string) SwarmTaskSummary {

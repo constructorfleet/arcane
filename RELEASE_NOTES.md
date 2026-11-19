@@ -1,14 +1,12 @@
-# 3.0.1-cf.23
+# 3.0.1-cf.24
 
-## Fix
+## Native Swarm service inspection
 
-- Close Tag Image after a successful tag and image refresh. The completed action now clears its busy state before requesting dialog closure; failures retain the dialog and actual error feedback. Refs #64.
+- Preserve Docker SDK service specifications using their native JSON encoding before including them in Arcane responses. Empty Global and GlobalJob mode markers and explicit zero replica/completion values now survive inspection instead of disappearing under JSON v2 omission rules. Refs #66.
+- Keep the existing mode decoder and native Docker create/update/scale behavior; no frontend mode guessing or global JSON serializer change is introduced.
 
 ## Validation
 
-- The issue was reproduced in cf.22: an owned unique tag was created on swarm03 and the success toast appeared, but the dialog remained open.
-- All 8 existing frontend tests, the production build, formatting and full lint passed locally. Runtime closure acceptance follows normal publication and rollout.
-
-## Limits
-
-- No registry access, image tags, or deployment behavior are changed by this UI fix.
+- Existing service-mode business coverage now exercises inspection through response serialization for replicated, zero-replica, replicated-job, global and global-job modes, alongside the existing scale rules.
+- Swarm/authz and API checks, existing frontend tests, production build, formatting and full lint pass locally.
+- Runtime mode display acceptance follows normal publication and rollout. No production service is mutated for QA.

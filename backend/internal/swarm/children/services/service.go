@@ -138,7 +138,10 @@ func (s *Service) GetService(ctx context.Context, serviceID string) (*types.Swar
 	}
 	service := serviceResult.Service
 
-	inspect := types.NewSwarmServiceInspect(service)
+	inspect, err := types.NewSwarmServiceInspect(service)
+	if err != nil {
+		return nil, err
+	}
 	inspect.Nodes = s.resolveServiceNodeNames(ctx, serviceID)
 	inspect.NetworkDetails = s.enrichServiceNetworkDetails(ctx, service.Spec.TaskTemplate.Networks)
 	inspect.Mounts = s.enrichServiceMounts(ctx, service.Spec.TaskTemplate.ContainerSpec)

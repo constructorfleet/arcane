@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"fmt"
 	"net/http"
@@ -41,7 +42,7 @@ func newSwarmTestDockerClient(t *testing.T, server *httptest.Server) *client.Cli
 	return cli
 }
 
-func TestService_ScaleService_HandlesServiceModes(t *testing.T) {
+func TestService_ServiceModes(t *testing.T) {
 	ctx := t.Context()
 	replicas := uint64(5)
 	maxConcurrent := uint64(2)
@@ -65,7 +66,7 @@ func TestService_ScaleService_HandlesServiceModes(t *testing.T) {
 		},
 		{
 			name:     "replicated job",
-			modeJSON: `{"ReplicatedJob":{"MaxConcurrent":2}}`,
+			modeJSON: `{"ReplicatedJob":{"MaxConcurrent":2,"TotalCompletions":0}}`,
 			assertMode: func(t *testing.T, mode swarm.ServiceMode) {
 				t.Helper()
 				require.Nil(t, mode.Replicated)
@@ -74,6 +75,16 @@ func TestService_ScaleService_HandlesServiceModes(t *testing.T) {
 				require.Equal(t, replicas, *mode.ReplicatedJob.TotalCompletions)
 				require.NotNil(t, mode.ReplicatedJob.MaxConcurrent)
 				require.Equal(t, maxConcurrent, *mode.ReplicatedJob.MaxConcurrent)
+			},
+		},
+		{
+			name:     "zero replicas",
+			modeJSON: `{"Replicated":{"Replicas":0}}`,
+			assertMode: func(t *testing.T, mode swarm.ServiceMode) {
+				t.Helper()
+				require.NotNil(t, mode.Replicated)
+				require.NotNil(t, mode.Replicated.Replicas)
+				require.Equal(t, replicas, *mode.Replicated.Replicas)
 			},
 		},
 		{
@@ -108,6 +119,8 @@ func TestService_ScaleService_HandlesServiceModes(t *testing.T) {
 					}
 				case r.Method == http.MethodGet && r.URL.Path == "/v1.41/services/service-1":
 					_, _ = fmt.Fprintf(w, `{"ID":"service-1","Version":{"Index":7},"Spec":{"Name":"service-1","Mode":%s}}`, tt.modeJSON)
+				case r.Method == http.MethodGet && (r.URL.Path == "/v1.41/nodes" || r.URL.Path == "/v1.41/tasks"):
+					_, _ = w.Write([]byte(`[]`))
 				case r.Method == http.MethodPost && r.URL.Path == "/v1.41/services/service-1/update":
 					updateCalls++
 					if !assert.Equal(t, "7", r.URL.Query().Get("version")) {
@@ -127,6 +140,18 @@ func TestService_ScaleService_HandlesServiceModes(t *testing.T) {
 
 			dockerService := newSettingsDockerService(t, newSwarmTestDockerClient(t, server))
 			svc := NewService(dockerService, func(context.Context) error { return nil }, nil)
+
+			inspected, err := svc.GetService(ctx, "service-1")
+			require.NoError(t, err)
+			encoded, err := json.Marshal(inspected)
+			require.NoError(t, err)
+			var wire struct {
+				Spec struct {
+					Mode jsontext.Value
+				} `json:"spec"`
+			}
+			require.NoError(t, json.Unmarshal(encoded, &wire))
+			require.JSONEq(t, tt.modeJSON, string(wire.Spec.Mode))
 
 			resp, err := svc.ScaleService(ctx, "service-1", replicas)
 			if tt.wantErr {
