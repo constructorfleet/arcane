@@ -8,6 +8,7 @@
 	import * as ResponsiveDialog from '#lib/components/ui/responsive-dialog/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { imageService } from '#lib/services/image-service.js';
+	import { extractApiErrorMessage } from '#lib/utils/api.js';
 	import { createForm, preventDefault } from '#lib/utils/settings.svelte.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
@@ -64,7 +65,7 @@
 				const error = operationResult.error;
 
 				console.error('Failed to tag image:', error);
-				toast.error(m.images_tag_failed());
+				toast.error(m.images_tag_failed(), { description: extractApiErrorMessage(error) });
 			}
 		} finally {
 			isTagging = false;

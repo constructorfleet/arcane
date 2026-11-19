@@ -467,17 +467,19 @@ func (s *ContainerRegistryService) GetRegistryAuthForImage(ctx context.Context, 
 		return "", err
 	}
 
+	var credentialErrors []error
 	for i := range candidates {
 		credential, credErr := s.credentialForRegistry(ctx, &candidates[i])
 		if credErr != nil {
 			slog.WarnContext(ctx, "failed to resolve registry credential, skipping", "registry", candidates[i].URL, "error", credErr)
+			credentialErrors = append(credentialErrors, credErr)
 			continue
 		}
 		if credential != nil {
 			return arcaneregistry.EncodeAuthHeader(credential.Username, credential.Token, credential.ServerAddress)
 		}
 	}
-	return "", nil
+	return "", errors.Join(credentialErrors...)
 }
 
 func (s *ContainerRegistryService) GetAllRegistryAuthConfigs(ctx context.Context) (map[string]dockerregistry.AuthConfig, error) {

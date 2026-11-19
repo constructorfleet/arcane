@@ -183,6 +183,16 @@ func RegisterImages(
 	}, authz.PermImagesDelete, h.RemoveImage)
 
 	middleware.RegisterWithPermission(api, huma.Operation{
+		OperationID: "push-image",
+		Method:      http.MethodPost,
+		Path:        "/agents/{id}/images/{imageId}/push",
+		Summary:     "Push a local image tag",
+		Description: "Push an existing tag from its owning agent to a registry",
+		Tags:        []string{"Images"},
+		Security:    handlerutil.DefaultOperationSecurity(),
+	}, authz.PermImagesPush, h.PushImage)
+
+	middleware.RegisterWithPermission(api, huma.Operation{
 		OperationID: "pull-image",
 		Method:      http.MethodPost,
 		Path:        "/agents/{id}/images/pull",

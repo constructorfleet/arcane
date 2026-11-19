@@ -19,7 +19,7 @@ import type { PatchOptions, PatchRecord, PatchTarget } from '#lib/types/imagepat
 import type { ImageUpdateResponse } from '#lib/types/imageupdate.js';
 import type { OperationStreamFrame } from '#lib/types/stream.js';
 import type { PruneImagesOptions } from '#lib/types/system.js';
-import type { ImageAttestationRequestOptions, ImagePullResult } from '#lib/types/ui/image.js';
+import type { ImageAttestationRequestOptions, ImageTransferRequest, ImageTransferResult } from '#lib/types/ui/image.js';
 import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 import type { UploadProgressCallback } from '#lib/types/ui/upload.js';
 import type { UpdaterOptions, UpdaterResult } from '#lib/types/updater.js';
@@ -100,44 +100,39 @@ class ImageService extends BaseAPIService {
 		return `/api/agents/${environmentId}/images/${encodeURIComponent(imageId)}/export`;
 	}
 
-	async pullImageStream(
-		imageName: string,
-		onLine: ((data: unknown) => void) | undefined,
-		environmentId: string
-	): Promise<ImagePullResult> {
+	async transferImageStream(request: ImageTransferRequest): Promise<ImageTransferResult> {
+		const { imageName, environmentId, onLine } = request;
+		const pushing = request.operation === 'push';
+		const failure = pushing ? m.image_push_failed() : m.images_pull_stream_failed();
 		const operationResult = await tryCatch(
 			(async () => {
+				const path = pushing
+					? `/api/agents/${environmentId}/images/${encodeURIComponent(request.imageId)}/push`
+					: `/api/agents/${environmentId}/images/pull`;
 				const body = await this.postStreamInternal(
-					`/api/agents/${environmentId}/images/pull`,
-					{ imageName },
-					(status) => `${m.images_pull_server_error()}: HTTP ${status}`
+					path,
+					pushing ? { reference: imageName } : { imageName },
+					(status) => `${failure}: HTTP ${status}`
 				);
+				let completed = false;
 				await readNdjsonStream(body, (parsed: OperationStreamFrame) => {
 					onLine?.(parsed);
 					if (parsed?.error) {
-						throw new Error(
-							typeof parsed.error === 'string' ? parsed.error : parsed.error.message || m.images_pull_stream_failed()
-						);
+						throw new Error(typeof parsed.error === 'string' ? parsed.error : parsed.error.message || failure);
 					}
-					// The terminal frame marks success; don't wait on the network EOF.
-					return parsed?.done === true;
+					completed = parsed?.done === true;
+					return completed;
 				});
+				if (!completed) throw new Error(m.image_transfer_incomplete());
 				return { success: true, imageName };
 			})()
 		);
 		if (operationResult.error !== null) {
 			const error = operationResult.error;
-			if (isSessionCancelledError(error)) {
-				return { success: false, imageName, cancelled: true };
-			}
-			return {
-				success: false,
-				imageName,
-				error: error instanceof Error ? error.message : m.images_pull_stream_failed()
-			};
-		} else {
-			return operationResult.data;
+			if (isSessionCancelledError(error)) return { success: false, imageName, cancelled: true };
+			return { success: false, imageName, error: error instanceof Error ? error.message : failure };
 		}
+		return operationResult.data;
 	}
 
 	async buildImageStream(request: ImageBuildRequest, environmentId: string, onLine: (line: string) => boolean): Promise<void> {

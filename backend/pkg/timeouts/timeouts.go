@@ -9,6 +9,7 @@ import (
 
 const (
 	DefaultDockerAPI       = 30 * time.Second
+	DefaultDockerImagePush = 10 * time.Minute
 	DefaultDockerImagePull = 10 * time.Minute
 	DefaultDockerDiskUsage = 10 * time.Minute
 	DefaultTrivyScan       = 15 * time.Minute

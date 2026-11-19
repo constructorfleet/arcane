@@ -11,6 +11,7 @@
 	const statuses: ActivityStatus[] = ['queued', 'running', 'success', 'failed', 'cancelled'];
 	const types: ActivityType[] = [
 		'job_run',
+		'image_push',
 		'image_pull',
 		'image_build',
 		'image_update_check',

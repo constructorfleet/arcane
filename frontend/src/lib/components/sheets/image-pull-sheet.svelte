@@ -85,7 +85,11 @@
 	}
 
 	async function drainPullStream(fullImageName: string, targetEnvironmentId: string) {
-		const result = await imageService.pullImageStream(fullImageName, undefined, targetEnvironmentId);
+		const result = await imageService.transferImageStream({
+			operation: 'pull',
+			imageName: fullImageName,
+			environmentId: targetEnvironmentId
+		});
 		if (result.cancelled) return;
 		if (!result.success) {
 			const message = result.error || m.images_pull_unexpected_error();

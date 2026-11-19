@@ -4,6 +4,7 @@ import {
 	ActivityIcon,
 	BroomIcon,
 	DownloadIcon,
+	UploadIcon,
 	EditIcon,
 	HammerIcon,
 	PauseIcon,
@@ -36,6 +37,7 @@ const statusDisplay = new Map(
 const typeDisplay = new Map(
 	Object.entries({
 		job_run: { label: m.activity_type_job_run, icon: ActivityIcon },
+		image_push: { label: m.push_image, icon: UploadIcon },
 		image_pull: { label: m.activity_type_image_pull, icon: DownloadIcon },
 		image_build: { label: m.activity_type_image_build, icon: HammerIcon },
 		image_update_check: { label: m.activity_type_image_update_check, icon: RefreshIcon },

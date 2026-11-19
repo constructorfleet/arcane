@@ -92,7 +92,11 @@
 		onOpenChange?.(false);
 		resetDialog();
 
-		const result = await imageService.pullImageStream(imageRef, undefined, targetEnvironmentId);
+		const result = await imageService.transferImageStream({
+			operation: 'pull',
+			imageName: imageRef,
+			environmentId: targetEnvironmentId
+		});
 		pullingImageName = null;
 		if (result.cancelled) return;
 		if (!result.success) {

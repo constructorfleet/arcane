@@ -79,6 +79,7 @@ const (
 	ActivityStatusSuccess         ActivityStatus       = "success"
 	ActivityStatusFailed          ActivityStatus       = "failed"
 	ActivityStatusCancelled       ActivityStatus       = "cancelled"
+	ActivityTypeImagePush         ActivityType         = "image_push"
 	ActivityTypeImagePull         ActivityType         = "image_pull"
 	ActivityTypeImageBuild        ActivityType         = "image_build"
 	ActivityTypeImageUpdateCheck  ActivityType         = "image_update_check"

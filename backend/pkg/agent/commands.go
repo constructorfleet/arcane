@@ -44,6 +44,7 @@ var (
 		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/images/counts", CommandName: "image.counts"},
 		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/images/{imageId}", CommandName: "image.inspect"},
 		{Method: http.MethodDelete, PathPattern: "/api/agents/{id}/images/{imageId}", CommandName: "image.delete"},
+		{Method: http.MethodPost, PathPattern: "/api/agents/{id}/images/{imageId}/push", CommandName: "image.push"},
 		{Method: http.MethodPost, PathPattern: "/api/agents/{id}/images/pull", CommandName: "image.pull"},
 		{Method: http.MethodPost, PathPattern: "/api/agents/{id}/images/build", CommandName: "image.build.start"},
 		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/images/builds", CommandName: "image.build.list"},

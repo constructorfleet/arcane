@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1126,5 +1127,115 @@ func TestImagePaginationConfig_FiltersByLabel(t *testing.T) {
 			}
 			require.Equal(t, tt.want, got)
 		})
+	}
+}
+
+func TestImageServicePush(t *testing.T) {
+	imageID := "sha256:" + strings.Repeat("a", 64)
+	resultDigest := "sha256:" + strings.Repeat("b", 64)
+	for _, tc := range []struct {
+		name             string
+		tagID            string
+		stream           string
+		wantError        string
+		brokenCredential bool
+		wantPush         bool
+	}{
+		{name: "authenticated push", tagID: imageID, stream: `{"status":"Pushed","id":"layer"}` + "\n" + `{"aux":{"Digest":"` + resultDigest + `"}}` + "\n", wantPush: true},
+		{name: "changed local tag", tagID: "sha256:" + strings.Repeat("c", 64), wantError: "no longer points"},
+		{name: "credential unavailable", tagID: imageID, brokenCredential: true, wantError: "credentials"},
+		{name: "registry denial in stream", tagID: imageID, stream: `{"errorDetail":{"message":"push permission denied","code":403}}` + "\n", wantError: "push permission denied", wantPush: true},
+		{name: "unconfirmed EOF", tagID: imageID, stream: `{"status":"Pushing"}` + "\n", wantError: "without a digest confirmation", wantPush: true},
+		{name: "invalid digest", tagID: imageID, stream: `{"aux":{"Digest":"not-a-digest"}}` + "\n", wantError: "without a digest confirmation", wantPush: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var pushes atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch imageDockerTestPath(r.URL.Path) {
+				case "/images/registry.example.test/team/qa:v1/json":
+					assert.Equal(t, http.MethodGet, r.Method)
+					_, _ = io.WriteString(w, `{"Id":"`+tc.tagID+`"}`)
+				case "/images/registry.example.test/team/qa/push":
+					pushes.Add(1)
+					assert.Equal(t, http.MethodPost, r.Method)
+					assert.Equal(t, "v1", r.URL.Query().Get("tag"))
+					auth, authErr := authconfig.Decode(r.Header.Get("X-Registry-Auth"))
+					if !assert.NoError(t, authErr) {
+						w.WriteHeader(http.StatusBadRequest)
+						return
+					}
+					assert.Equal(t, "writer", auth.Username)
+					assert.Equal(t, "test-push-token", auth.Password)
+					_, _ = io.WriteString(w, tc.stream)
+				default:
+					t.Errorf("unexpected Docker operation %s %s", r.Method, r.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			t.Cleanup(server.Close)
+			authService, db := setupImageServiceAuthTest(t)
+			createTestPullRegistry(t, db, "https://registry.example.test", "writer", "test-push-token")
+			if tc.brokenCredential {
+				require.NoError(t, db.Model(&registry.ContainerRegistry{}).Where("url = ?", "https://registry.example.test").Update("token", "invalid-ciphertext").Error)
+			}
+			svc := NewImageService(ImageServiceParams{DockerService: newImageTestDockerService(t, server), RegistryService: authService.registryService})
+			err := svc.Push(t.Context(), PushRequest{ImageID: imageID, Ref: "registry.example.test/team/qa:v1", Progress: io.Discard})
+			if tc.wantError != "" {
+				require.ErrorContains(t, err, tc.wantError)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tc.wantPush, pushes.Load() == 1)
+		})
+	}
+}
+
+func TestImageServicePushRequiresExplicitTagAndSource(t *testing.T) {
+	for _, tc := range []PushRequest{
+		{ImageID: "latest", Ref: "registry.example.test/team/qa:v1", Progress: io.Discard},
+		{ImageID: "sha256:" + strings.Repeat("a", 64), Ref: "team/qa:v1", Progress: io.Discard},
+		{ImageID: "sha256:" + strings.Repeat("a", 64), Ref: "registry.example.test/team/qa", Progress: io.Discard},
+		{ImageID: "sha256:" + strings.Repeat("a", 64), Ref: "registry.example.test/team/qa@sha256:" + strings.Repeat("b", 64), Progress: io.Discard},
+	} {
+		svc := &ImageService{}
+		require.Error(t, svc.Push(t.Context(), tc))
+	}
+}
+
+func TestImageServicePushHonorsCancellation(t *testing.T) {
+	started := make(chan struct{})
+	imageID := "sha256:" + strings.Repeat("a", 64)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.HasSuffix(r.URL.Path, "/json") {
+			_, _ = io.WriteString(w, `{"Id":"`+imageID+`"}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{"status":"Pushing"}`+"\n")
+		w.(http.Flusher).Flush()
+		close(started)
+		<-r.Context().Done()
+	}))
+	t.Cleanup(server.Close)
+	authService, _ := setupImageServiceAuthTest(t)
+	svc := NewImageService(ImageServiceParams{DockerService: newImageTestDockerService(t, server), RegistryService: authService.registryService})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	result := make(chan error, 1)
+	go func() {
+		result <- svc.Push(ctx, PushRequest{ImageID: imageID, Ref: "registry.example.test/team/qa:v1", Progress: io.Discard})
+	}()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("push did not start")
+	}
+	cancel()
+	select {
+	case err := <-result:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(5 * time.Second):
+		t.Fatal("push did not cancel")
 	}
 }

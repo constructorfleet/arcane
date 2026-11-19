@@ -4,10 +4,16 @@ export interface ImageAttestationRequestOptions {
 	statement?: boolean;
 }
 
-export type ImagePullResult = {
+export type ImageTransferResult = {
 	success: boolean;
 	imageName: string;
 	error?: string;
-	/** The pull was abandoned because the user signed out. */
+	/** The transfer was abandoned because the user signed out. */
 	cancelled?: boolean;
 };
+
+export type ImageTransferRequest = {
+	imageName: string;
+	environmentId: string;
+	onLine?: (data: unknown) => void;
+} & ({ operation: 'pull' } | { operation: 'push'; imageId: string });

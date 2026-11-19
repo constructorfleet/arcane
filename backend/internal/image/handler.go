@@ -93,6 +93,12 @@ type (
 		Force         bool   `query:"force" doc:"Force removal"`
 	}
 
+	PushImageInput struct {
+		EnvironmentID string `path:"id" doc:"Environment ID"`
+		ImageID       string `path:"imageId" doc:"Expected image ID"`
+		Body          types.ImagePushRequest
+	}
+
 	PullImageInput struct {
 		EnvironmentID string `path:"id" doc:"Environment ID"`
 		Body          types.ImagePullOptions
@@ -303,6 +309,52 @@ func (h *ImageHandler) RemoveImage(ctx context.Context, input *RemoveImageInput)
 	}
 
 	return handlerutil.MessageOutput("Image removed successfully", ""), nil
+}
+
+func (h *ImageHandler) PushImage(ctx context.Context, input *PushImageInput) (*huma.StreamResponse, error) {
+	user, err := handlerutil.RequireUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &huma.StreamResponse{
+		Body: func(humaCtx huma.Context) { //nolint:contextcheck // context is obtained from humaCtx.Context()
+			httpx.SetJSONStreamHeaders(humaCtx)
+			runtimeCtx := activitylib.ActivityRuntimeContext(humaCtx.Context(), h.appCtx)
+			rawWriter := humaCtx.BodyWriter()
+			activityID, runtimeCtx := activitylib.StartHandlerActivity(runtimeCtx, h.activityService, activitylib.HandlerOptions{
+				EnvironmentID: input.EnvironmentID,
+				Type:          types.ActivityTypeImagePush,
+				ResourceType:  "image",
+				ResourceID:    input.ImageID,
+				ResourceName:  input.Body.Reference,
+				User:          user,
+				Step:          "Pushing image",
+				Message:       "Image push started",
+				Metadata:      database.JSON{"reference": input.Body.Reference, "imageId": input.ImageID},
+				Queue:         true,
+			})
+			activitylib.WriteStartedLine(rawWriter, activityID)
+			if f, ok := rawWriter.(http.Flusher); ok {
+				f.Flush()
+			}
+			activitylib.AwaitHandlerActivitySlot(runtimeCtx, h.activityService, activityID, input.EnvironmentID)
+			writer := activitylib.NewWriter(runtimeCtx, activitylib.WriterOptions{
+				Service:     h.activityService,
+				ActivityID:  activityID,
+				Output:      rawWriter,
+				DefaultStep: "Pushing image",
+			})
+			pushErr := h.imageService.Push(runtimeCtx, PushRequest{ImageID: input.ImageID, Ref: input.Body.Reference, Progress: writer})
+			activitylib.FlushWriter(writer)
+			if pushErr != nil {
+				activitylib.CompleteHandlerActivity(runtimeCtx, h.activityService, activityID, "Image push failed", pushErr)
+				activitylib.WriteErrorLine(rawWriter, pushErr)
+				return
+			}
+			activitylib.WriteDoneLine(rawWriter)
+			activitylib.CompleteHandlerActivity(runtimeCtx, h.activityService, activityID, "Image push completed", nil)
+		},
+	}, nil
 }
 
 func (h *ImageHandler) PullImage(ctx context.Context, input *PullImageInput) (*huma.StreamResponse, error) {

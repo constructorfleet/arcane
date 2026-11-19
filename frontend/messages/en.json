@@ -4704,5 +4704,13 @@
   "repository_list_showing_configured": "The repository list could not be retrieved. Showing the names configured for this registry.",
   "select_connected_image_pull_agent": "Select a connected agent with permission to pull images.",
   "updates_managed_by_deployment": "Updates are managed through the deployment configuration. For Swarm stacks, update the stack or its GitOps source.",
-  "network_observations_not_ready": "Network observations are pending or incomplete. Retry unavailable nodes before removing this network."
+  "network_observations_not_ready": "Network observations are pending or incomplete. Retry unavailable nodes before removing this network.",
+  "push_image": "Push Image",
+  "push_existing_image_tag": "Push an existing repository tag from this image’s agent. Use Tag Image first with an explicit registry host to choose a different destination.",
+  "source_agent_push_unavailable": "The source agent is disconnected or image push is not authorized.",
+  "image_push_failed": "Image push failed",
+  "image_pushed_successfully": "Image {reference} pushed successfully",
+  "image_transfer_incomplete": "The image transfer ended without a completion confirmation.",
+  "source_image": "Source image",
+  "registry_reference": "Registry reference"
 }

@@ -3,6 +3,7 @@ package image
 import (
 	"cmp"
 	"context"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -20,6 +21,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
+	"github.com/opencontainers/go-digest"
 	"go.uber.org/fx"
 	"golang.org/x/sync/errgroup"
 
@@ -96,6 +98,12 @@ type (
 		SettingsService      *settings.SettingsService
 		ActivityService      *activity.ActivityService
 		Config               *config.Config
+	}
+
+	PushRequest struct {
+		Progress io.Writer
+		ImageID  string
+		Ref      string
 	}
 
 	PullRequest struct {
@@ -547,6 +555,83 @@ func (s *ImageService) PullImage(ctx context.Context, imageName string, progress
 		slog.WarnContext(ctx, "failed to record registry pull count", "image", imageName, "error", recordImagePullErr)
 	}
 
+	return nil
+}
+
+func (s *ImageService) Push(ctx context.Context, req PushRequest) error {
+	expectedID, err := digest.Parse(strings.TrimSpace(req.ImageID))
+	if err != nil || expectedID.Algorithm() != digest.SHA256 {
+		return common.Classify(common.ErrValidation, errors.New("a full source image ID is required"))
+	}
+	rawRef := strings.TrimSpace(req.Ref)
+	named, err := reference.ParseNormalizedNamed(rawRef)
+	if err != nil {
+		return common.Classify(common.ErrValidation, fmt.Errorf("invalid push reference: %w", err))
+	}
+	host, _, hasRepository := strings.Cut(rawRef, "/")
+	if !hasRepository || (!strings.ContainsAny(host, ".:") && host != "localhost") {
+		return common.Classify(common.ErrValidation, errors.New("use an explicit registry host in the push tag"))
+	}
+	if _, digested := named.(reference.Digested); digested {
+		return common.Classify(common.ErrValidation, errors.New("choose a repository tag, not a digest reference"))
+	}
+	tagged, ok := named.(reference.NamedTagged)
+	if !ok {
+		return common.Classify(common.ErrValidation, errors.New("an explicit repository tag is required"))
+	}
+
+	pushCtx, cancel := context.WithTimeout(ctx, timeouts.DefaultDockerImagePush)
+	defer cancel()
+	dockerClient, err := s.dockerService.GetClient(pushCtx)
+	if err != nil {
+		return fmt.Errorf("connect to source Docker agent: %w", err)
+	}
+	inspected, err := dockerClient.ImageInspect(pushCtx, tagged.String())
+	if err != nil {
+		return fmt.Errorf("inspect existing push tag: %w", err)
+	}
+	if inspected.ID != expectedID.String() {
+		return common.Classify(common.ErrConflict, errors.New("the repository tag no longer points to the selected image; refresh before pushing"))
+	}
+	auth, err := s.registryService.GetRegistryAuthForImage(pushCtx, tagged.String())
+	if err != nil {
+		return fmt.Errorf("resolve push registry credentials: %w", err)
+	}
+	response, err := dockerClient.ImagePush(pushCtx, tagged.String(), client.ImagePushOptions{RegistryAuth: auth})
+	if err != nil {
+		return fmt.Errorf("start image push: %w", err)
+	}
+	confirmed := false
+	for message, streamErr := range response.JSONMessages(pushCtx) {
+		if streamErr != nil {
+			return fmt.Errorf("read image push progress: %w", streamErr)
+		}
+		if message.Error != nil {
+			return fmt.Errorf("image push failed: %w", message.Error)
+		}
+		if text := cmp.Or(message.Stream, message.Status); text != "" {
+			if _, writeErr := fmt.Fprintln(req.Progress, strings.TrimSpace(message.ID+" "+text)); writeErr != nil {
+				return fmt.Errorf("write image push progress: %w", writeErr)
+			}
+		}
+		if message.Aux != nil {
+			var result struct {
+				Digest string `json:"Digest"`
+			}
+			if decodeErr := json.Unmarshal(*message.Aux, &result); decodeErr != nil {
+				return fmt.Errorf("read image push digest: %w", decodeErr)
+			}
+			if _, digestErr := digest.Parse(result.Digest); digestErr == nil {
+				confirmed = true
+			}
+		}
+	}
+	if contextErr := pushCtx.Err(); contextErr != nil {
+		return contextErr
+	}
+	if !confirmed {
+		return errors.New("image push ended without a digest confirmation; inspect the registry before retrying")
+	}
 	return nil
 }
 

@@ -137,6 +137,10 @@ type (
 		SpaceReclaimed int64 `json:"spaceReclaimed"`
 	}
 
+	ImagePushRequest struct {
+		Reference string `json:"reference" minLength:"1" doc:"Existing repository tag pointing to the selected image"`
+	}
+
 	ImageTagRequest struct {
 		Repository string `json:"repository" doc:"Target repository name"`
 

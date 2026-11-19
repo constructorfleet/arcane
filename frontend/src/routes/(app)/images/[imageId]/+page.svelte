@@ -49,6 +49,7 @@
 	import { tryCatch } from '#lib/utils/try-catch.js';
 	import { toastVulnerabilityScanStatus } from '#lib/utils/vulnerability.js';
 
+	import ImagePushDialog from '../components/image-push-dialog.svelte';
 	import ImageTagDialog from '../components/image-tag-dialog.svelte';
 	import HardenedImagePanel from './components/hardened-image-panel.svelte';
 	import ImageAttestationsPanel from './components/image-attestations-panel.svelte';
@@ -83,6 +84,7 @@
 	const canPatchImage = $derived(hasPermission('images:patch', currentEnvId));
 	const canTagImage = $derived(hasPermission('images:tag', currentEnvId));
 	const canPullImage = $derived(hasPermission('images:pull', currentEnvId));
+	const canPushImage = $derived(hasPermission('images:push', currentEnvId));
 	const canReadImage = $derived(hasPermission('images:read', currentEnvId));
 	const canReadReleaseNotes = $derived(hasPermission('image-updates:read', currentEnvId));
 
@@ -93,6 +95,7 @@
 		patching: false
 	});
 	let tagDialogOpen = $state(false);
+	let pushDialogOpen = $state(false);
 	let releaseNotesOpen = $state(false);
 
 	let scanRequest = $state<{ scope: string; time: string } | null>(null);
@@ -267,7 +270,7 @@
 		const routeImageId = data.imageId;
 		const pulledFromId = image.id;
 		isLoading.pulling = true;
-		const result = await imageService.pullImageStream(repoTag, undefined, environmentId);
+		const result = await imageService.transferImageStream({ operation: 'pull', imageName: repoTag, environmentId });
 		isLoading.pulling = false;
 		if (result.cancelled) return;
 		if (!result.success) {
@@ -314,6 +317,15 @@
 				placement: 'secondary',
 				label: m.images_tag_image(),
 				onclick: () => (tagDialogOpen = true)
+			});
+		}
+		if (canPushImage) {
+			list.push({
+				id: 'push',
+				action: 'base',
+				placement: 'secondary',
+				label: m.push_image(),
+				onclick: () => (pushDialogOpen = true)
 			});
 		}
 		if (canPullImage && pullableTag) {
@@ -523,11 +535,15 @@
 		bind:open={tagDialogOpen}
 		imageId={image.id}
 		environmentId={currentEnvId}
-		defaultRepository={image.repoTags?.[0]?.split(':')[0] ?? (pinnedRepository || '')}
+		defaultRepository={parseImageRef(image.repoTags?.[0] ?? '').repo || pinnedRepository || ''}
 		onTagged={() => queryClient.invalidateQueries({ queryKey: queryKeys.images.detail(currentEnvId, data.imageId) })}
 	/>
 {/if}
 
 {#if image && hasTags && releaseNotesOpen}
 	<ImageReleaseNotesDialog bind:open={releaseNotesOpen} environmentId={currentEnvId} imageRef={detailTitle} />
+{/if}
+
+{#if image && pushDialogOpen}
+	<ImagePushDialog bind:open={pushDialogOpen} imageId={image.id} environmentId={currentEnvId} repoTags={image.repoTags ?? []} />
 {/if}

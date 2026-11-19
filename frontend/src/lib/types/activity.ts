@@ -2,6 +2,7 @@ export type ActivityStatus = 'queued' | 'running' | 'success' | 'failed' | 'canc
 
 export type ActivityType =
 	| 'job_run'
+	| 'image_push'
 	| 'image_pull'
 	| 'image_build'
 	| 'image_update_check'
