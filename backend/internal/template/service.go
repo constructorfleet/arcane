@@ -40,7 +40,9 @@ import (
 	"getarcane.dev/arcane/v3/internal/common"
 	"getarcane.dev/arcane/v3/internal/database"
 	"getarcane.dev/arcane/v3/internal/settings"
+	"getarcane.dev/arcane/v3/pkg/handlerutil"
 	"getarcane.dev/arcane/v3/pkg/httpx"
+	"getarcane.dev/arcane/v3/pkg/iconcatalog"
 	"getarcane.dev/arcane/v3/pkg/logging"
 	"getarcane.dev/arcane/v3/pkg/pagination"
 	"getarcane.dev/arcane/v3/pkg/projects"
@@ -191,8 +193,8 @@ func (s *TemplateService) GetAllTemplatesPaginated(ctx context.Context, params p
 
 	items := make([]types.Template, 0, len(templates))
 	for _, t := range templates {
-		var dtoItem types.Template
-		if mapStructErr := mapping.MapStruct(&t, &dtoItem); mapStructErr != nil {
+		dtoItem, mapStructErr := templateDTO(ctx, &t)
+		if mapStructErr != nil {
 			slog.WarnContext(ctx, "failed to map template to DTO", "error", mapStructErr, "templateId", t.ID)
 			continue
 		}
@@ -1259,8 +1261,8 @@ func (s *TemplateService) GetTemplateContentWithParsedData(ctx context.Context, 
 		setTemplateIconURL(composeTemplate, projects.ResolveTemplateIconURL(ctx, composeContent, envContent))
 	}
 
-	var outTemplate types.Template
-	if mapErr := mapping.MapStruct(composeTemplate, &outTemplate); mapErr != nil {
+	outTemplate, mapErr := templateDTO(ctx, composeTemplate)
+	if mapErr != nil {
 		return nil, fmt.Errorf("failed to map template: %w", mapErr)
 	}
 
@@ -1280,4 +1282,21 @@ func (s *TemplateService) GetTemplateContentWithParsedData(ctx context.Context, 
 		EnvVariables:     envVars,
 		IsFolderTemplate: folderComposePath != "",
 	}, nil
+}
+
+func templateDTO(ctx context.Context, template *ComposeTemplate) (types.Template, error) {
+	var out types.Template
+	if err := mapping.MapStruct(template, &out); err != nil {
+		return out, err
+	}
+	if out.Metadata == nil || out.Metadata.IconURL == nil {
+		return out, nil
+	}
+	actor, _ := handlerutil.CurrentUserFromContext(ctx)
+	catalog := cmp.Or(kit.FromPtr(kit.FromPtr(actor).Preferences.IconCatalog), iconcatalog.DefaultCatalog)
+	icon := iconcatalog.Resolve(catalog, iconcatalog.IconSet{Icon: *out.Metadata.IconURL})
+	metadata := *out.Metadata
+	metadata.IconURL = mo.EmptyableToOption(icon.IconLightURL).ToPointer()
+	out.Metadata = &metadata
+	return out, nil
 }

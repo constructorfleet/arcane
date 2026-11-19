@@ -110,9 +110,13 @@ func (h *TemplateHandler) GetAllTemplates(ctx context.Context, _ *GetAllTemplate
 		return nil, huma.Error500InternalServerError("Failed to get templates: " + err.Error())
 	}
 
-	out, mapErr := mapping.MapSlice[ComposeTemplate, types.Template](templates)
-	if mapErr != nil {
-		return nil, huma.Error500InternalServerError("Failed to map templates: " + mapErr.Error())
+	out := make([]types.Template, 0, len(templates))
+	for i := range templates {
+		item, mapErr := templateDTO(ctx, &templates[i])
+		if mapErr != nil {
+			return nil, huma.Error500InternalServerError("Failed to map templates: " + mapErr.Error())
+		}
+		out = append(out, item)
 	}
 
 	return &handlerutil.Out[[]types.Template]{
@@ -134,8 +138,8 @@ func (h *TemplateHandler) GetTemplate(ctx context.Context, input *GetTemplateInp
 		return nil, huma.NewError(apiErr.HTTPStatus(), apiErr.Message)
 	}
 
-	var out types.Template
-	if mapErr := mapping.MapStruct(tmpl, &out); mapErr != nil {
+	out, mapErr := templateDTO(ctx, tmpl)
+	if mapErr != nil {
 		return nil, huma.Error500InternalServerError("Failed to map templates: " + mapErr.Error())
 	}
 
@@ -180,8 +184,8 @@ func (h *TemplateHandler) CreateTemplate(ctx context.Context, input *CreateTempl
 		return nil, huma.NewError(apiErr.HTTPStatus(), apiErr.Message)
 	}
 
-	var out types.Template
-	if mapErr := mapping.MapStruct(tmpl, &out); mapErr != nil {
+	out, mapErr := templateDTO(ctx, tmpl)
+	if mapErr != nil {
 		return nil, huma.Error500InternalServerError("Failed to map templates: " + mapErr.Error())
 	}
 
@@ -213,8 +217,8 @@ func (h *TemplateHandler) UpdateTemplate(ctx context.Context, input *UpdateTempl
 		return nil, huma.Error500InternalServerError("Failed to get template: " + err.Error())
 	}
 
-	var out types.Template
-	if mapErr := mapping.MapStruct(updated, &out); mapErr != nil {
+	out, mapErr := templateDTO(ctx, updated)
+	if mapErr != nil {
 		return nil, huma.Error500InternalServerError("Failed to map templates: " + mapErr.Error())
 	}
 
@@ -258,8 +262,8 @@ func (h *TemplateHandler) DownloadTemplate(ctx context.Context, input *TemplateA
 		return nil, huma.Error500InternalServerError("Failed to download template: " + err.Error())
 	}
 
-	var out types.Template
-	if mapErr := mapping.MapStruct(localTemplate, &out); mapErr != nil {
+	out, mapErr := templateDTO(ctx, localTemplate)
+	if mapErr != nil {
 		return nil, huma.Error500InternalServerError("Failed to map templates: " + mapErr.Error())
 	}
 

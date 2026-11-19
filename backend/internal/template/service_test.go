@@ -339,6 +339,7 @@ func TestGetAllTemplatesPaginated_FiltersByType(t *testing.T) {
 	localTemplates := []ComposeTemplate{
 		{
 			ID: "local-one", CreatedAt: now, UpdatedAt: &now,
+			Metadata:    &ComposeTemplateMetadata{IconURL: new("nginx")},
 			Name:        "Local One",
 			Description: "Local template",
 			Content:     "services: {}",
@@ -347,6 +348,7 @@ func TestGetAllTemplatesPaginated_FiltersByType(t *testing.T) {
 		},
 		{
 			ID: "local-two", CreatedAt: now, UpdatedAt: &now,
+			Metadata:    &ComposeTemplateMetadata{IconURL: new("https://cdn.example/local.png")},
 			Name:        "Local Two",
 			Description: "Local template",
 			Content:     "services: {}",
@@ -362,6 +364,7 @@ func TestGetAllTemplatesPaginated_FiltersByType(t *testing.T) {
 		Value: []ComposeTemplate{
 			{
 				ID: "remote-one", CreatedAt: now, UpdatedAt: &now,
+				Metadata:    &ComposeTemplateMetadata{IconURL: new("redis")},
 				Name:        "Remote One",
 				Description: "Remote template",
 				Content:     "services: {}",
@@ -374,23 +377,55 @@ func TestGetAllTemplatesPaginated_FiltersByType(t *testing.T) {
 	tests := []struct {
 		name       string
 		typeFilter string
+		catalog    string
 		wantIDs    []string
 	}{
 		{name: "local", typeFilter: "false", wantIDs: []string{"local-one", "local-two"}},
 		{name: "remote", typeFilter: "true", wantIDs: []string{"remote-one"}},
 		{name: "both", typeFilter: "false,true", wantIDs: []string{"local-one", "local-two", "remote-one"}},
+		{name: "preferred catalog", typeFilter: "false,true", catalog: "dashboard-icons", wantIDs: []string{"local-one", "local-two", "remote-one"}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			templates, _, err := service.GetAllTemplatesPaginated(t.Context(), pagination.QueryParams{
+			ctx := t.Context()
+			if tt.catalog != "" {
+				ctx = context.WithValue(ctx, types.CurrentUserContextKey{}, &types.Actor{
+					Preferences: types.UserPreferences{IconCatalog: new(tt.catalog)},
+				})
+			}
+			templates, _, err := service.GetAllTemplatesPaginated(ctx, pagination.QueryParams{
 				Start: 0, Limit: 20,
 				Filters: map[string]string{"type": tt.typeFilter},
 			})
 			require.NoError(t, err)
 			require.ElementsMatch(t, tt.wantIDs, templateIDs(templates))
+			for _, template := range templates {
+				require.NotNil(t, template.Metadata)
+				require.NotNil(t, template.Metadata.IconURL)
+				if template.ID == "local-two" {
+					require.Equal(t, "https://cdn.example/local.png", *template.Metadata.IconURL)
+					continue
+				}
+				slug := "nginx"
+				if template.IsRemote {
+					slug = "redis"
+				}
+				prefix := "https://cdn.jsdelivr.net/gh/selfhst/icons@main/svg/"
+				if tt.catalog == "dashboard-icons" {
+					prefix = "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/"
+				}
+				require.Equal(t, prefix+slug+".svg", *template.Metadata.IconURL)
+			}
 		})
 	}
+	var stored ComposeTemplate
+	require.NoError(t, db.First(&stored, "id = ?", "local-one").Error)
+	require.Equal(t, "nginx", *stored.Metadata.IconURL)
+	cached, found, err := service.remoteCache.Get(service.remoteGeneration.Load())
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, "redis", *cached[0].Metadata.IconURL)
 }
 
 func templateIDs(templates []types.Template) []string {
