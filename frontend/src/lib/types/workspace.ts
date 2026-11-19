@@ -28,6 +28,7 @@ export interface WorkspaceFileContent {
 	size: number;
 	mimeType: string;
 	content?: string;
+	previewData?: string;
 	editable: boolean;
 	readOnlyReason?: WorkspaceReadOnlyReason;
 }

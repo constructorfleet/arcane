@@ -114,6 +114,7 @@
 	let loadedWorkspaceFileContents = $state<Record<string, string>>({});
 	let workspaceFileMetadata = $state<Record<string, VolumeWorkspaceFileContent>>({});
 	let workspaceFileLoadErrors = $state<Record<string, string>>({});
+	let failedImagePreview = $state('');
 	let workspaceFileLoading = $state<Record<string, boolean>>({});
 	let workspaceRestoreRecords = $state<Record<string, true>>({});
 	let workspaceStagedFiles = $state<Record<string, File>>({});
@@ -915,6 +916,7 @@
 {/snippet}
 
 {#snippet volumeWorkspaceFileEditor(volume: Volume, relativePath: string)}
+	{@const previewKey = `${currentEnvId}:${volume.name}:${relativePath}`}
 	{#if workspaceFileLoadErrors[relativePath]}
 		<div class="flex h-full items-center justify-center px-4 text-sm text-destructive">
 			{workspaceFileLoadErrors[relativePath]}
@@ -936,6 +938,21 @@
 			originalValue={loadedWorkspaceFileContents[relativePath] ?? ''}
 			enableDiff={true}
 		/>
+	{:else if selectedWorkspaceMetadata.previewData && ['image/png', 'image/jpeg', 'image/gif'].includes(selectedWorkspaceMetadata.mimeType) && failedImagePreview !== previewKey}
+		<div class="flex h-full min-h-0 flex-col gap-4 p-4">
+			<div class="flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-lg border bg-muted/20 p-4">
+				<img
+					src={`data:${selectedWorkspaceMetadata.mimeType};base64,${selectedWorkspaceMetadata.previewData}`}
+					alt={workspaceFileBasename(relativePath)}
+					class="max-h-full max-w-full object-contain"
+					onerror={() => (failedImagePreview = previewKey)}
+				/>
+			</div>
+			<div class="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+				<span>{selectedWorkspaceMetadata.mimeType} · {bytes.format(selectedWorkspaceMetadata.size, { unitSeparator: ' ' })}</span>
+				<ArcaneButton action="base" customLabel={m.common_download()} onclick={() => downloadVolumeWorkspaceFile(relativePath)} />
+			</div>
+		</div>
 	{:else}
 		<div class="flex h-full items-center justify-center p-6">
 			<Card.Root class="w-full max-w-xl">
@@ -951,6 +968,17 @@
 						{#if selectedWorkspaceMetadata.mimeType}<p>
 								{m.common_type()}: {selectedWorkspaceMetadata.mimeType}
 							</p>{/if}
+						{#if failedImagePreview === previewKey}<p role="status" class="text-destructive">
+								{m.image_preview_unavailable()}
+							</p>{/if}
+						{#if selectedWorkspaceMetadata.readOnlyReason === 'binary'}<p>{m.image_preview_limits()}</p>{/if}
+						{#if selectedWorkspaceMetadata.readOnlyReason === 'binary' || selectedWorkspaceMetadata.readOnlyReason === 'too_large'}
+							<ArcaneButton
+								action="base"
+								customLabel={m.common_download()}
+								onclick={() => downloadVolumeWorkspaceFile(relativePath)}
+							/>
+						{/if}
 						{#if selectedWorkspaceEntry?.linkTarget}<p>
 								{m.volumes_symlink_target_tooltip({ target: selectedWorkspaceEntry.linkTarget })}
 							</p>{/if}

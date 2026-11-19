@@ -1220,11 +1220,17 @@ func volumeWorkspaceFileContentResponse(relativePath, kind string, size int64, c
 		}
 		return ""
 	}()
+	mimeType := http.DetectContentType(content)
+	var previewData string
+	if readOnlyReason == types.FileReadOnlyBinary {
+		previewData = volumeWorkspaceImagePreview(mimeType, content, size)
+	}
 	return &types.WorkspaceFileContent{
 		Path:           "/" + relativePath,
 		RelativePath:   relativePath,
 		Name:           path.Base(relativePath),
-		MimeType:       http.DetectContentType(content),
+		MimeType:       mimeType,
+		PreviewData:    previewData,
 		Size:           size,
 		ReadOnlyReason: readOnlyReason,
 		Editable:       readOnlyReason == "",

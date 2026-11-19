@@ -51,6 +51,7 @@ type (
 		RelativePath   string `json:"relativePath"`
 		Name           string `json:"name"`
 		Content        string `json:"content,omitempty"`
+		PreviewData    string `json:"previewData,omitempty" doc:"Base64 raster image preview; never editable text"`
 		MimeType       string `json:"mimeType"`
 		ReadOnlyReason string `json:"readOnlyReason,omitempty" enum:"binary,too_large,symlink,special,gitops_managed"`
 		Size           int64  `json:"size"`

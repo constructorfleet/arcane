@@ -4680,5 +4680,7 @@
   "workspace_read_waiting": "Workspace reads stop waiting after 30 seconds. You can stop waiting and return to the overview.",
   "stop_waiting": "Stop waiting",
   "workspace_unavailable": "Workspace unavailable",
-  "check_volume_attachment": "Check the selected agent and the volume's active consumer node, then retry or return to the volume list."
+  "check_volume_attachment": "Check the selected agent and the volume's active consumer node, then retry or return to the volume list.",
+  "image_preview_unavailable": "This image could not be displayed. Download it to inspect the original file.",
+  "image_preview_limits": "Previews support PNG, JPEG and GIF images up to 5 MiB and 4096 pixels per side. Other formats and larger files can be downloaded."
 }

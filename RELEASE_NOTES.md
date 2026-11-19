@@ -1,12 +1,12 @@
-# 3.0.1-cf.10
+# 3.0.1-cf.11
 
-## Fixes
+## Features
 
-- Bound volume workspace folder/text reads to 30 seconds and propagate query cancellation to HTTP requests (#14).
-- Disable automatic folder-read retries and background focus/reconnect retries. Offer explicit Retry and return-to-Volumes actions with the server error and attachment guidance.
-- Add Stop waiting during initial loading to cancel the read and return to the overview. Upload/save/download behavior and storage attachment policy are unchanged.
+- Preview PNG, JPEG and GIF files in the volume workspace as read-only images (#15).
+- Bound previews to 5 MiB, 4096 pixels per side, and the configured workspace read limit. Check image headers and do not preview HTML, SVG, symlinks, special files, unsupported formats, or oversized images.
+- Keep binary bytes separate from editable text. Show metadata and an explicit download action for unsupported files; decoding failures have a visible fallback.
 
-## Validation and limits
+## Validation
 
-- Validate frontend build/type/lint and required CI before merge.
-- This bounds the interactive wait; it does not prove the cause of the reported inactive-RBD failure, relocate volumes, or change exclusive mapping. Shared-volume grouping/active-node navigation remains #13; exact failing-volume acceptance remains separate.
+- Business tests cover supported formats, malformed headers, dimensions, file-size limits, and unchanged text/read-only semantics.
+- Required CI and live preview/download acceptance precede completion. Volume attachment and RBD handoff policies are unchanged.

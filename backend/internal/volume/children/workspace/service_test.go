@@ -165,6 +165,7 @@ func TestVolumeWorkspaceFileContentResponse(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, below.Editable)
 	require.Equal(t, "hello", below.Content)
+	require.Empty(t, below.PreviewData)
 
 	atLimit, err := volumeWorkspaceFileContentResponse("notes.txt", "regular", maxFileSizeBytes, text, maxFileSizeBytes)
 	require.NoError(t, err)
@@ -178,6 +179,7 @@ func TestVolumeWorkspaceFileContentResponse(t *testing.T) {
 	binaryContent, err := volumeWorkspaceFileContentResponse("data.bin", "regular", 2, []byte{0xff, 0x00}, maxFileSizeBytes)
 	require.NoError(t, err)
 	require.Equal(t, types.FileReadOnlyBinary, binaryContent.ReadOnlyReason)
+	require.Empty(t, binaryContent.PreviewData)
 
 	special, err := volumeWorkspaceFileContentResponse("pipe", "special", 0, nil, maxFileSizeBytes)
 	require.NoError(t, err)
