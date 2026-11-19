@@ -12,9 +12,11 @@ services:
       # - PGID=1000
       # auto (default) prefers gRPC and falls back to websocket; grpc or websocket forces one.
       - ARCANE_AGENT_TRANSPORT=auto
+      - ARCANE_BUILDS_DIRECTORY=/builds
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - agent-data:/app/data
+      - agent-builds:/builds
     # Use host cgroup namespace for better container self-detection
     # This allows Arcane to detect its own container ID more reliably
     cgroup: host
@@ -23,3 +25,6 @@ services:
 
 volumes:
   agent-data:
+  # Keep build workspaces node-local and separate from agent state.
+  agent-builds:
+    driver: local
