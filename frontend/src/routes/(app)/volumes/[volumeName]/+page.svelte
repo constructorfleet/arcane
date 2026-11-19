@@ -856,6 +856,14 @@
 		return items;
 	});
 
+	async function stopWorkspaceLoad() {
+		const environmentId = currentEnvId;
+		const volumeName = volume?.name;
+		workspaceRequested = false;
+		urlTab.select('overview');
+		if (volumeName) await queryClient.cancelQueries({ queryKey: queryKeys.volumes.workspace(environmentId, volumeName) });
+	}
+
 	function onTabChange(value: string) {
 		if (value === 'workspace') workspaceRequested = true;
 		urlTab.select(value);
@@ -1040,12 +1048,24 @@
 			{m.common_access_denied()}
 		</div>
 	{:else if workspaceFolders.root?.isPending}
-		<div class="flex min-h-96 items-center justify-center rounded-lg border text-muted-foreground">
+		<div
+			class="flex min-h-96 flex-col items-center justify-center gap-4 rounded-lg border px-4 text-center text-muted-foreground"
+		>
 			<Spinner class="size-6" />
+			<p class="max-w-lg text-sm">{m.workspace_read_waiting()}</p>
+			<ArcaneButton action="cancel" customLabel={m.stop_waiting()} onclick={stopWorkspaceLoad} />
 		</div>
 	{:else if workspaceFolders.root?.error}
-		<div class="flex min-h-96 items-center justify-center rounded-lg border px-4 text-sm text-destructive">
-			{workspaceFolders.root.error instanceof Error ? workspaceFolders.root.error.message : m.common_failed()}
+		<div class="flex min-h-96 flex-col items-center justify-center gap-4 rounded-lg border px-4 text-center text-sm">
+			<p class="font-semibold">{m.workspace_unavailable()}</p>
+			<p class="max-w-lg break-words text-destructive" role="status">
+				{workspaceFolders.root.error instanceof Error ? workspaceFolders.root.error.message : m.common_failed()}
+			</p>
+			<p class="max-w-lg text-muted-foreground">{m.check_volume_attachment()}</p>
+			<div class="flex flex-wrap justify-center gap-2">
+				<ArcaneButton action="refresh" customLabel={m.common_retry()} onclick={() => workspaceFolders.root?.refetch()} />
+				<ArcaneButton action="base" tone="outline" href={resolve('/(app)/volumes')}>{m.resource_volumes_cap()}</ArcaneButton>
+			</div>
 		</div>
 	{:else}
 		<div class="space-y-3">

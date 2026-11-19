@@ -4,21 +4,32 @@ import type { Workspace, WorkspaceFileContent } from '#lib/types/workspace.js';
 import { downloadBlob, filenameFromPath } from '#lib/utils/browser-download.js';
 import { createWorkspaceFormData } from '#lib/utils/workspace-files.js';
 
-import BaseAPIService from './api-service';
+import BaseAPIService, { type APIRequestConfig } from './api-service';
 
 class VolumeWorkspaceService extends BaseAPIService {
-	async getWorkspace(volumeName: string, path: string, environmentId: string): Promise<Workspace> {
+	async getWorkspace(volumeName: string, path: string, environmentId: string, config?: APIRequestConfig): Promise<Workspace> {
 		return this.handleResponse(
 			this.api.get(`/agents/${environmentId}/volumes/${volumeName}/workspace`, {
+				...config,
+				timeout: 30_000,
+				retry: 0,
 				cache: 'no-store',
 				params: { path }
 			})
 		);
 	}
 
-	async getWorkspaceFile(volumeName: string, relativePath: string, environmentId: string): Promise<WorkspaceFileContent> {
+	async getWorkspaceFile(
+		volumeName: string,
+		relativePath: string,
+		environmentId: string,
+		config?: APIRequestConfig
+	): Promise<WorkspaceFileContent> {
 		return this.handleResponse(
 			this.api.get(`/agents/${environmentId}/volumes/${volumeName}/workspace/file`, {
+				...config,
+				timeout: 30_000,
+				retry: 0,
 				cache: 'no-store',
 				params: { relativePath }
 			})

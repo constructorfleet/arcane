@@ -4676,5 +4676,9 @@
   "task_has_no_container": "No container was assigned to this task.",
   "task_node_agent_unavailable": "The task node has no uniquely verified connected agent. Check node agent coverage and retry.",
   "task_container_identity_mismatch": "The container no longer matches the selected Swarm task. Refresh the task list.",
-  "task_container_unavailable": "Container unavailable: {error}"
+  "task_container_unavailable": "Container unavailable: {error}",
+  "workspace_read_waiting": "Workspace reads stop waiting after 30 seconds. You can stop waiting and return to the overview.",
+  "stop_waiting": "Stop waiting",
+  "workspace_unavailable": "Workspace unavailable",
+  "check_volume_attachment": "Check the selected agent and the volume's active consumer node, then retry or return to the volume list."
 }

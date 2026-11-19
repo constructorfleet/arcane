@@ -31,6 +31,12 @@ export function volumeBackupListQuery(environmentId: string, volumeName: string,
 export function volumeWorkspaceFolderQuery(environmentId: string, volumeName: string, path: string) {
 	return queryOptions({
 		queryKey: queryKeys.volumes.workspaceFolder(environmentId, volumeName, path),
-		queryFn: () => volumeWorkspaceService.getWorkspace(volumeName, path, environmentId)
+		queryFn: async ({ signal }) => {
+			await environmentStore.ready;
+			return volumeWorkspaceService.getWorkspace(volumeName, path, environmentId, { signal });
+		},
+		retry: false,
+		refetchOnWindowFocus: false,
+		refetchOnReconnect: false
 	});
 }
