@@ -7,7 +7,9 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"mime"
 	"net"
 	"net/http"
 	"runtime"
@@ -61,7 +63,6 @@ import (
 
 type (
 	RegistryDaemonClient interface {
-		RegistryLogin(ctx context.Context, options client.RegistryLoginOptions) (client.RegistryLoginResult, error)
 		DistributionInspect(ctx context.Context, imageRef string, options client.DistributionInspectOptions) (client.DistributionInspectResult, error)
 	}
 
@@ -682,38 +683,72 @@ func (s *ContainerRegistryService) getCachedRateLimit(ctx context.Context, regis
 	return &entry.RateLimit, entry.CheckedAt, true
 }
 
-func (s *ContainerRegistryService) TestRegistry(ctx context.Context, registryURL, username, token string) (testErr error) {
+func (s *ContainerRegistryService) TestRegistry(ctx context.Context, reg types.ContainerRegistry) (authenticated bool, testErr error) {
 	ctx, span := otel.Tracer(logging.InstrumentationName).Start(ctx, "registry.test_credentials", trace.WithAttributes(
-		attribute.String("arcane.registry.host", kitregistry.Normalize(registryURL)),
+		attribute.String("arcane.registry.host", kitregistry.Normalize(reg.URL)),
 	))
 	defer func() { logging.EndSpan(span, testErr) }()
-	if strings.TrimSpace(username) == "" && strings.TrimSpace(token) == "" {
-		return nil
+	lookupCtx, cancel := context.WithTimeout(ctx, timeouts.DefaultRegistry)
+	defer cancel()
+	host, _ := arcaneregistry.SplitRegistryURL(reg.URL)
+	nameOptions := []name.Option{name.StrictValidation}
+	if reg.Insecure {
+		nameOptions = append(nameOptions, name.Insecure)
 	}
-
-	dockerClient, err := s.getDockerClient(ctx)
+	target, err := name.NewRegistry(host, nameOptions...)
 	if err != nil {
-		return err
+		return false, fmt.Errorf("invalid registry endpoint: %w", err)
 	}
-
-	_, err = dockerClient.RegistryLogin(ctx, client.RegistryLoginOptions{
-		Username:      strings.TrimSpace(username),
-		Password:      strings.TrimSpace(token),
-		ServerAddress: normalizeRegistryServerAddress(registryURL),
-	})
+	challenge, err := transport.Ping(lookupCtx, target, s.distributionHTTPClient.Transport)
 	if err != nil {
-		return fmt.Errorf("registry login failed: %w", err)
+		return false, fmt.Errorf("registry endpoint check failed: %w", err)
 	}
-
-	return nil
+	scheme := strings.ToLower(challenge.Scheme)
+	if scheme != "" && scheme != "basic" && scheme != "bearer" {
+		return false, fmt.Errorf("unsupported registry authentication challenge %q", challenge.Scheme)
+	}
+	username, token := strings.TrimSpace(reg.Username), strings.TrimSpace(reg.Token)
+	auth := authn.Anonymous
+	if username != "" || token != "" {
+		auth = authn.FromConfig(authn.AuthConfig{Username: username, Password: token})
+	}
+	authTransport, err := transport.NewWithContext(lookupCtx, target, auth, s.distributionHTTPClient.Transport, nil)
+	if err != nil {
+		return false, fmt.Errorf("registry authentication failed: %w", err)
+	}
+	httpClient := &http.Client{
+		Transport: authTransport, CheckRedirect: s.distributionHTTPClient.CheckRedirect,
+		Jar: s.distributionHTTPClient.Jar, Timeout: s.distributionHTTPClient.Timeout,
+	}
+	endpoint := fmt.Sprintf("%s://%s/v2/", kit.Ternary(challenge.Insecure, "http", "https"), target.RegistryStr())
+	request, err := http.NewRequestWithContext(lookupCtx, http.MethodGet, endpoint, http.NoBody)
+	if err != nil {
+		return false, fmt.Errorf("create registry endpoint request: %w", err)
+	}
+	response, err := httpClient.Do(request)
+	if err != nil {
+		return false, fmt.Errorf("registry endpoint request failed: %w", err)
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
+		_ = response.Body.Close()
+	}()
+	if checkErr := transport.CheckError(response, http.StatusOK); checkErr != nil {
+		return false, fmt.Errorf("registry endpoint rejected access: %w", checkErr)
+	}
+	contentType, _, _ := mime.ParseMediaType(response.Header.Get("Content-Type"))
+	if contentType == "text/html" {
+		return false, errors.New("registry endpoint returned HTML instead of a registry response")
+	}
+	return scheme != "" && (username != "" || token != ""), nil
 }
 
-func (s *ContainerRegistryService) TestECRRegistry(ctx context.Context, reg *ContainerRegistry) error {
+func (s *ContainerRegistryService) TestECRRegistry(ctx context.Context, reg *ContainerRegistry) (bool, error) {
 	ecrUser, ecrPass, err := s.GetOrRefreshECRToken(ctx, reg)
 	if err != nil {
-		return fmt.Errorf("failed to obtain ECR token: %w", err)
+		return false, fmt.Errorf("failed to obtain ECR token: %w", err)
 	}
-	return s.TestRegistry(ctx, reg.URL, ecrUser, ecrPass)
+	return s.TestRegistry(ctx, types.ContainerRegistry{URL: reg.URL, Username: ecrUser, Token: ecrPass, Insecure: reg.Insecure})
 }
 
 func (s *ContainerRegistryService) ImageDigest(ctx context.Context, imageRef string) (string, error) {

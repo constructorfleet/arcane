@@ -1,12 +1,15 @@
-# 3.0.1-cf.17
+# 3.0.1-cf.18
 
-## Volume consumer provenance
+## Fixes
 
-- Mark known Arcane volume helper containers distinctly in the volume consumer overview, using the existing internal/helper label contract (#13).
-- Show unavailable container metadata with the actual API error instead of silently presenting a short ID as complete consumer details.
-- Explain that helper mounts still count as real consumers. Volume in-use and attachment policy are unchanged.
+- Test registry endpoint reachability and Basic/Bearer authentication directly over registry HTTP, without requiring a manager Docker socket (#40).
+- Contact anonymous endpoints instead of reporting success without a request. Bound checks by the registry timeout and preserve cancellation and TLS verification.
+- Distinguish a challenged credential check from unverified credentials on public endpoints; repository permissions are not claimed by a connection test.
+- Show catalog errors prominently without describing denied access as a proven unsupported catalog. Preserve known-repository browsing (#50).
+
+- Add a registry-tag Pull action that reuses the existing pull sheet and agent endpoint. Show the selected agent and pin that destination through submission; disconnected or unauthorized targets cannot silently fall back to another node.
 
 ## Validation and limits
 
-- Validate frontend tests/build, full format/lint and required CI before merge. Helper presentation requires live acceptance after publication.
-- This improves consumer provenance; shared storage identity/grouping and automatic attachment-aware navigation remain open. Current RBD plugin Status exposes size alone and does not provide enough storage identity for safe cross-node grouping.
+- The Docker-socket failure and catalog permission error were independently reproduced on cf.12; opening a known Harbor repository already worked via HTTP.
+- Validate registry business tests, frontend build/tests, full format/lint and required CI before merge. Pull/build/push execution remains agent-scoped; this does not complete every registry feature in #40.

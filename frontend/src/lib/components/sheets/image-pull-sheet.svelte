@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { z } from 'zod/v4';
 
@@ -8,15 +9,19 @@
 	import * as ResponsiveDialog from '#lib/components/ui/responsive-dialog/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { imageService } from '#lib/services/image-service.js';
+	import { environmentStore } from '#lib/stores/environment.store.svelte.js';
+	import { hasPermission } from '#lib/utils/auth.js';
+	import { isEnvironmentOnline, parseImageRef } from '#lib/utils/docker.js';
 	import { destinationEnvironmentId } from '#lib/utils/environments.js';
 	import { createForm, preventDefault } from '#lib/utils/settings.svelte.js';
 
 	type ImagePullFormProps = {
 		open: boolean;
-		onPullFinished?: (success: boolean, imageName?: string, error?: string) => void;
+		initialImageRef?: string;
+		onPullFinished?: (success: boolean, imageName?: string, error?: string, environmentId?: string) => void;
 	};
 
-	let { open = $bindable(false), onPullFinished = () => {} }: ImagePullFormProps = $props();
+	let { open = $bindable(false), initialImageRef = '', onPullFinished = () => {} }: ImagePullFormProps = $props();
 
 	const formSchema = z.object({
 		imageRef: z.string().min(1, m.images_image_required()),
@@ -30,9 +35,31 @@
 
 	let isPulling = $state(false);
 	let pickedEnvironmentId = $state('');
-	const environmentId = $derived(destinationEnvironmentId(pickedEnvironmentId, 'images:pull'));
+	const destinations = $derived(
+		environmentStore.available.filter((env) => env.enabled && isEnvironmentOnline(env) && hasPermission('images:pull', env.id))
+	);
+	const environmentId = $derived(pickedEnvironmentId);
+	const target = $derived(environmentStore.available.find((env) => env.id === environmentId));
+	const canPull = $derived(destinations.some((env) => env.id === environmentId));
+	$effect(() => {
+		if (!open) return;
+		const ref = initialImageRef;
+		untrack(() => {
+			pickedEnvironmentId = destinationEnvironmentId('', 'images:pull', destinations);
+			if (ref.includes('@')) {
+				form.reset({ imageRef: ref, tag: '' });
+			} else {
+				const { repo, tag } = parseImageRef(ref);
+				form.reset({ imageRef: repo, tag });
+			}
+		});
+	});
 
 	async function handleSubmit() {
+		if (!canPull) {
+			toast.error(m.select_connected_image_pull_agent());
+			return;
+		}
 		const data = form.validate();
 		if (!data) return;
 
@@ -51,9 +78,10 @@
 		}
 
 		const fullImageName = `${imageName}:${imageTag}`;
+		const targetEnvironmentId = environmentId;
 		open = false;
 		isPulling = false;
-		void drainPullStream(fullImageName, environmentId);
+		void drainPullStream(fullImageName, targetEnvironmentId);
 	}
 
 	async function drainPullStream(fullImageName: string, targetEnvironmentId: string) {
@@ -62,10 +90,10 @@
 		if (!result.success) {
 			const message = result.error || m.images_pull_unexpected_error();
 			toast.error(message);
-			onPullFinished(false, fullImageName, message);
+			onPullFinished(false, fullImageName, message, targetEnvironmentId);
 			return;
 		}
-		onPullFinished(true, fullImageName);
+		onPullFinished(true, fullImageName, undefined, targetEnvironmentId);
 	}
 
 	function handleOpenChange(newOpenState: boolean) {
@@ -91,8 +119,14 @@
 		<EnvironmentDestinationSelect
 			bind:value={() => environmentId, (value) => (pickedEnvironmentId = value)}
 			permission="images:pull"
+			environments={destinations}
+			showSingle
 			variant="field"
 		/>
+		<p class="text-sm text-muted-foreground">
+			{m.agent()}: {target?.name ?? m.common_unknown()} <span class="font-mono text-xs">{environmentId}</span>
+		</p>
+		{#if !canPull}<p class="text-sm text-destructive">{m.select_connected_image_pull_agent()}</p>{/if}
 		<FormInput
 			label={m.images_image_name_label()}
 			type="text"
@@ -110,6 +144,6 @@
 	</form>
 
 	{#snippet footer()}
-		<SheetFooterActions bind:open submitAction="pull" onSubmit={handleSubmit} submitDisabled={isPulling} />
+		<SheetFooterActions bind:open submitAction="pull" onSubmit={handleSubmit} submitDisabled={isPulling || !canPull} />
 	{/snippet}
 </ResponsiveDialog.Root>

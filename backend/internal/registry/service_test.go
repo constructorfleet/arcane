@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -46,7 +47,6 @@ import (
 
 type (
 	fakeRegistryDaemonClient struct {
-		registryLoginFn       func(ctx context.Context, options client.RegistryLoginOptions) (client.RegistryLoginResult, error)
 		distributionInspectFn func(ctx context.Context, imageRef string, options client.DistributionInspectOptions) (client.DistributionInspectResult, error)
 	}
 
@@ -99,13 +99,6 @@ func decodeRegistryAuth(t *testing.T, encoded string) dockerregistry.AuthConfig 
 
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
-}
-
-func (f *fakeRegistryDaemonClient) RegistryLogin(ctx context.Context, options client.RegistryLoginOptions) (client.RegistryLoginResult, error) {
-	if f.registryLoginFn == nil {
-		return client.RegistryLoginResult{}, nil
-	}
-	return f.registryLoginFn(ctx, options)
 }
 
 func (f *fakeRegistryDaemonClient) DistributionInspect(ctx context.Context, imageRef string, options client.DistributionInspectOptions) (client.DistributionInspectResult, error) {
@@ -817,52 +810,125 @@ func TestContainerRegistryService_SyncRegistries_ClearsGenericTokenWhenManagerSe
 	assert.Empty(t, decryptedToken)
 }
 
-func TestContainerRegistryService_TestRegistry_UsesDockerDaemon(t *testing.T) {
+func TestContainerRegistryService_TestRegistry_UsesRegistryHTTP(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v2/", r.URL.Path)
+		username, password, _ := r.BasicAuth()
+		if username != "user" || password != "token" {
+			w.Header().Set("WWW-Authenticate", `Basic realm="registry"`)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
 	svc := newRegistryTestService(t, setupContainerRegistryTestDB(t), func(context.Context) (RegistryDaemonClient, error) {
-		return &fakeRegistryDaemonClient{
-			registryLoginFn: func(ctx context.Context, options client.RegistryLoginOptions) (client.RegistryLoginResult, error) {
-				assert.Equal(t, "user", options.Username)
-				assert.Equal(t, "token", options.Password)
-				assert.Equal(t, "registry.example.com:5443", options.ServerAddress)
-				return client.RegistryLoginResult{}, nil
-			},
-		}, nil
-	})
-
-	err := svc.TestRegistry(t.Context(), "https://registry.example.com:5443", "user", "token")
+		t.Fatal("registry connection tests must not use a Docker daemon")
+		return &fakeRegistryDaemonClient{}, nil
+	}, server.Client())
+	authenticated, err := svc.TestRegistry(t.Context(), types.ContainerRegistry{URL: server.URL, Username: "user", Token: "token"})
 	require.NoError(t, err)
-}
-
-func TestContainerRegistryService_TestRegistry_PropagatesDaemonError(t *testing.T) {
-	expectedErr := errors.New("tls: failed to verify certificate: x509: certificate signed by unknown authority")
-	svc := newRegistryTestService(t, setupContainerRegistryTestDB(t), func(context.Context) (RegistryDaemonClient, error) {
-		return &fakeRegistryDaemonClient{
-			registryLoginFn: func(ctx context.Context, options client.RegistryLoginOptions) (client.RegistryLoginResult, error) {
-				return client.RegistryLoginResult{}, expectedErr
-			},
-		}, nil
-	})
-
-	err := svc.TestRegistry(t.Context(), "registry.example.com", "user", "token")
+	require.True(t, authenticated)
+	_, err = svc.TestRegistry(t.Context(), types.ContainerRegistry{URL: server.URL, Username: "user", Token: "incorrect-secret"})
 	require.Error(t, err)
-	assert.ErrorIs(t, err, expectedErr)
+	require.NotContains(t, err.Error(), "incorrect-secret")
 }
 
-func TestContainerRegistryService_TestRegistry_SkipsLoginForEmptyCredentials(t *testing.T) {
+func TestContainerRegistryService_TestRegistry_PropagatesTransportError(t *testing.T) {
+	expectedErr := errors.New("tls: failed to verify certificate: x509: certificate signed by unknown authority")
+	httpClient := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) { return nil, expectedErr })}
 	svc := newRegistryTestService(t, setupContainerRegistryTestDB(t), func(context.Context) (RegistryDaemonClient, error) {
-		return &fakeRegistryDaemonClient{
-			registryLoginFn: func(ctx context.Context, options client.RegistryLoginOptions) (client.RegistryLoginResult, error) {
-				require.FailNow(t, "RegistryLogin should not be called with empty credentials")
-				return client.RegistryLoginResult{}, nil
-			},
-		}, nil
-	})
+		t.Fatal("registry connection tests must not use a Docker daemon")
+		return &fakeRegistryDaemonClient{}, nil
+	}, httpClient)
+	_, err := svc.TestRegistry(t.Context(), types.ContainerRegistry{URL: "registry.example.com", Username: "user", Token: "token"})
+	require.Error(t, err)
+	require.ErrorIs(t, err, expectedErr)
+}
 
-	err := svc.TestRegistry(t.Context(), "registry.example.com", "", "")
-	require.NoError(t, err)
+func TestContainerRegistryService_TestRegistry_ChecksAnonymousReachability(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		contentType string
+		status      int
+		wantError   bool
+	}{
+		{name: "public registry", status: http.StatusOK, contentType: "application/json"},
+		{name: "unavailable endpoint", status: http.StatusServiceUnavailable, wantError: true},
+		{name: "HTML fallback", status: http.StatusOK, contentType: "text/html", wantError: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var requests atomic.Int32
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
+				w.Header().Set("Content-Type", test.contentType)
+				w.WriteHeader(test.status)
+				_, _ = w.Write([]byte(`{}`))
+			}))
+			t.Cleanup(server.Close)
+			svc := newRegistryTestService(t, setupContainerRegistryTestDB(t), func(context.Context) (RegistryDaemonClient, error) {
+				t.Fatal("anonymous registry checks must not use a Docker daemon")
+				return &fakeRegistryDaemonClient{}, nil
+			}, server.Client())
+			authenticated, err := svc.TestRegistry(t.Context(), types.ContainerRegistry{URL: server.URL, Username: "  ", Token: "  "})
+			require.Equal(t, test.wantError, err != nil)
+			require.False(t, authenticated)
+			require.Positive(t, requests.Load())
+		})
+	}
+}
 
-	err = svc.TestRegistry(t.Context(), "registry.example.com", "  ", "  ")
+func TestContainerRegistryService_TestRegistry_VerifiesBearerChallenge(t *testing.T) {
+	var tokens atomic.Int32
+	var server *httptest.Server
+	server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/token" {
+			username, password, _ := r.BasicAuth()
+			if username != "user" || password != "token" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			tokens.Add(1)
+			_, _ = w.Write([]byte(`{"token":"approved-token","expires_in":300}`))
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer approved-token" {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="`+server.URL+`/token",service="registry.test"`)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
+	svc := newRegistryTestService(t, setupContainerRegistryTestDB(t), func(context.Context) (RegistryDaemonClient, error) {
+		t.Fatal("Bearer registry checks must not use a Docker daemon")
+		return &fakeRegistryDaemonClient{}, nil
+	}, server.Client())
+	authenticated, err := svc.TestRegistry(t.Context(), types.ContainerRegistry{URL: server.URL, Username: "user", Token: "token"})
 	require.NoError(t, err)
+	require.True(t, authenticated)
+	require.Positive(t, tokens.Load())
+}
+
+func TestContainerRegistryService_TestRegistry_DoesNotVerifyUnchallengedCredentials(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
+	svc := newRegistryTestService(t, setupContainerRegistryTestDB(t), func(context.Context) (RegistryDaemonClient, error) {
+		t.Fatal("public registry checks must not use a Docker daemon")
+		return &fakeRegistryDaemonClient{}, nil
+	}, server.Client())
+	authenticated, err := svc.TestRegistry(t.Context(), types.ContainerRegistry{URL: server.URL, Username: "unverified", Token: "unverified-secret"})
+	require.NoError(t, err)
+	require.False(t, authenticated)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	_, err = svc.TestRegistry(ctx, types.ContainerRegistry{URL: server.URL})
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestContainerRegistryService_InspectImageDigest_AnonymousSuccess(t *testing.T) {

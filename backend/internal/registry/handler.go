@@ -3,7 +3,6 @@ package registry
 import (
 	"context"
 	"log/slog"
-	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -172,27 +171,25 @@ func (h *ContainerRegistryHandler) TestRegistry(ctx context.Context, input *Cont
 		return nil, huma.NewError(apiErr.HTTPStatus(), "Failed to retrieve registry: "+err.Error())
 	}
 
-	// ECR registries use a different auth flow: generate a temporary token via AWS API.
+	var authenticated bool
+	var testErr error
 	if reg.RegistryType == RegistryTypeECR {
-		if testECRRegistryErr := h.registryService.TestECRRegistry(ctx, reg); testECRRegistryErr != nil {
-			return nil, huma.Error400BadRequest("Registry test failed: " + testECRRegistryErr.Error())
+		authenticated, testErr = h.registryService.TestECRRegistry(ctx, reg)
+	} else {
+		decryptedToken, decryptErr := crypto.Decrypt(reg.Token)
+		if decryptErr != nil {
+			return nil, huma.Error500InternalServerError("Failed to decrypt token: " + decryptErr.Error())
 		}
-		return handlerutil.MessageOutput("ECR authentication succeeded", ""), nil
+		authenticated, testErr = h.registryService.TestRegistry(ctx, types.ContainerRegistry{
+			URL: reg.URL, Username: reg.Username, Token: decryptedToken, Insecure: reg.Insecure,
+		})
 	}
-
-	decryptedToken, err := crypto.Decrypt(reg.Token)
-	if err != nil {
-		return nil, huma.Error500InternalServerError("Failed to decrypt token: " + err.Error())
+	if testErr != nil {
+		return nil, huma.Error400BadRequest("Registry test failed: " + testErr.Error())
 	}
-
-	if testRegistryErr := h.registryService.TestRegistry(ctx, reg.URL, reg.Username, decryptedToken); testRegistryErr != nil {
-		return nil, huma.Error400BadRequest("Registry test failed: " + testRegistryErr.Error())
-	}
-
-	return handlerutil.MessageOutput(kit.Ternary(
-		strings.TrimSpace(reg.Username) == "" && strings.TrimSpace(decryptedToken) == "",
-		"Registry saved (no credentials to test)",
-		"Authentication succeeded",
+	return handlerutil.MessageOutput(kit.Ternary(authenticated,
+		"Registry authentication succeeded. Repository permissions were not tested.",
+		"Registry endpoint is reachable. Repository permissions and credential authentication were not verified.",
 	), ""), nil
 }
 

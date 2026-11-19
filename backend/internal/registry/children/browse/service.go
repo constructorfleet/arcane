@@ -106,7 +106,7 @@ func (s *Service) ListRepositories(ctx context.Context, id string, params pagina
 		return remote.Catalog(lookupCtx, target.registry, target.options...)
 	})
 	if err != nil {
-		return nil, pagination.Response{}, classifyBrowseError(err, "failed to list repositories (the registry may not support the catalog API)")
+		return nil, pagination.Response{}, classifyBrowseError(err, "failed to list repositories")
 	}
 	page, response := paginateNames(slices.DeleteFunc(names, func(repositoryName string) bool {
 		return target.prefix != "" && !strings.HasPrefix(repositoryName, target.prefix+"/")

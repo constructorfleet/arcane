@@ -7,6 +7,7 @@
 	import type { ActionButton } from '#lib/components/action-button-group/types.js';
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
+	import ImagePullSheet from '#lib/components/sheets/image-pull-sheet.svelte';
 	import { EmptyState } from '#lib/components/states/index.js';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -16,7 +17,7 @@
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import { AlertIcon, ArrowRightIcon, RegistryIcon, SearchIcon, TagIcon, TrashIcon } from '#lib/icons/index.js';
+	import { AlertIcon, ArrowRightIcon, RegistryIcon, SearchIcon, TagIcon, TrashIcon, DownloadIcon } from '#lib/icons/index.js';
 	import { ResourceDetailLayout } from '#lib/layouts/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
@@ -40,6 +41,9 @@
 	const repository = $derived(data.repository);
 	const tags = $derived(data.tags);
 	const canDeleteTags = $derived(hasShownPermission('registries:delete-tags'));
+	const canPullImages = $derived(hasShownPermission('images:pull'));
+	let pullOpen = $state(false);
+	let pullReference = $state('');
 
 	let selecting = $state(false);
 	let selected = $state<string[]>([]);
@@ -212,8 +216,13 @@
 			{/if}
 		</form>
 
+		{#if data.catalogError}
+			<Alert.Root variant="warning-subtle" size="sm" icon={AlertIcon}>
+				<Alert.Description>{data.catalogError}</Alert.Description>
+			</Alert.Root>
+		{/if}
 		{#if data.catalogError && repositories.length > 0}
-			<p class="text-sm text-muted-foreground">{m.registries_catalog_unavailable_configured()}</p>
+			<p class="text-sm text-muted-foreground">{m.repository_list_showing_configured()}</p>
 		{/if}
 
 		{#if repositories.length > 0}
@@ -247,14 +256,9 @@
 		{:else if data.catalogError}
 			<EmptyState
 				icon={RegistryIcon}
-				title={m.registries_catalog_unavailable_title()}
-				description={m.registries_catalog_unavailable_description()}
-			>
-				<details class="w-full max-w-2xl rounded-lg border border-border/60 bg-muted/15 text-left">
-					<summary class="cursor-pointer px-4 py-2 text-sm font-medium select-none">{m.common_error_details()}</summary>
-					<p class="border-t px-4 py-3 font-mono text-xs break-all text-muted-foreground">{data.catalogError}</p>
-				</details>
-			</EmptyState>
+				title={m.repository_list_unavailable()}
+				description={m.repository_list_unavailable_description()}
+			></EmptyState>
 		{/if}
 	</div>
 {/snippet}
@@ -357,23 +361,35 @@
 								{/each}
 							</div>
 						{/if}
-						{#if canDeleteTags && !selecting}
+						{#if (canDeleteTags || canPullImages) && !selecting}
 							<RowActionsMenu
 								name={tag.name}
 								triggerClass="order-1 size-8 shrink-0 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 lg:order-none"
 							>
-								<DropdownMenu.Item
-									variant="destructive"
-									onclick={() => handleDeleteOne(tag.name)}
-									disabled={deletingTag === tag.name}
-								>
-									{#if deletingTag === tag.name}
-										<Spinner class="size-4" />
-									{:else}
-										<TrashIcon class="size-4" />
-									{/if}
-									{m.common_delete()}
-								</DropdownMenu.Item>
+								{#if canPullImages}
+									<DropdownMenu.Item
+										onclick={() => {
+											pullReference = tagReference(tag.name);
+											pullOpen = true;
+										}}
+									>
+										<DownloadIcon class="size-4" />{m.images_pull_image()}
+									</DropdownMenu.Item>
+								{/if}
+								{#if canDeleteTags}
+									<DropdownMenu.Item
+										variant="destructive"
+										onclick={() => handleDeleteOne(tag.name)}
+										disabled={deletingTag === tag.name}
+									>
+										{#if deletingTag === tag.name}
+											<Spinner class="size-4" />
+										{:else}
+											<TrashIcon class="size-4" />
+										{/if}
+										{m.common_delete()}
+									</DropdownMenu.Item>
+								{/if}
 							</RowActionsMenu>
 						{/if}
 					</div>
@@ -410,3 +426,14 @@
 		{@render repositoryGrid()}
 	{/if}
 </ResourceDetailLayout>
+
+<ImagePullSheet
+	bind:open={pullOpen}
+	initialImageRef={pullReference}
+	onPullFinished={(success, imageName) => {
+		if (success && imageName) {
+			toast.success(m.images_pull_success({ repoTag: imageName }));
+			void queryClient.invalidateQueries({ queryKey: queryKeys.images.all });
+		}
+	}}
+/>

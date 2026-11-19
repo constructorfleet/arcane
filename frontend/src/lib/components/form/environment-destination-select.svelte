@@ -18,6 +18,7 @@
 		environments,
 		variant = 'toolbar',
 		allOption = false,
+		showSingle = false,
 		readonly = false
 	}: {
 		value?: string;
@@ -25,6 +26,7 @@
 		environments?: EnvironmentRef[];
 		variant?: 'toolbar' | 'field' | 'prefix';
 		allOption?: boolean;
+		showSingle?: boolean;
 		readonly?: boolean;
 	} = $props();
 
@@ -64,7 +66,7 @@
 {/snippet}
 
 {#if variant === 'field'}
-	{#if hasChoice}
+	{#if hasChoice || (showSingle && !readonly && permitted.length > 0)}
 		<SelectWithLabel
 			id="destination-environment"
 			label={m.resource_environment_cap()}
