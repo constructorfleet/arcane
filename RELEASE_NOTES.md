@@ -1,13 +1,12 @@
-# 3.0.1-cf.5
+# 3.0.1-cf.6
 
 ## Fixes
 
-- Fix Harbor links in release notes: link the repository UI and exact artifact metadata instead of a nonexistent artifact UI route.
-- Restore explicit per-job Buildx selection so the runner environment cannot silently redirect image builds to a different builder.
-- Preserve version tags, source/PR links, and immutable pull references.
+- Generate source and pull-request links from the public WEB_URL release metadata instead of runner-internal Gitea addresses.
+- Keep the internal API transport separate from user-facing web links; preserve source tags and image digest references.
 
-## Validation and limitations
+## Validation
 
-- Harbor's deployed UI code identifies the repository artifacts-tab route; its v2 API serves exact digest metadata.
-- The former artifact UI URL was browser-tested and returned 404. The corresponding metadata endpoint returns the expected digest.
-- Required release-contract, Go, and frontend checks run before merge. Application behavior and deployment configuration are unchanged.
+- Release tooling covers draft generation with an internal API URL and a public web URL, including an internal PR URL returned by the API.
+- cf.5 release-note web links were corrected without changing its source tag or image digests.
+- Required release-contract, Go, and frontend checks run before merge. No application behavior or deployment configuration changes.

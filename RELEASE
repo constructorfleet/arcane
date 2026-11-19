@@ -1,6 +1,7 @@
 REGISTRY=docker.home.prettybaked.com
 REPOSITORY=constructorfleet/arcane
-VERSION=3.0.1-cf.5
+VERSION=3.0.1-cf.6
 PLATFORMS=linux/amd64
 PROVENANCE=true
 HARBOR_PROJECT_ID=2
+WEB_URL=https://gitea.home.prettybaked.com

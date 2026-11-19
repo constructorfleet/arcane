@@ -39,6 +39,22 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertIn('published=true', output.read_text())
             self.assertTrue(all(call.args[0] == 'GET' for call in request.call_args_list))
 
+    def test_draft_uses_public_links_when_api_and_pr_urls_are_internal(self):
+        sha = 'b' * 40
+        values = {**self.current, 'WEB_URL': 'https://public.example', 'PROVENANCE': 'true'}
+        release_text = '\n'.join(key + '=' + value for key, value in values.items())
+        pull = {'number': 3, 'merged': True, 'merge_commit_sha': sha, 'html_url': 'http://gitea:3000/owner/repo/pulls/3'}
+        with patch.dict(os.environ, {'GITEA_SHA': sha, 'GITEA_SERVER_URL': 'http://gitea:3000', 'GITEA_REPOSITORY': 'owner/repo'}), \
+                patch('sys.argv', ['release.py', 'draft', '--manager-digest', 'sha256:' + 'a' * 64, '--agent-digest', 'sha256:' + 'c' * 64]), \
+                patch('release.Path.read_text', side_effect=[release_text, self.notes]), \
+                patch('release.Path.write_text'), \
+                patch('release.api', side_effect=[None, None, pull, {}]) as request:
+            main()
+        body = request.call_args_list[-1].args[2]['body']
+        self.assertIn('https://public.example/owner/repo/commit/' + sha, body)
+        self.assertIn('https://public.example/owner/repo/pulls/3', body)
+        self.assertNotIn('http://gitea:3000', body)
+
     def test_release_includes_both_immutable_images_and_links(self):
         digest = 'sha256:' + 'a' * 64
         body = release_body(self.current, self.notes, 'b' * 40, {'manager': digest, 'agent': digest},

@@ -28,7 +28,6 @@ jobs:
       - name: Verify release identity
         id: release
         env:
-          GITEA_SERVER_URL: https://gitea.home.prettybaked.com
           GITEA_REPOSITORY: ${{ github.repository }}
           GITEA_SHA: ${{ github.sha }}
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
@@ -90,7 +89,6 @@ jobs:
       contents: write
       pull-requests: read
     env:
-      GITEA_SERVER_URL: https://gitea.home.prettybaked.com
       GITEA_REPOSITORY: ${{ github.repository }}
       GITEA_SHA: ${{ github.sha }}
       GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}

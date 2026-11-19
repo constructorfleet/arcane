@@ -57,7 +57,7 @@ def api(method, path, payload=None, missing=False):
 def release_body(values, notes, sha, digests, pull, server, repository):
     lines = [notes.strip(), "", f"Source: [{sha[:12]}]({server}/{repository}/commit/{sha})"]
     if pull:
-        lines.append(f"Pull request: [#{pull['number']}]({pull['html_url']})")
+        lines.append(f"Pull request: [#{pull['number']}]({server}/{repository}/pulls/{pull['number']})")
     lines.extend(["", "## Container images", "", "| Image | Version | Immutable reference | Harbor |", "| --- | --- | --- | --- |"])
     for image, digest in digests.items():
         if not DIGEST.fullmatch(digest):
@@ -121,7 +121,7 @@ def main():
     if not pull or not pull.get("merged") or pull.get("merge_commit_sha") != sha:
         raise ValueError("Release source must be a merged pull request")
     body = release_body(values, notes, sha, {"manager": args.manager_digest or "", "agent": args.agent_digest or ""}, pull,
-                        os.environ["GITEA_SERVER_URL"].rstrip("/"), os.environ["GITEA_REPOSITORY"])
+                        values["WEB_URL"].rstrip("/"), os.environ["GITEA_REPOSITORY"])
     Path("release-notes.generated.md").write_text(body)
     payload = {"tag_name": tag, "target_commitish": sha, "name": values["VERSION"], "body": body, "draft": True, "prerelease": True}
     if existing:
