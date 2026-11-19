@@ -626,6 +626,10 @@
 	const diskUsage = $derived(diskUsageQuery.data?.byEnvironment ?? []);
 
 	function handleAttentionAction(item: AttentionItem) {
+		if (item.target.kind === 'activity') {
+			activityStore.openCenter(item.target.activityId, undefined, item.environmentId);
+			return;
+		}
 		if (item.target.kind === 'upgrade') {
 			upgradeDialogOpenById[item.environmentId] = true;
 		}

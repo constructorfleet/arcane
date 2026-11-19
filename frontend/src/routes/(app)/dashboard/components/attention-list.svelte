@@ -72,7 +72,7 @@
 						</span>
 						<EnvironmentCell value={item.environmentId} />
 						{#if item.detail}
-							<span class="block text-xs wrap-break-word whitespace-normal text-muted-foreground sm:truncate">{item.detail}</span>
+							<span class="block text-xs wrap-break-word whitespace-normal text-muted-foreground">{item.detail}</span>
 						{/if}
 					</span>
 					{#if item.target.kind === 'link'}

@@ -136,7 +136,7 @@ export function getGpuMetricLabel(stats: SystemStats | null): string {
 }
 
 export type AttentionSeverity = 'critical' | 'warning' | 'info';
-export type AttentionTarget = { kind: 'link'; href: string } | { kind: 'upgrade' };
+export type AttentionTarget = { kind: 'link'; href: string } | { kind: 'upgrade' } | { kind: 'activity'; activityId: string };
 export type AttentionSort = 'impact' | 'newest';
 
 export interface AttentionItem {
@@ -229,28 +229,6 @@ export function collapseActivities(activities: Activity[]): CollapsedActivity[] 
 	return [...groups.values()];
 }
 
-function failingActivityHref(activity: Activity, environmentId: string): string {
-	switch (activity.type) {
-		case 'image_update_check':
-		case 'auto_update':
-			return resolve('/(app)/updates');
-		case 'vulnerability_scan':
-		case 'image_patch':
-			return resolve('/(app)/security');
-		case 'job_run':
-			return resolve('/(app)/agents/[id]?tab=history', { id: environmentId });
-	}
-	if (activity.resourceId && activity.type.startsWith('container_')) {
-		return resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(environmentId)}`, {
-			containerId: activity.resourceId
-		});
-	}
-	if (activity.resourceId && activity.type.startsWith('project_')) {
-		return resolve(`/(app)/projects/[projectId]?env=${encodeURIComponent(environmentId)}`, { projectId: activity.resourceId });
-	}
-	return environmentDetailHref(environmentId);
-}
-
 function failedJobAndRepeatedFailureItems(sources: AttentionSources): AttentionItem[] {
 	const cutoff = sources.now.subtract({ hours: REPEATED_FAILURE_WINDOW_HOURS });
 	const failedGroups = sources.activityGroups.filter(({ activity }) => activity.status === 'failed');
@@ -275,7 +253,9 @@ function failedJobAndRepeatedFailureItems(sources: AttentionSources): AttentionI
 			detail: job.lastError || job.lastRun?.outcome.message || '',
 			timestamp: job.lastRun?.finishedAt ?? job.lastRun?.updatedAt ?? null,
 			actionLabel: m.common_view(),
-			target: { kind: 'link', href: failedJobHref(environmentId, job.id) },
+			target: group
+				? { kind: 'activity', activityId: group.activity.id }
+				: { kind: 'link', href: failedJobHref(environmentId, job.id) },
 			count: group?.ids.length,
 			activityKey: group?.key
 		})),
@@ -298,10 +278,10 @@ function failedJobAndRepeatedFailureItems(sources: AttentionSources): AttentionI
 					severity: 'critical',
 					environmentId,
 					title: m.job_failed({ job: activity.resourceName ? `${title} ${activity.resourceName}` : title }),
-					detail: activity.error || formatRelativeTime(timestamp),
+					detail: activity.error || activity.latestMessage || formatRelativeTime(timestamp),
 					timestamp,
 					actionLabel: m.common_view(),
-					target: { kind: 'link', href: failingActivityHref(activity, environmentId) },
+					target: { kind: 'activity', activityId: activity.id },
 					count: ids.length,
 					activityKey: key
 				};

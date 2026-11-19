@@ -1,12 +1,12 @@
-# 3.0.1-cf.12
+# 3.0.1-cf.13
 
 ## Fixes
 
-- Show the existing Swarm nodes table on the Cluster page, including per-node status, availability, and permission-gated node actions (#9).
-- Add the missing Pause availability action alongside Drain and Active in the shared node menu. Requests retain the exact node ID and query-agent scope.
-- Label cluster inspection as cluster-wide administration, separate from node availability.
+- Open the exact failed activity from repeated-failure dashboard attention items, including image update checks, rather than sending those failures to the Updates list (#10).
+- Linked job failures also open their matched activity; jobs without a captured activity retain their scoped job-history destination.
+- Show the latest activity message when no error summary exists and allow reasons to wrap without desktop truncation. Preserve affected-agent labels and other warning destinations.
 
 ## Validation and limits
 
-- Validate frontend build/type/lint, existing frontend tests, and required CI before merge.
-- Live QA must verify the node list and action scope. Production nodes are not drained or demoted as a UI smoke test.
+- Reported Updates misrouting was reproduced on the live dashboard before this change.
+- Validate frontend build/type/lint, existing frontend tests, and required CI before merge; verify the activity panel and agent scope after rollout.
