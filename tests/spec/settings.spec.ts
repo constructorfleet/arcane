@@ -1,3 +1,5 @@
+import type { WebSocketRoute } from '@playwright/test';
+
 import { test, expect, type Page } from '../fixtures/test.fixture';
 import { createTestApiKeys, deleteTestApiKeys, waitForDialogReady } from '../utils/playwright.util';
 import { fetchApiKeysWithRetry } from '../utils/fetch.util';
@@ -164,8 +166,12 @@ test.describe('Diagnostics', () => {
 		message: 'duplicate diagnostic entry'
 	};
 
-	async function mockDiagnosticsLogsWebSocket(page: Page) {
+	async function mockDiagnosticsLogsWebSocket(
+		page: Page,
+		onSocket: (socket: WebSocketRoute) => void
+	) {
 		await page.routeWebSocket(/\/api\/diagnostics\/logs\/stream(?:\?.*)?$/, (socket) => {
+			onSocket(socket);
 			socket.send(JSON.stringify(duplicateLogEntry));
 			socket.send(JSON.stringify(duplicateLogEntry));
 		});
@@ -173,12 +179,25 @@ test.describe('Diagnostics', () => {
 
 	test.describe('Diagnostics logs', () => {
 		test('renders repeated entries from the live diagnostic log stream', async ({ page }) => {
-			await mockDiagnosticsLogsWebSocket(page);
+			let socket!: WebSocketRoute;
+			await mockDiagnosticsLogsWebSocket(page, (connected) => (socket = connected));
 
 			await page.goto('/system/diagnostics?tab=logs');
 			await page.waitForLoadState('domcontentloaded');
 
 			await expect(page).toHaveURL(/\/system\/diagnostics/);
+			await expect(page.getByText('duplicate diagnostic entry', { exact: true })).toHaveCount(2);
+
+			await page.getByRole('button', { name: 'More actions', exact: true }).click();
+			await page.getByRole('menuitem', { name: 'Pause', exact: true }).click();
+			socket.send(JSON.stringify({ ...duplicateLogEntry, message: 'queued while paused' }));
+			await page.waitForTimeout(250);
+			await expect(page.getByText('queued while paused', { exact: true })).toHaveCount(0);
+			await expect(page.getByText('duplicate diagnostic entry', { exact: true })).toHaveCount(2);
+
+			await page.getByRole('button', { name: 'More actions', exact: true }).click();
+			await page.getByRole('menuitem', { name: 'Resume', exact: true }).click();
+			await expect(page.getByText('queued while paused', { exact: true })).toHaveCount(1);
 			await expect(page.getByText('duplicate diagnostic entry', { exact: true })).toHaveCount(2);
 		});
 	});

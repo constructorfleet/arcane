@@ -504,7 +504,7 @@
 				</Tabs.Content>
 
 				<Tabs.Content value="actors" class="mt-6">
-					<DiagnosticActorPanel />
+					<DiagnosticActorPanel {paused} />
 				</Tabs.Content>
 
 				<Tabs.Content value="goroutines" class="mt-6">
@@ -512,7 +512,7 @@
 				</Tabs.Content>
 
 				<Tabs.Content value="logs" class="mt-6">
-					<DiagnosticLogPanel height="min(70vh, 640px)" />
+					<DiagnosticLogPanel {paused} height="min(70vh, 640px)" />
 				</Tabs.Content>
 
 				<Tabs.Content value="profiling" class="mt-6">

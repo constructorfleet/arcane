@@ -277,6 +277,16 @@ was deployed; deployment interpolation, extension application, separate theme-sw
 visual acceptance and final branding remain open in
 [template issue #17](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues/17).
 
+Administration review remains #16. The parent Connections stream passed bounded
+Pause/Resume/Refresh and owned-page teardown (3 → 6 → 3 connections). On cf.34,
+Actors continued updating while the parent header was paused (#93). cf.38 passes
+page pause state to the independent Actors/log views, retains the latest actor
+snapshot and a bounded incoming log buffer, and preserves explicit Clear and
+reconnect behavior. Six source-callback/effect cases pass with framework
+scheduling mocked; the existing log browser case was extended but development
+E2E was not run. Post-release live acceptance is tracked in #93; broader
+administration and scoped-negative cases remain open.
+
 Metrics: the existing OTel path supports a separate Prometheus exporter and
 instruments agent/tunnel, container, Swarm, HTTP, Git sync, backup and
 runtime/database activity. Unset exporters default off. Homelab PR #12 enabled

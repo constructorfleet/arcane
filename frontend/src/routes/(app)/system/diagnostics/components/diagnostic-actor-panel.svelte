@@ -13,7 +13,13 @@
 	import { formatTime } from '#lib/utils/formatting.js';
 	import { createActorDiagnosticsWebSocket, ReconnectingWebSocket } from '#lib/utils/ws.js';
 
+	let { paused = false }: { paused?: boolean } = $props();
+
+	let latestEnvironments = $state.raw<ActorDiagnostics[]>([]);
 	let environments = $state.raw<ActorDiagnostics[]>([]);
+	$effect(() => {
+		if (!paused) environments = latestEnvironments;
+	});
 	const expanded = new SvelteSet<string>();
 	let ws: ReconnectingWebSocket<ActorDiagnostics[]> | null = null;
 
@@ -27,7 +33,7 @@
 	}
 
 	onMount(() => {
-		ws = createActorDiagnosticsWebSocket({ onMessage: (data) => (environments = data) });
+		ws = createActorDiagnosticsWebSocket({ onMessage: (data) => (latestEnvironments = data) });
 		ws.connect();
 	});
 

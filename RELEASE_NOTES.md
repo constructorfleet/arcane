@@ -1,6 +1,7 @@
-# 3.0.1-cf.37
+# 3.0.1-cf.38
 
-- Preserve the inactive-volume attachment error through the workspace API (#14). Use its workspace-specific conflict category so the UI receives HTTP 409 and the driver/agent guidance, instead of a generic 500 “internal error”.
-- Strengthen the existing inactive cached-helper and fresh-create business cases to assert the category consumed by the workspace handler. Both cases failed on cf.36 despite matching the broader conflict category.
+- Apply Diagnostics Pause to the independent Actors and backend-log views (#93). Resume immediately displays the newest actor snapshot and the bounded log history received while paused.
+- Keep the existing log-buffer limit, filters and explicit Clear behavior. Paused reconnects preserve the frozen view, and automatic scrolling follows displayed updates.
+- Extend the existing duplicate-log browser case with pause/resume buffering. A network-free harness exercises actual component callbacks/effects and the Clear expression: five failures before the correction, all six cases passing afterward.
 
-Live cf.36 returned promptly on the user-supplied inactive swarm03 URL, but lost the error details at the workspace boundary; #14 remains open for corrected live acceptance. The preflight still precedes helper acquisition. No inactive RBD mount or file operation is used to reproduce this classification defect. Normal volume/workspace/backup coverage, required checks and post-release UI/no-helper audit are recorded in the PR and issue. Broader shared identity, active-agent navigation and RBD writes remain #13/#33.
+Live cf.34 Actors reproduced the failure while the parent header stayed frozen; no actor details, profiling or jobs were triggered. The harness mocks framework scheduling and does not establish full DOM/browser acceptance. Full development E2E was not run; no dev stack was started. Required checks and post-release live acceptance are recorded in the PR and #93. Broader administration and scoped-authorization acceptance remain #16/#63.

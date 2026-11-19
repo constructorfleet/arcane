@@ -14,9 +14,10 @@
 	interface Props {
 		height?: string;
 		maxLines?: number;
+		paused?: boolean;
 	}
 
-	let { height = '360px', maxLines = 1000 }: Props = $props();
+	let { height = '360px', maxLines = 1000, paused = false }: Props = $props();
 
 	interface DisplayLogEntry {
 		id: number;
@@ -25,6 +26,7 @@
 
 	let nextLogId = 0;
 	let logs = $state<DisplayLogEntry[]>([]);
+	let displayedLogs = $state<DisplayLogEntry[]>([]);
 	let connected = $state(false);
 	let autoScroll = $state(true);
 	let filterText = $state('');
@@ -33,13 +35,20 @@
 	let ws: ReconnectingWebSocket<LogEntry> | null = null;
 
 	const filtered = $derived(
-		logs.filter(({ entry }) => {
+		displayedLogs.filter(({ entry }) => {
 			const lvl = entry.level.toLowerCase();
 			if (levelFilter !== 'all' && !lvl.startsWith(levelFilter)) return false;
 			if (filterText && !entry.message.toLowerCase().includes(filterText.toLowerCase())) return false;
 			return true;
 		})
 	);
+
+	$effect(() => {
+		if (!paused) {
+			displayedLogs = [...logs];
+			scrollToBottom();
+		}
+	});
 
 	function scrollToBottom() {
 		if (autoScroll && viewport) {
@@ -52,7 +61,6 @@
 	function push(entry: LogEntry) {
 		logs.push({ id: nextLogId++, entry });
 		if (logs.length > maxLines) logs = logs.slice(logs.length - maxLines);
-		scrollToBottom();
 	}
 
 	function levelClass(level: string): string {
@@ -110,7 +118,16 @@
 				<input type="checkbox" bind:checked={autoScroll} class="size-3.5" />
 				{m.common_autoscroll()}
 			</label>
-			<ArcaneButton action="base" tone="ghost" icon={TrashIcon} customLabel={m.common_clear()} onclick={() => (logs = [])} />
+			<ArcaneButton
+				action="base"
+				tone="ghost"
+				icon={TrashIcon}
+				customLabel={m.common_clear()}
+				onclick={() => {
+					logs = [];
+					displayedLogs = [];
+				}}
+			/>
 		</div>
 	</div>
 
@@ -119,7 +136,7 @@
 		class="h-(--panel-height) overflow-y-auto bg-background px-3 py-2 font-mono text-xs leading-relaxed"
 		style="--panel-height: {height}"
 		role="log"
-		aria-live={connected ? 'polite' : 'off'}
+		aria-live={connected && !paused ? 'polite' : 'off'}
 	>
 		{#if filtered.length === 0}
 			<div class="py-6 text-center text-muted-foreground">{m.diagnostics_logs_empty()}</div>
