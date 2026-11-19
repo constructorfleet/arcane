@@ -199,6 +199,7 @@ export async function handleUnauthorizedResponseInternal(
 	const isVersionMismatch = serverMsg?.toLowerCase().includes('application has been updated') ?? false;
 	const isAuthApi = skipAuthPaths.some((path) => requestPath.startsWith(path));
 	const pathname = window.location.pathname || '/';
+	const returnPath = pathname + window.location.search;
 
 	if (isAuthApi || isAuthPagePath(pathname)) {
 		return 'none';
@@ -229,7 +230,7 @@ export async function handleUnauthorizedResponseInternal(
 	if (recoverable && isTransientRefreshFailure) return 'none';
 	if (!unauthorizedRedirectStarted) {
 		unauthorizedRedirectStarted = true;
-		window.location.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+		window.location.replace(`/login?redirect=${encodeURIComponent(returnPath)}`);
 	}
 	return 'redirect';
 }

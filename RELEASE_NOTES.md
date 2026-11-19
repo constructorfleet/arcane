@@ -1,7 +1,7 @@
-# 3.0.1-cf.34
+# 3.0.1-cf.35
 
-- Stop stack deployment when its Compose, environment or supporting source files cannot be persisted (#88, CMP-07). Return the storage error before any Docker deployment request instead of reporting a managed stack without saved source.
-- Extend existing stack-source business coverage with an owned temporary storage failure and fake Docker endpoint. Before the fix, network/service creation and a success response continued; after the fix, the source error is returned with no Docker requests.
-- Related stack-source and native Swarm library coverage passes. Full checks and runtime release acceptance are recorded in the fixing PR and issue.
+- Preserve the complete local path and query when an expired session or unauthenticated page redirects to sign-in (#90). Selected-agent `env`, workspace `tab`, sorting and other query parameters survive the redirect.
+- Keep existing authentication-page loop guards, refresh recovery and the root landing-page preference unchanged.
+- Extend the existing authentication browser cases to assert the returned path. A network-free harness exercises the actual API failure handler and root-layout guard, including refresh and navigation guards.
 
-The failure case uses local temporary files and an in-process fake Docker endpoint. No production source directory, stack or service is changed to induce a failure. Broader Compose/GitOps design remains tracked separately.
+Full checks and release verification are recorded in the fixing PR and issue. The browser suite requires its development prerequisites and is not run against the production service. No wrong-node mutation was attempted or observed during QA.

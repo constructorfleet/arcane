@@ -184,9 +184,11 @@ test.describe('Token refresh behaviour', () => {
 		// Keep /auth/bootstrap unauthenticated too so the login page does not immediately bounce back.
 		await injectExpired401Always(page, /\/api\/auth\/bootstrap(?:\?.*)?$/);
 
-		await page.goto('/containers');
+		const returnPath = '/containers?env=synthetic-agent&sort=name&order=asc';
+		await page.goto(returnPath);
 		await expect.poll(() => refreshCalled).toBe(true);
 		await page.waitForURL(/\/login(\?|$)/, { timeout: 15_000 });
+		expect(new URL(page.url()).searchParams.get('redirect')).toBe(returnPath);
 		await expect(
 			page.getByRole('button', { name: 'Sign in to Arcane', exact: true })
 		).toBeVisible();
@@ -194,10 +196,12 @@ test.describe('Token refresh behaviour', () => {
 
 	test('unauthenticated users are redirected to /login', async ({ page }) => {
 		await page.context().clearCookies();
-		await page.goto('/dashboard');
+		const returnPath = '/system/diagnostics?tab=actors';
+		await page.goto(returnPath);
 		await page.waitForURL(/\/login/, { timeout: 10_000 });
 		await page.waitForLoadState('load');
 		await expect(page).toHaveURL(/\/login/);
+		expect(new URL(page.url()).searchParams.get('redirect')).toBe(returnPath);
 		await expect(
 			page.getByRole('button', { name: 'Sign in to Arcane', exact: true })
 		).toBeVisible();

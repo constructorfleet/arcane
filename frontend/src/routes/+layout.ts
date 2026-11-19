@@ -415,7 +415,9 @@ export const load: LayoutLoad = async ({ url, depends }) => {
 		getEffectiveLandingPage()
 	);
 	if (redirectPath && redirectPath !== url.pathname) {
-		throw redirect(302, redirectPath);
+		const destination =
+			!user && url.pathname !== '/' ? `${redirectPath}?redirect=${encodeURIComponent(url.pathname + url.search)}` : redirectPath;
+		throw redirect(302, destination);
 	}
 
 	return {
