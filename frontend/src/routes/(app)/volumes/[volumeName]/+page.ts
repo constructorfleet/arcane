@@ -4,6 +4,8 @@ import { m } from '#lib/paraglide/messages.js';
 import { queryKeys } from '#lib/query/query-keys.js';
 import { containerService } from '#lib/services/container-service.js';
 import { volumeService } from '#lib/services/volume-service.js';
+import type { VolumeConsumer } from '#lib/types/volume.js';
+import { extractApiErrorMessage } from '#lib/utils/api.js';
 import { resolveDetailEnvironmentId } from '#lib/utils/environments.js';
 import { tryCatch } from '#lib/utils/try-catch.js';
 
@@ -22,7 +24,7 @@ export const load: PageLoad = async ({ params, parent, url }) => {
 				queryFn: () => volumeService.getVolumeForEnvironment(envId, volumeName)
 			});
 
-			let containersDetailed: { id: string; name: string }[] = [];
+			let containersDetailed: VolumeConsumer[] = [];
 			if (volume.containers && volume.containers.length > 0) {
 				containersDetailed = await Promise.all(
 					volume.containers.map(async (id: string) => {
@@ -34,11 +36,23 @@ export const load: PageLoad = async ({ params, parent, url }) => {
 								});
 								const idVal = c?.id || id;
 								const nameVal = c?.name || idVal.substring(0, 12);
-								return { id: idVal, name: nameVal };
+								const labels = c?.labels ?? {};
+								return {
+									id: idVal,
+									name: nameVal,
+									volumeHelper:
+										labels['com.getarcaneapp.internal.resource']?.trim().toLowerCase() === 'true' &&
+										labels['com.getarcaneapp.volume-helper']?.trim().toLowerCase() === 'true'
+								};
 							})()
 						);
 						if (operationResult.error !== null) {
-							return { id, name: id.substring(0, 12) };
+							return {
+								id,
+								name: id.substring(0, 12),
+								volumeHelper: null,
+								detailsError: extractApiErrorMessage(operationResult.error)
+							};
 						} else {
 							return operationResult.data;
 						}

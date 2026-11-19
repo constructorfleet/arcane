@@ -76,6 +76,7 @@ acceptance remain open.
 - [ ] VOL-07 — Protect file operations against path traversal, escaping symlinks, stale edits, and abandoned helper containers.
 - [ ] VOL-08 — Distinguish same-named node-local volumes; do not assume a name or driver's “global” scope proves shared storage identity.
 - [x] VOL-09 — Keep volume pagination and sorting usable when plugins repeat records; count each volume once per node and recover without clearing saved preferences.
+- [x] VOL-10 — Preview supported raster images read-only, with explicit type/size limits and download states for unsupported files.
 
 Status: the user confirmed RBD volume browsing on 2026-11-18. Full VOL-01
 acceptance across remote and manager-host agents remains open; uploading and

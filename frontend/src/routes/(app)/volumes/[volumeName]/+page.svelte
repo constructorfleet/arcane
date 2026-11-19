@@ -48,7 +48,7 @@
 	import { volumeService } from '#lib/services/volume-service.js';
 	import { volumeWorkspaceService } from '#lib/services/volume-workspace-service.js';
 	import type { VolumeWorkspaceFileContent } from '#lib/types/ui/volume.js';
-	import type { VolumeBackupEntry, VolumeWorkspaceFileChange, Volume } from '#lib/types/volume.js';
+	import type { VolumeConsumer, VolumeBackupEntry, VolumeWorkspaceFileChange, Volume } from '#lib/types/volume.js';
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
@@ -78,7 +78,7 @@
 	let { data } = $props();
 	let volume = $derived(data.volume);
 	let active = true;
-	let containersDetailed = $derived<{ id: string; name: string }[]>(data.containersDetailed ?? []);
+	let containersDetailed = $derived<VolumeConsumer[]>(data.containersDetailed ?? []);
 
 	const currentEnvId = $derived(data.envId);
 	const environmentSettings = useEnvironmentSettings(() => currentEnvId);
@@ -873,6 +873,9 @@
 
 {#snippet volumeContainers(volume: Volume)}
 	<DetailSection title={m.volumes_containers_using_title()} icon={ContainersIcon}>
+		{#if containersDetailed.some((consumer) => consumer.volumeHelper === true)}
+			<p class="text-sm text-muted-foreground">{m.volume_helpers_hold_mounts()}</p>
+		{/if}
 		{#if containersDetailed.length > 0}
 			<div class="divide-y rounded-lg border">
 				{#each containersDetailed as c (c.id)}
@@ -885,6 +888,12 @@
 								<ContainersIcon class="mr-1.5 size-3.5 text-muted-foreground" />
 								{c.name}
 							</a>
+							{#if c.volumeHelper === true}
+								<Badge variant="blue">{m.volume_helper()}</Badge>
+							{:else if c.volumeHelper === null}
+								<Badge variant="gray">{m.common_unavailable()}</Badge>
+							{/if}
+							{#if c.detailsError}<p class="mt-1 text-xs text-muted-foreground">{c.detailsError}</p>{/if}
 						</div>
 						<div class="w-full pl-0 sm:w-2/3 sm:pl-4">
 							<code

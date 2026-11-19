@@ -1,11 +1,12 @@
-# 3.0.1-cf.16
+# 3.0.1-cf.17
 
-## Build stability
+## Volume consumer provenance
 
-- Bound manager and agent image compilation with `GOMAXPROCS=4` and `go build -p 2`, matching the existing pull-request Go validation limits.
-- Keep this limit within the build-stage command. Runtime container configuration continues through the existing deployment configuration.
+- Mark known Arcane volume helper containers distinctly in the volume consumer overview, using the existing internal/helper label contract (#13).
+- Show unavailable container metadata with the actual API error instead of silently presenting a short ID as complete consumer details.
+- Explain that helper mounts still count as real consumers. Volume in-use and attachment policy are unchanged.
 
 ## Validation and limits
 
-- Severe recent guest memory/CPU/I/O pressure was observed on swarm05 during the cf.15 publication/rollout window; its exact initiating process is unproven (#42). This limits our compilation concurrency as a mitigation, not a claim that the incident's root cause is resolved.
-- Validate release tooling, frontend build, full format/lint and required CI before merge. Published image builds and normal rollout must still pass verification.
+- Validate frontend tests/build, full format/lint and required CI before merge. Helper presentation requires live acceptance after publication.
+- This improves consumer provenance; shared storage identity/grouping and automatic attachment-aware navigation remain open. Current RBD plugin Status exposes size alone and does not provide enough storage identity for safe cross-node grouping.

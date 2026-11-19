@@ -4696,5 +4696,7 @@
   "network_identity_unavailable": "This agent cannot verify the requested Swarm network identity.",
   "network_observation_scope": "These are independent observations from the listed agents, not a complete cluster-wide deletion check. Unavailable or unobserved nodes may still have consumers.",
   "network_has_observed_consumers": "This network has observed container consumers. Detach its consumers before deleting it.",
-  "no_observed_container_use": "No observed container use"
+  "no_observed_container_use": "No observed container use",
+  "volume_helper": "Arcane volume helper",
+  "volume_helpers_hold_mounts": "Volume helpers can keep this node’s volume mounted without an application consumer. They still count as real consumers and do not establish that attachment on another node is safe."
 }

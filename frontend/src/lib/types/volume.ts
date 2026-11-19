@@ -1,6 +1,13 @@
 import type { BackupManagementType, BackupStatus, BackupTrigger } from './backup';
 import type { WorkspaceFileChange } from './workspace';
 
+export interface VolumeConsumer {
+	id: string;
+	name: string;
+	volumeHelper: boolean | null;
+	detailsError?: string;
+}
+
 export type VolumeWorkspaceFileChangeOperation =
 	| 'create_file'
 	| 'create_folder'
