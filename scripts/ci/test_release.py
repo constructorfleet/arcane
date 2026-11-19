@@ -46,7 +46,8 @@ class ReleaseContractTests(unittest.TestCase):
         for image in ('manager', 'agent'):
             self.assertIn(f'arcane-{image}@{digest}', body)
             self.assertIn(f'arcane-{image}:3.0.1-cf.4', body)
-            self.assertIn(f'/harbor/projects/2/repositories/arcane-{image}/artifacts/{digest}', body)
+            self.assertIn(f'/harbor/projects/2/repositories/arcane-{image}/artifacts-tab', body)
+            self.assertIn(f'/api/v2.0/projects/constructorfleet/repositories/arcane-{image}/artifacts/{digest}', body)
         self.assertIn('/pulls/7', body)
         self.assertIn('/commit/' + 'b' * 40, body)
         with self.assertRaises(ValueError):
