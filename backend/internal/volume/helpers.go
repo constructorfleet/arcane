@@ -122,7 +122,7 @@ func (s *VolumeService) acquireVolumeHelper(ctx context.Context, volumeName stri
 		return "", nil, fmt.Errorf("failed to inspect volume before workspace access: %w", inspectErr)
 	}
 	if inspected.Volume.Scope == "global" && inspected.Volume.Driver != "local" && inspected.Volume.Mountpoint == "" {
-		return "", nil, common.Classify(common.ErrConflict, fmt.Errorf(
+		return "", nil, common.Classify(common.ErrVolumeWorkspaceConflict, fmt.Errorf(
 			"volume %q uses global driver %q and is not mounted on this agent; open its workspace on an agent already using this volume",
 			volumeName, inspected.Volume.Driver,
 		))

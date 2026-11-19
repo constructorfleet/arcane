@@ -117,6 +117,12 @@ as attached only on swarm04. No inactive RBD mount was attempted. The guard
 does not discover backend identity or automatically route to another agent;
 shared grouping/navigation and broader RBD acceptance remain #13/#14/#33.
 
+Live cf.36 reached a prompt unavailable state on the supplied inactive swarm03
+URL, but its generic conflict category was hidden as an internal error by the
+workspace-specific HTTP boundary. cf.37 uses the workspace conflict category;
+the existing inactive cached/fresh helper cases now assert that exact contract.
+Corrected live UI and no-helper acceptance remain tracked in #14.
+
 ## Native Docker resources and onboarding
 
 - [ ] RES-01 — Discover resources on an existing Swarm regardless of whether Ansible, SwarmCD, Docker CLI, Arcane, or another UI deployed them.

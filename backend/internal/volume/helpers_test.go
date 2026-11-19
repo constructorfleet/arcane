@@ -137,7 +137,7 @@ func TestCreateTempContainerReusesWritableHelper(t *testing.T) {
 			inspectedVolume = volume.Volume{Name: "workspace-volume", Driver: tc.driver, Scope: tc.scope, Mountpoint: tc.mountpoint}
 			helperID, release, acquireErr := service.acquireVolumeHelper(t.Context(), "workspace-volume")
 			if tc.conflict {
-				require.ErrorIs(t, acquireErr, common.ErrConflict)
+				require.ErrorIs(t, acquireErr, common.ErrVolumeWorkspaceConflict)
 				require.ErrorContains(t, acquireErr, "not mounted on this agent")
 				require.Empty(t, helperID)
 				require.Nil(t, release)
