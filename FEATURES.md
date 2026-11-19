@@ -32,9 +32,9 @@ Change this ordering whenever priorities change.
 - [x] BASE-07 — Validate manager-only bootstrap and agent-enabled role rendering with Ansible and Docker stack tooling.
 - [x] BASE-08 — Create and verify an Arcane Docmost page describing actual status and limitations.
 - [x] BASE-09 — Schedule separate hourly deployment-maintenance and documentation-maintenance follow-ups.
-- [ ] BASE-10 — Perform and verify the initial live Arcane rollout from homelab-ansible.
-- [ ] BASE-11 — Verify the live Authentik callback and administrator access.
-- [ ] BASE-12 — Enroll and verify one agent per Linux node, including the manager host.
+- [x] BASE-10 — Perform and verify the initial live Arcane rollout from homelab-ansible.
+- [x] BASE-11 — Verify the live Authentik callback and administrator access.
+- [x] BASE-12 — Enroll and verify one agent per Linux node, including the manager host.
 
 ## Control plane and global agents
 
@@ -49,21 +49,25 @@ Change this ordering whenever priorities change.
 Status: BASE-03 is service-tested. Socket-free deployment is verified with one
 manager and five global agents on cf.6, including the manager's host. Directory
 retirement and independent enrollment are verified; deletion of five agents was
-verified in isolation. Node-agent association UI is tracked separately in #5;
+verified in isolation. Node-agent association UI was verified in cf.8 (#5 closed);
 credential rotation, failover, and complete node-local operation acceptance remain open.
 
 ## Node routing and interactive operations
 
 - [x] NODE-01 — Resolve a service task to its node and container, then proxy requests to that node's agent.
-- [ ] NODE-02 — Open container consoles and exec sessions on the selected node and replica.
+- [x] NODE-02 — Open container consoles and exec sessions on the selected node and replica.
 - [ ] NODE-03 — Stream container/task logs through the correct agent, with working disconnect and cancellation behavior.
 - [ ] NODE-04 — Handle task movement and agent disconnection without silently switching an existing console to another replica.
 - [ ] NODE-05 — Inspect and operate on node-local containers, images, volumes, and networks through the correct agent.
 
 Status: cf.9 global and service task links resolved exact containers on swarm02,
 swarm03, and swarm05 through their own agent UUIDs. Removed/unassigned tasks show
-clear unavailable states (#8). Console/exec, logs, migration, and disconnect
-acceptance remain open.
+clear unavailable states (#8). A direct cf.15 shell session on the owned standalone
+fixture on swarm01 returned its marker and exited cleanly (agent status 1000).
+cf.22 service-task navigation and Shell markers passed on owned tasks on swarm02
+and swarm03, with matching native container IDs and clean shell exits. A synthetic
+stdout marker streamed through swarm03 Logs and Stop ended the stream. Both
+nodes have manager role; worker-role, migration and failure/disconnect cases remain open.
 
 ## Volumes and files
 
@@ -82,11 +86,16 @@ Status: the user confirmed RBD volume browsing on 2026-11-18. Full VOL-01
 acceptance across remote and manager-host agents remains open; uploading and
 editing remain unverified. The pagination/sorting crash reported on 2026-11-18 was caused by duplicate
 same-node volume names (`each_key_duplicate`). Release `3.0.1-cf.3` deduplicates
-per daemon before pagination/counting. SwarmCD rolled out both images; all five
-agents and the manager are healthy. Browser verification passed saved-preference
+per daemon before pagination/counting. Its SwarmCD rollout and five-agent/manager
+health were verified. Browser verification passed saved-preference
 recovery, three pages, driver sorting in both directions, and navigation away/back.
-Volume service and pagination tests and Go lint passed. Full local format/lint
-remains blocked by missing `vp`; the manager image frontend build passed.
+Volume service and pagination tests and Go lint passed. Local format/lint was
+blocked by missing `vp` at cf.3; later feature branches passed full local checks.
+
+cf.17 local-fixture acceptance identified the exact agent-scoped Arcane volume
+helper, retained In Use, and explained its mount ownership. Shared RBD identity,
+grouping and safe attachment-aware navigation remain open in
+[volume issue #13](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues/13).
 
 ## Native Docker resources and onboarding
 
@@ -105,13 +114,21 @@ control-plane/global-agent architecture before being marked complete.
 
 ## Compose and stack authoring
 
-- [ ] CMP-01 — Create and edit stacks directly in the UI using standard Compose YAML.
+- [x] CMP-01 — Create and edit stacks directly in the UI using standard Compose YAML.
 - [ ] CMP-02 — Parse and validate Compose, then validate the supported feature set for the selected target: Swarm stack or local Compose.
 - [ ] CMP-03 — Preserve useful YAML anchors, merges, extension fields, and Arcane's existing authoring conveniences.
 - [ ] CMP-04 — Audit and retain useful Arcane custom tags/features with documented expansion to deployable Compose. **Candidate features; exact set undecided.**
 - [ ] CMP-05 — Show resolved nonsecret variables, effective images, validation errors, and the deployment diff before applying changes.
 - [ ] CMP-06 — Keep GUI editing and YAML editing consistent, and warn when an edit cannot preserve a document feature.
 - [ ] CMP-07 — Preserve source Compose, associated files, deployment history, and enough provenance to explain live drift.
+- [x] CMP-08 — Launch standalone containers from the UI through an explicitly selected node agent. cf.23 owned swarm03 launch and native command/resource/security settings matched; cf.26 also accepted 0.1 CPU creation and 0.25 CPU editing with exact native NanoCPUs (#69 closed).
+
+Status: cf.23 owned Swarm stack create/Edit/Save passed through explicitly selected
+swarm03. Original anchor/merge and synthetic `.env` input survived Source refresh;
+native runtime environment expansion, metadata-label update, 0.1 CPU, 32 MiB and
+read-only/capability settings matched. The owned service/network and source files
+were cleaned up. Advanced/unsupported-feature validation, deployment previews,
+history and broader GUI/source round trips remain open.
 
 Boundary: no required TOML or replacement service/stack definition language.
 Swarm does not support every modern local-Compose feature; unsupported behavior
@@ -128,6 +145,26 @@ must be surfaced rather than silently ignored.
 - [ ] SEC-07 — Read and edit authorized variable values while keeping secret values out of ordinary logs, metrics, diffs, and exports.
 - [ ] SEC-08 — Preview which stacks a shared-value change affects and select which deployments to update.
 
+Status: native config/secret counts, two next-page transitions and config name
+sorting passed a read-only cf.19/cf.20 inventory check. UI creation through swarm03
+produced an owned native config rediscovered through swarm01. cf.21 list and
+aggregate responses omitted its content, while authorized inspection/UI display
+and a label update retained the original marker bytes. cf.22 synthetic secret
+creation through explicitly selected swarm03, swarm01 discovery, immutable-value
+guidance and persisted label editing also passed; native metadata matched. Both
+unused fixtures were removed. Negative scoped-role cases remain #63; immutable
+revisions, consumer management and reusable-global delivery are still open.
+
+Reusable-input source audit at cf.28: existing global-variable service encrypts
+secret-marked storage and redacts mutation/list DTOs; omitted values preserve
+ciphertext, and secret-to-readable changes require a replacement value.
+Agent-scoped values override all-agent values; interpolation-only inputs need
+not be injected into containers. Control-plane synchronization skips local0.
+These effective values materialize as agent-side `.env.global` inputs, distinct
+from native Swarm secret delivery. Existing variable/project business coverage
+passed PR #75 Go CI; live synthetic reuse and scoped-denial acceptance remain
+#29 / #63. No production values were read or changed for this audit.
+
 Boundary: Docker cannot return the plaintext of an existing Swarm secret.
 Imported secrets must be shown as external/write-only; replacement is supported
 without pretending their old values can be recovered. Standalone containers
@@ -135,16 +172,42 @@ need a distinct secret-delivery mechanism because Swarm secrets are service-only
 
 ## Identity and registries
 
-- [ ] AUTH-01 — Verify OIDC sign-in through Authentik, including the deployed callback and group/role mapping.
+- [x] AUTH-01 — Verify OIDC sign-in through Authentik, including the deployed callback and group/role mapping.
 - [ ] AUTH-02 — Enforce permissions on backend requests and interactive streams, including exec, file writes, deployment, and secret operations.
-- [ ] REG-01 — Pull private images with Harbor credentials during service creation, updates, standalone launches, and helper-container creation.
+- [ ] REG-01 — Pull private images with configured third-party registry credentials (Harbor in this homelab) during service creation, updates, standalone launches, and helper-container creation.
 - [ ] REG-02 — Ensure newly scheduled tasks on uncached nodes can pull authenticated images.
 - [ ] REG-03 — Support explicitly configured image-rewrite policies for pull-through caches, following the homelab-ansible pattern.
-- [ ] REG-04 — Preserve image paths, tags, and digests; normalize Docker Hub official images correctly; avoid rewriting Harbor references recursively.
+- [ ] REG-04 — Preserve image paths, tags, and digests; normalize Docker Hub official images correctly; avoid rewriting configured cache references recursively, including Harbor.
 - [ ] REG-05 — Show original and effective image references and allow policy opt-outs where needed.
+- [x] REG-06 — Push an existing node image tag through its explicitly selected owning agent, with registry credentials, progress and actual errors.
+- [x] REG-07 — Build a saved local workspace through an explicitly selected agent and load its resulting image on that node.
 
-Status: upstream OIDC/registry features and homelab callback configuration exist;
-end-to-end behavior still needs verification.
+Status: fresh private-window OIDC sign-in/logout/callback and the expected SSO
+Administrator role passed on cf.20; the original browser session remained active.
+The callback was already live and needed no Terraform apply. Alternate groups,
+role removal and scoped resource/stream/file allow/deny acceptance remain in
+[AUTH-02 issue #63](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues/63).
+
+cf.18 verified registry connection, accurate catalog-denial wording, known-repository
+browsing and an explicitly selected swarm03 tag pull. Before/after inventories
+proved the destination; image layers were already cached. Private uncached pulls,
+non-Harbor runtime and broader build/push acceptance remain
+[registry issue #40](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues/40).
+cf.22 standalone Push passed for a unique owned QA tag from explicitly selected
+swarm03. Activity output, the native agent request and Harbor artifact metadata
+agree on the pushed digest. The new repository/tag browses in Arcane and a
+subsequent explicit swarm02 Pull passed. Layers were cross-mounted or cached;
+that cf.22 check did not establish uncached transfer. Negative and
+cancellation behavior has business-test coverage. No released tag was overwritten.
+
+cf.24 UI-created synthetic Dockerfile/text built through selected swarm03, then a
+separate Push transferred a new layer to Harbor. Selected swarm02 Pull acquired
+that previously absent layer and matched its native digest/label. Both context
+files survived cf.25 agent replacement with exact hashes and reopened in the UI;
+the exact owned files were then cleaned up. The dedicated node-local `/builds`
+mount is separate from identity state. Repository deployment-example prevention shipped in cf.27 / PR #74,
+closing #71. Private authentication, non-Harbor providers, integrated Build+Push,
+and broader cache/provider behavior remain open.
 
 ## Direct deployment and GitOps
 
@@ -166,9 +229,46 @@ or support both remains an explicit design decision.
 - [ ] TPL-02 — Audit and reuse Arcane's existing template/catalog behavior where it fits standard Compose.
 - [ ] OBS-01 — Expose Prometheus metrics for manager health, agent connectivity, operations, errors, deployment results, and reconciliation state.
 - [ ] OBS-02 — Provide useful UI error/status information for partial deployment failures and unavailable nodes.
+- [x] OBS-03 — Collect existing manager and node-agent Prometheus series through six unique task targets on the monitoring overlay, with remote-query and native container-ID coverage proof.
 - [ ] OPS-01 — Record an audit trail for mutations and sensitive operations without recording secret payloads.
 - [ ] OPS-02 — Verify rollback, backup/restore, encryption-key preservation, and upgrades for manager state.
 - [ ] OPS-03 — Keep Arcane Docmost feature, customization, deployment, and troubleshooting pages synchronized with verified changes.
+
+Template evidence: a cf.15 unsaved Compose anchor/merge draft and matching
+synthetic `.env` input passed editor diagnostics; invalid YAML produced an error.
+Existing metadata business tests also pass for anchors, interpolation, includes,
+name/color tags and global environment loading. Existing template-service tests
+pass for downloaded/local icon preservation and refusing unowned overwrites.
+cf.22 saved/reopened an owned template after refresh with literal anchors/merge,
+extension metadata and synthetic `.env` retained. An explicit interpolated icon
+URL rendered in the gallery. cf.25 resolved the retained `nginx` catalog slug
+without editing or resaving, closing #67.
+cf.28 derived both variant URLs from the retained variant-only template without
+editing/resaving; the gallery and picker rendered nginx artwork in the existing
+dark theme, closing #73. Its unsaved project draft retained anchors/merge and both
+source variants, then was closed without creating a project. No template stack
+was deployed; deployment interpolation, extension application, separate theme-switch
+visual acceptance and final branding remain open in
+[template issue #17](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues/17).
+
+Metrics: the existing OTel path supports a separate Prometheus exporter and
+instruments agent/tunnel, container, Swarm, HTTP, Git sync, backup and
+runtime/database activity. Unset exporters default off. Homelab PR #12 enabled
+private collection for one manager and five agents; repeated target and
+VictoriaMetrics queries passed, and sampled container IDs matched native Docker
+on all five nodes. Exporters listen on attached overlays with no new host port
+or public router. Immediate warm and successful replacement scrapes passed;
+fully isolated cold-cache completeness remains unproven. Broader operation/
+reconciliation coverage and dashboards/alerts remain
+[metrics issue #32](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues/32).
+
+During that configuration rollout, node05 recovered naturally from an OOM and
+pressure incident; manager relocation preserved all five agent UUIDs and data
+fencing. RBD handoff evidence remains #42. A source/heap audit identified 8 GiB
+of fixed collector cardinality-tracking allocations; the tracking-policy choice
+and current mitigation status are recorded in
+[infrastructure issue #76](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues/76).
+These observations do not establish the initiating allocation of the global OOM.
 
 ## Decisions still open
 
@@ -180,8 +280,8 @@ or support both remains an explicit design decision.
 
 ## First useful release acceptance
 
-- [ ] ACCEPT-01 — Manager runs without a Docker socket; healthy readiness does not require a local Docker daemon.
-- [ ] ACCEPT-02 — A global agent runs once on every eligible node, including the manager's host.
+- [x] ACCEPT-01 — Manager runs without a Docker socket; healthy readiness does not require a local Docker daemon.
+- [x] ACCEPT-02 — A global agent runs once on every eligible node, including the manager's host.
 - [ ] ACCEPT-03 — Console/exec reaches the selected task on either of two different workers.
 - [ ] ACCEPT-04 — RBD volume browsing, upload, and editing work on the correct node without unsafe additional attachment.
 - [ ] ACCEPT-05 — Existing externally deployed resources appear and can be operated on without redeployment during discovery.

@@ -1,16 +1,18 @@
-# 3.0.1-cf.28
+# 3.0.1-cf.29
 
-## Template light and dark icons
+## Verified feature acceptance
 
-- Retain `x-arcane.icon-light` and `icon-dark` when parsing saved templates and expose both resolved URLs to the gallery and template picker. Reuse the existing icon catalog, viewing-user preference and theme selection. Refs #73 / #17.
-- Derive variants from saved Compose on catalog reads so previously saved variant-only templates work without editing/resaving or schema migration. Keep canonical source/identifiers unchanged; local catalog responses continue omitting Compose and dotenv contents.
-- Preserve generic icon URLs, catalog identifiers and remote-registry icon fallbacks. Light artwork is used for a dark theme and dark artwork for a light theme, matching existing project/container behavior.
+- Reconcile FEATURES.md with bounded live acceptance: fresh OIDC sign-in, native config/secret creation, Compose stack and standalone authoring, fractional CPU create/edit, selected-agent image Push/build/fresh-layer Pull, persistent local build workspaces, and template icon presentation. Link the remaining scope rather than treating partial evidence as full completion.
+- Add REG-07 and OBS-03 for selected-agent workspace builds and six-target private Prometheus collection. Homelab PR #12 deployed existing metrics through the monitoring overlay; repeated queries and native Docker container-ID coverage passed on all five nodes.
+- Record source/test audits of reusable encrypted inputs and telemetry, alongside the distinction between global environment materialization and native Swarm secrets. Preserve open scoped-authorization, template deployment/theme, registry/cache, RBD and later design work.
 
-## Validation
+## Validation and runtime evidence
 
-- Existing template service coverage exercises preexisting variant-only content with dotenv interpolation, catalog preference/default resolution, generic/explicit icons, list-content omission and unchanged database/cache identifiers. Existing template parser tests remain passing.
-- Backend template/project tests, frontend tests (8), production frontend build, format/full lint and release contract pass locally. Runtime light/dark and no-resave acceptance follows normal publication/rollout; the owned never-deploy template retains its cf.25 failing variant-only baseline.
+- Documentation formatting, full lint and release contract pass locally. This release records behavior verified across cf.20–cf.28 and the homelab configuration rollout; it introduces no new application implementation.
+- Current cf.28 manager on swarm03 passes Docker health and database readiness. Five agents are Running, UI Online and metrics-up with unchanged UUIDs; agent images do not define Docker HEALTHCHECKs.
 
 ## Limits
 
-- Remote catalogs use their registry icon until Compose is downloaded; listing does not fetch every remote template. General template deployment, extension application, custom bang tags and final fork branding remain separate #17 acceptance/design work.
+- Metrics proof covers six unique task targets, observed series and native ID coverage, warm requests and successful replacement scrapes. Fully isolated cold-cache completeness and broader operational/reconciliation metrics and dashboards remain #32.
+- Node05 experienced a global OOM/pressure incident during configuration rollout and recovered without interventions. Collector cardinality tracking has a proven 8 GiB allocation; its policy choice is tracked in #76, separate from RBD handoff #42. The initiating global-OOM allocation remains unproven.
+- Native config/secret and template/registry acceptance remain bounded to the recorded fixtures and actors; scoped denial #63 and the actual inactive RBD target #14 still need their missing inputs.
