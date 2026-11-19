@@ -171,8 +171,19 @@ func (s *TemplateService) GetAllTemplates(ctx context.Context) ([]ComposeTemplat
 	}
 
 	var templates []ComposeTemplate
-	if err := s.db.WithContext(ctx).Omit("Content", "EnvContent").Preload("Registry").Find(&templates).Error; err != nil {
+	if err := s.db.WithContext(ctx).Preload("Registry").Find(&templates).Error; err != nil {
 		return nil, fmt.Errorf("failed to get local templates: %w", err)
+	}
+
+	for i := range templates {
+		icons := projects.ResolveTemplateIcons(ctx, templates[i].Content, kit.FromPtr(templates[i].EnvContent))
+		if templates[i].Metadata != nil {
+			icons.Icon = cmp.Or(icons.Icon, kit.FromPtr(templates[i].Metadata.IconURL))
+		}
+		setTemplateIcons(&templates[i], icons)
+		// List responses expose derived icon metadata, never Compose or dotenv contents.
+		templates[i].Content = ""
+		templates[i].EnvContent = nil
 	}
 
 	remoteTemplates, err := s.remoteTemplates(ctx, false)
@@ -303,7 +314,7 @@ func (s *TemplateService) CreateTemplate(ctx context.Context, template *ComposeT
 	}
 	template.IsCustom = true
 	template.IsRemote = false
-	setTemplateIconURL(template, projects.ResolveTemplateIconURL(ctx, template.Content, mo.PointerToOption(template.EnvContent).OrEmpty()))
+	setTemplateIcons(template, projects.ResolveTemplateIcons(ctx, template.Content, mo.PointerToOption(template.EnvContent).OrEmpty()))
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(template).Error; err != nil {
 			return fmt.Errorf("failed to create template: %w", err)
@@ -365,7 +376,7 @@ func (s *TemplateService) UpdateTemplate(ctx context.Context, id string, req typ
 
 		existing.Content = updates.Content
 		existing.EnvContent = updates.EnvContent
-		setTemplateIconURL(&existing, projects.ResolveTemplateIconURL(ctx, existing.Content, mo.PointerToOption(existing.EnvContent).OrEmpty()))
+		setTemplateIcons(&existing, projects.ResolveTemplateIcons(ctx, existing.Content, mo.PointerToOption(existing.EnvContent).OrEmpty()))
 		if err := tx.Save(&existing).Error; err != nil {
 			return fmt.Errorf("failed to update template: %w", err)
 		}
@@ -1169,7 +1180,7 @@ func (s *TemplateService) SyncLocalTemplatesFromFilesystem(ctx context.Context) 
 			continue
 		}
 		if folderErr == nil {
-			iconURL := projects.ResolveTemplateIconURL(ctx, compose, mo.PointerToOption(envPtr).OrEmpty())
+			icons := projects.ResolveTemplateIcons(ctx, compose, mo.PointerToOption(envPtr).OrEmpty())
 			folderErr = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 				// Match on description (the absolute compose path) or, for disk imports, the folder name so
 				// directory reconfigurations and compose renames keep a single row.
@@ -1191,7 +1202,7 @@ func (s *TemplateService) SyncLocalTemplatesFromFilesystem(ctx context.Context) 
 				tpl.EnvContent = envPtr
 				tpl.IsCustom = true
 				tpl.IsRemote = false
-				setTemplateIconURL(tpl, iconURL)
+				setTemplateIcons(tpl, icons)
 
 				if exists {
 					if saveErr := tx.Save(tpl).Error; saveErr != nil {
@@ -1217,13 +1228,14 @@ func (s *TemplateService) SyncLocalTemplatesFromFilesystem(ctx context.Context) 
 	return nil
 }
 
-func setTemplateIconURL(template *ComposeTemplate, iconURL *string) {
+func setTemplateIcons(template *ComposeTemplate, icons projects.IconSet) {
+	iconURL := mo.EmptyableToOption(strings.TrimSpace(icons.Icon)).ToPointer()
 	if template == nil {
 		return
 	}
 
 	if template.Metadata == nil {
-		if iconURL == nil {
+		if icons.IsEmpty() {
 			return
 		}
 		template.Metadata = &ComposeTemplateMetadata{}
@@ -1231,13 +1243,17 @@ func setTemplateIconURL(template *ComposeTemplate, iconURL *string) {
 
 	// Downloaded templates fall back to their registry icon.
 	template.Metadata.IconURL = cmp.Or(iconURL, template.Metadata.RegistryIconURL)
+	template.Metadata.IconLightURL = mo.EmptyableToOption(icons.Light).ToPointer()
+	template.Metadata.IconDarkURL = mo.EmptyableToOption(icons.Dark).ToPointer()
 	if template.Metadata.Version == nil &&
 		template.Metadata.Author == nil &&
 		len(template.Metadata.Tags) == 0 &&
 		template.Metadata.RemoteURL == nil &&
 		template.Metadata.EnvURL == nil &&
 		template.Metadata.DocumentationURL == nil &&
-		template.Metadata.IconURL == nil {
+		template.Metadata.IconURL == nil &&
+		template.Metadata.IconLightURL == nil &&
+		template.Metadata.IconDarkURL == nil {
 		template.Metadata = nil
 	}
 }
@@ -1258,7 +1274,7 @@ func (s *TemplateService) GetTemplateContentWithParsedData(ctx context.Context, 
 		slog.WarnContext(ctx, "failed to check template folder", "templateId", id, "error", folderErr)
 	}
 	if !composeTemplate.IsRemote {
-		setTemplateIconURL(composeTemplate, projects.ResolveTemplateIconURL(ctx, composeContent, envContent))
+		setTemplateIcons(composeTemplate, projects.ResolveTemplateIcons(ctx, composeContent, envContent))
 	}
 
 	outTemplate, mapErr := templateDTO(ctx, composeTemplate)
@@ -1289,14 +1305,24 @@ func templateDTO(ctx context.Context, template *ComposeTemplate) (types.Template
 	if err := mapping.MapStruct(template, &out); err != nil {
 		return out, err
 	}
-	if out.Metadata == nil || out.Metadata.IconURL == nil {
+	// Derive variants from saved Compose so existing templates need no resave or schema migration.
+	icons := projects.ResolveTemplateIcons(ctx, template.Content, kit.FromPtr(template.EnvContent))
+	metadata := types.TemplateMeta{}
+	if out.Metadata != nil {
+		metadata = *out.Metadata
+		icons.Icon = cmp.Or(icons.Icon, kit.FromPtr(metadata.IconURL))
+		icons.Light = cmp.Or(icons.Light, kit.FromPtr(metadata.IconLightURL))
+		icons.Dark = cmp.Or(icons.Dark, kit.FromPtr(metadata.IconDarkURL))
+	}
+	if icons.IsEmpty() {
 		return out, nil
 	}
 	actor, _ := handlerutil.CurrentUserFromContext(ctx)
 	catalog := cmp.Or(kit.FromPtr(kit.FromPtr(actor).Preferences.IconCatalog), iconcatalog.DefaultCatalog)
-	icon := iconcatalog.Resolve(catalog, iconcatalog.IconSet{Icon: *out.Metadata.IconURL})
-	metadata := *out.Metadata
+	icon := iconcatalog.Resolve(catalog, icons)
 	metadata.IconURL = mo.EmptyableToOption(icon.IconLightURL).ToPointer()
+	metadata.IconLightURL = mo.EmptyableToOption(icon.IconLightURL).ToPointer()
+	metadata.IconDarkURL = mo.EmptyableToOption(icon.IconDarkURL).ToPointer()
 	out.Metadata = &metadata
 	return out, nil
 }

@@ -355,6 +355,12 @@ func TestGetAllTemplatesPaginated_FiltersByType(t *testing.T) {
 			IsCustom:    true,
 			IsRemote:    false,
 		},
+		{
+			ID: "local-variants", CreatedAt: now, UpdatedAt: &now,
+			Name: "Local variants", IsCustom: true,
+			Content:    "x-arcane:\n  icon-light: nginx\n  icon-dark: ${DARK_ICON}\nservices: {}\n",
+			EnvContent: new("DARK_ICON=https://cdn.example/dark.png\n"),
+		},
 	}
 	require.NoError(t, db.WithContext(t.Context()).Create(&localTemplates).Error)
 
@@ -380,10 +386,10 @@ func TestGetAllTemplatesPaginated_FiltersByType(t *testing.T) {
 		catalog    string
 		wantIDs    []string
 	}{
-		{name: "local", typeFilter: "false", wantIDs: []string{"local-one", "local-two"}},
+		{name: "local", typeFilter: "false", wantIDs: []string{"local-one", "local-two", "local-variants"}},
 		{name: "remote", typeFilter: "true", wantIDs: []string{"remote-one"}},
-		{name: "both", typeFilter: "false,true", wantIDs: []string{"local-one", "local-two", "remote-one"}},
-		{name: "preferred catalog", typeFilter: "false,true", catalog: "dashboard-icons", wantIDs: []string{"local-one", "local-two", "remote-one"}},
+		{name: "both", typeFilter: "false,true", wantIDs: []string{"local-one", "local-two", "local-variants", "remote-one"}},
+		{name: "preferred catalog", typeFilter: "false,true", catalog: "dashboard-icons", wantIDs: []string{"local-one", "local-two", "local-variants", "remote-one"}},
 	}
 
 	for _, tt := range tests {
@@ -401,8 +407,23 @@ func TestGetAllTemplatesPaginated_FiltersByType(t *testing.T) {
 			require.NoError(t, err)
 			require.ElementsMatch(t, tt.wantIDs, templateIDs(templates))
 			for _, template := range templates {
+				if !template.IsRemote {
+					require.Empty(t, template.Content)
+					require.Nil(t, template.EnvContent)
+				}
 				require.NotNil(t, template.Metadata)
 				require.NotNil(t, template.Metadata.IconURL)
+				if template.ID == "local-variants" {
+					wantLight := "https://cdn.jsdelivr.net/gh/selfhst/icons@main/svg/nginx-light.svg"
+					if tt.catalog == "dashboard-icons" {
+						wantLight = "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/nginx.svg"
+					}
+					require.Equal(t, wantLight, *template.Metadata.IconLightURL)
+					require.Equal(t, "https://cdn.example/dark.png", *template.Metadata.IconDarkURL)
+					continue
+				}
+				require.Equal(t, template.Metadata.IconURL, template.Metadata.IconLightURL)
+				require.Equal(t, template.Metadata.IconURL, template.Metadata.IconDarkURL)
 				if template.ID == "local-two" {
 					require.Equal(t, "https://cdn.example/local.png", *template.Metadata.IconURL)
 					continue

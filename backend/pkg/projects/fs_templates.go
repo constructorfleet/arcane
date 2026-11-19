@@ -13,7 +13,6 @@ import (
 
 	composeloader "github.com/compose-spec/compose-go/v2/loader"
 	composetypes "github.com/compose-spec/compose-go/v2/types"
-	"github.com/samber/mo"
 
 	"kit.getarcane.app/acfs"
 	"kit.getarcane.app/fs"
@@ -357,15 +356,15 @@ func ParseComposeServices(ctx context.Context, composeContent string) []string {
 	return serviceNames
 }
 
-func ResolveTemplateIconURL(ctx context.Context, composeContent, envContent string) *string {
+func ResolveTemplateIcons(ctx context.Context, composeContent, envContent string) IconSet {
 	if strings.TrimSpace(composeContent) == "" {
-		return nil
+		return IconSet{}
 	}
 
 	tmpDir, err := acfs.Host{}.MkdirTemp(ctx, os.TempDir(), "arcane-template-icon-*")
 	if err != nil {
 		slog.WarnContext(ctx, "failed to create temp dir for template icon parsing", "error", err)
-		return nil
+		return IconSet{}
 	}
 	defer func() { _ = acfs.Host{}.RemoveAll(context.WithoutCancel(ctx), tmpDir) }()
 
@@ -397,13 +396,13 @@ func ResolveTemplateIconURL(ctx context.Context, composeContent, envContent stri
 	})
 	if err != nil {
 		slog.WarnContext(ctx, "failed to parse compose for template icon metadata", "error", err)
-		return nil
+		return IconSet{}
 	}
 
 	if project == nil {
-		return nil
+		return IconSet{}
 	}
 
 	icon, _, _, _ := parseArcaneBlock(ctx, project.Extensions[arcaneBlockKey])
-	return mo.EmptyableToOption(strings.TrimSpace(icon.Icon)).ToPointer()
+	return icon
 }

@@ -38,6 +38,8 @@ type (
 		EnvURL           *string  `json:"envUrl,omitempty"`
 		DocumentationURL *string  `json:"documentationUrl,omitempty"`
 		IconURL          *string  `json:"iconUrl,omitempty"`
+		IconLightURL     *string  `json:"iconLightUrl,omitempty"`
+		IconDarkURL      *string  `json:"iconDarkUrl,omitempty"`
 		UpdatedAt        *string  `json:"updatedAt,omitempty"`
 		Tags             []string `json:"tags,omitempty"`
 	}

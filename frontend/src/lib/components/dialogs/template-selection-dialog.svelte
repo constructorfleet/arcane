@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { createMutation } from '@tanstack/svelte-query';
+	import { mode } from 'mode-watcher';
 	import { toast } from 'svelte-sonner';
 	import { SvelteSet } from 'svelte/reactivity';
 
@@ -29,6 +30,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { templateService } from '#lib/services/template-service.js';
 	import type { Template } from '#lib/types/template.js';
+	import { getThemedIconUrl } from '#lib/utils/docker.js';
 	import { hasShownPermission } from '#lib/utils/environments.js';
 	import { withOccurrenceKeys } from '#lib/utils/formatting.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
@@ -202,7 +204,7 @@
 			<div class="mb-2 flex items-start justify-between gap-2">
 				<div class="flex min-w-0 items-start gap-3">
 					<IconImage
-						src={template.metadata?.iconUrl}
+						src={getThemedIconUrl(template.metadata, mode.current) ?? template.metadata?.iconUrl}
 						alt={template.name}
 						fallback={template.isRemote ? RegistryIcon : ProjectsIcon}
 						class="size-5"

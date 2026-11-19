@@ -34,6 +34,8 @@ type (
 		EnvURL           *string  `json:"envUrl,omitempty"`
 		DocumentationURL *string  `json:"documentationUrl,omitempty"`
 		IconURL          *string  `json:"iconUrl,omitempty"`
+		IconLightURL     *string  `json:"iconLightUrl,omitempty" gorm:"-"`
+		IconDarkURL      *string  `json:"iconDarkUrl,omitempty" gorm:"-"`
 		RegistryIconURL  *string  `json:"registryIconUrl,omitempty"`
 		Tags             []string `json:"tags,omitempty" gorm:"serializer:json"`
 	}

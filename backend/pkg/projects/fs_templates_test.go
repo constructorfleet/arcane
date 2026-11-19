@@ -60,7 +60,7 @@ func TestReadFolderComposeTemplate_ReadsEnvExample(t *testing.T) {
 	assert.Equal(t, "KEY=value\n", *env)
 }
 
-func TestResolveTemplateIconURL(t *testing.T) {
+func TestResolveTemplateIcons(t *testing.T) {
 	tests := []struct {
 		name       string
 		compose    string
@@ -111,14 +111,13 @@ services:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			iconURL := ResolveTemplateIconURL(t.Context(), tt.compose, tt.envContent)
+			icons := ResolveTemplateIcons(t.Context(), tt.compose, tt.envContent)
 			if tt.want == "" {
-				require.Nil(t, iconURL)
+				require.True(t, icons.IsEmpty())
 				return
 			}
 
-			require.NotNil(t, iconURL)
-			require.Equal(t, tt.want, *iconURL)
+			require.Equal(t, tt.want, icons.Icon)
 		})
 	}
 }

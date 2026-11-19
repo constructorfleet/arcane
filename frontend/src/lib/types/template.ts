@@ -58,6 +58,8 @@ export interface Template {
 		envUrl?: string;
 		documentationUrl?: string;
 		iconUrl?: string;
+		iconLightUrl?: string;
+		iconDarkUrl?: string;
 		updatedAt?: string;
 	};
 }

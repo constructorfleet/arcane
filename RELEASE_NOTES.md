@@ -1,15 +1,16 @@
-# 3.0.1-cf.27
+# 3.0.1-cf.28
 
-## Persistent agent build workspaces
+## Template light and dark icons
 
-- Add a dedicated node-local build volume mounted at `/builds` to the standalone and global Swarm agent examples. Set the canonical `ARCANE_BUILDS_DIRECTORY` explicitly. Refs #71.
-- Keep build files separate from enrolled identity state. Preserve global Linux-node coverage, enrollment secrets and stop-first updates.
+- Retain `x-arcane.icon-light` and `icon-dark` when parsing saved templates and expose both resolved URLs to the gallery and template picker. Reuse the existing icon catalog, viewing-user preference and theme selection. Refs #73 / #17.
+- Derive variants from saved Compose on catalog reads so previously saved variant-only templates work without editing/resaving or schema migration. Keep canonical source/identifiers unchanged; local catalog responses continue omitting Compose and dotenv contents.
+- Preserve generic icon URLs, catalog identifiers and remote-registry icon fallbacks. Light artwork is used for a dark theme and dark artwork for a light theme, matching existing project/container behavior.
 
 ## Validation
 
-- Both examples parse successfully using Docker Compose / Docker stack config with placeholder inputs; no example stack was deployed. Formatting, full lint and release contract pass locally.
-- The equivalent homelab deployment change (homelab-ansible PR #11) is already deployed: all five agents have the writable local volume. UI file creation/build passed, and both owned files retained exact hashes through cf.24 → cf.25 replacement and reopened without saving. Exact fixture-file cleanup completed afterward.
+- Existing template service coverage exercises preexisting variant-only content with dotenv interpolation, catalog preference/default resolution, generic/explicit icons, list-content omission and unchanged database/cache identifiers. Existing template parser tests remain passing.
+- Backend template/project tests, frontend tests (8), production frontend build, format/full lint and release contract pass locally. Runtime light/dark and no-resave acceptance follows normal publication/rollout; the owned never-deploy template retains its cf.25 failing variant-only baseline.
 
 ## Limits
 
-- These examples require the patched agent image and reachable control plane. No identity, shared-storage policy, RBD attachment or data-directory overlap validation changed. Build workspace files remain local to their selected node.
+- Remote catalogs use their registry icon until Compose is downloaded; listing does not fetch every remote template. General template deployment, extension application, custom bang tags and final fork branding remain separate #17 acceptance/design work.

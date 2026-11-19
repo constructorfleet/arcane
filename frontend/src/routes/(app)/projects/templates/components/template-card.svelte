@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { mode } from 'mode-watcher';
 
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
 	import IconImage from '#lib/components/icon-image.svelte';
@@ -11,6 +12,7 @@
 	import { InspectIcon, FolderOpenIcon, GlobeIcon, TrashIcon, DownloadIcon, MoveToFolderIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { Template } from '#lib/types/template.js';
+	import { getThemedIconUrl } from '#lib/utils/docker.js';
 	import { hasShownPermission } from '#lib/utils/environments.js';
 
 	let {
@@ -42,7 +44,7 @@
 >
 	<div class="flex items-start gap-3">
 		<IconImage
-			src={template.metadata?.iconUrl}
+			src={getThemedIconUrl(template.metadata, mode.current) ?? template.metadata?.iconUrl}
 			alt={template.name}
 			fallback={template.isRemote ? GlobeIcon : FolderOpenIcon}
 			class="size-5"
