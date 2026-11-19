@@ -1,18 +1,13 @@
-# 3.0.1-cf.29
+# 3.0.1-cf.30
 
-## Verified feature acceptance
+## Node role authorization
 
-- Reconcile FEATURES.md with bounded live acceptance: fresh OIDC sign-in, native config/secret creation, Compose stack and standalone authoring, fractional CPU create/edit, selected-agent image Push/build/fresh-layer Pull, persistent local build workspaces, and template icon presentation. Link the remaining scope rather than treating partial evidence as full completion.
-- Add REG-07 and OBS-03 for selected-agent workspace builds and six-target private Prometheus collection. Homelab PR #12 deployed existing metrics through the monitoring overlay; repeated queries and native Docker container-ID coverage passed on all five nodes.
-- Record source/test audits of reusable encrypted inputs and telemetry, alongside the distinction between global environment materialization and native Swarm secrets. Preserve open scoped-authorization, template deployment/theme, registry/cache, RBD and later design work.
+- Require the target agent’s `swarm-nodes:promote` or `swarm-nodes:demote` permission when the generic node PATCH includes a role. Node-update access alone cannot change a role through this alternate path.
+- Reject unknown or empty submitted roles before Docker access. Ordinary label and availability edits retain their existing permission; dedicated promote/demote actions retain theirs.
+- Export the role-dependent permission conditions with the PATCH operation. Refs #78, #34 and #63.
 
-## Validation and runtime evidence
+## Validation
 
-- Documentation formatting, full lint and release contract pass locally. This release records behavior verified across cf.20–cf.28 and the homelab configuration rollout; it introduces no new application implementation.
-- Current cf.28 manager on swarm03 passes Docker health and database readiness. Five agents are Running, UI Online and metrics-up with unchanged UUIDs; agent images do not define Docker HEALTHCHECKs.
-
-## Limits
-
-- Metrics proof covers six unique task targets, observed series and native ID coverage, warm requests and successful replacement scrapes. Fully isolated cold-cache completeness and broader operational/reconciliation metrics and dashboards remain #32.
-- Node05 experienced a global OOM/pressure incident during configuration rollout and recovered without interventions. Collector cardinality tracking has a proven 8 GiB allocation; its policy choice is tracked in #76, separate from RBD handoff #42. The initiating global-OOM allocation remains unproven.
-- Native config/secret and template/registry acceptance remain bounded to the recorded fixtures and actors; scoped denial #63 and the actual inactive RBD target #14 still need their missing inputs.
+- Extended existing permission-condition coverage. Relevant authorization, middleware, node and API checks, formatting, full lint and release contract passed.
+- Seventeen synthetic requests exercised the actual node routes: denied/wrong-scope requests and invalid roles stopped before the service boundary; correctly authorized role requests and ordinary label/availability requests reached a deliberately stopped synthetic service. No Docker client or live account was used.
+- Production node roles and availability are unchanged. The limited live QA account required by #63 is still unavailable; synthetic authorization evidence must not be reported as that live acceptance.

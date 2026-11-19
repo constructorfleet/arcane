@@ -26,6 +26,21 @@ const (
 )
 
 var (
+	SwarmNodeRoleConditions = PermissionConditions{
+		{
+			In:         ConditionInBody,
+			Field:      "role",
+			Value:      "manager",
+			Permission: PermSwarmNodesPromote,
+		},
+		{
+			In:         ConditionInBody,
+			Field:      "role",
+			Value:      "worker",
+			Permission: PermSwarmNodesDemote,
+		},
+	}
+
 	BuildPushConditions = PermissionConditions{
 		{
 			In:         ConditionInBody,

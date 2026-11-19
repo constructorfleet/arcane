@@ -1,6 +1,6 @@
 REGISTRY=docker.home.prettybaked.com
 REPOSITORY=constructorfleet/arcane
-VERSION=3.0.1-cf.29
+VERSION=3.0.1-cf.30
 PLATFORMS=linux/amd64
 PROVENANCE=true
 HARBOR_PROJECT_ID=2

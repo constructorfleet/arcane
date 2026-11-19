@@ -256,6 +256,10 @@ func TestBuildPermissionExport(t *testing.T) {
 }
 
 func TestPermissionConditionsRequired(t *testing.T) {
+	require.Equal(t, []string{PermSwarmNodesPromote}, SwarmNodeRoleConditions.Required("role", "manager"))
+	require.Equal(t, []string{PermSwarmNodesDemote}, SwarmNodeRoleConditions.Required("role", "worker"))
+	require.Empty(t, SwarmNodeRoleConditions.Required("role", ""))
+	require.Empty(t, SwarmNodeRoleConditions.Required("role", "invalid"))
 	require.Equal(t, []string{PermVolumesUpload, PermVolumesDelete}, VolumeWorkspaceConditions.Required("fileChanges.operation", "rename"))
 	require.Equal(t, []string{PermImagesPush}, BuildPushConditions.Required("push", "true"))
 	require.Empty(t, BuildPushConditions.Required("push", "false"))

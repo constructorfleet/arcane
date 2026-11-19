@@ -286,6 +286,19 @@ func (h *Handler) UpdateNode(ctx context.Context, input *UpdateSwarmNodeInput) (
 		return nil, huma.Error400BadRequest("invalid request body")
 	}
 
+	if submitted["role"] {
+		permissions, _ := middleware.PermissionsFromContext(ctx)
+		required := authz.SwarmNodeRoleConditions.Required("role", input.Body.Role)
+		if len(required) == 0 {
+			return nil, huma.Error400BadRequest("node role must be manager or worker")
+		}
+		for _, permission := range required {
+			if !permissions.Allows(permission, input.EnvironmentID) {
+				return nil, huma.Error403Forbidden("permission denied: " + permission)
+			}
+		}
+	}
+
 	if updateErr := h.service.UpdateNode(ctx, input.NodeID, input.Body, submitted); updateErr != nil {
 		return nil, h.mapError(updateErr, "Swarm node not found: "+updateErr.Error())
 	}

@@ -128,6 +128,7 @@ func RegisterRoutes(api huma.API, h *Handler) {
 				"Swarm",
 			},
 			Security: handlerutil.DefaultOperationSecurity(),
+			Metadata: map[string]any{authz.MetaPermissionConditions: authz.SwarmNodeRoleConditions},
 		},
 		authz.PermSwarmNodesUpdate,
 		h.UpdateNode,
