@@ -1,0 +1,55 @@
+name: QA bug report
+about: Flag a problem found while testing Constructorfleet Arcane.
+title: '[QA] '
+labels: ['bug', 'qa', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: 'Report one problem per issue. Never include tokens, passwords, secret contents, or private keys. Screenshots can be attached in the steps field.'
+  - type: input
+    id: version
+    attributes:
+      label: Release / version
+      description: Copy the version shown in the sidebar, for example 3.0.1-cf.4.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: ['Agents / enrollment', 'Swarm / services / stacks', 'Volumes / files / RBD', 'Containers / console', 'Images / registries', 'Networks', 'Configs / secrets / variables', 'OIDC / permissions', 'GitOps / deployment', 'Other UI']
+    validations:
+      required: true
+  - type: input
+    id: target
+    attributes:
+      label: Agent / node / resource
+      description: Include the selected agent(s), resource name, and page URL. Say whether the UI was showing all agents.
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps and observed behavior
+      description: Include sorting, filtering, paging, repeatability, and screenshots when relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      options: ['Broken workflow / no workaround', 'Works with a workaround', 'Visual / usability problem', 'Possible data loss or security issue — stop testing and contact maintainer privately']
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized error / logs
+      description: Include HTTP status, request ID, browser console error, and approximate time. Remove sensitive values.
+  - type: input
+    id: checklist
+    attributes:
+      label: Related checklist item or issue
+      description: Optional, such as VOL-09 or an existing issue number.

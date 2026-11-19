@@ -8,8 +8,12 @@ Build repository: https://gitea.home.prettybaked.com/constructorfleet/arcane.
 
 This is the implementation contract for the fork, not a claim that the target
 system is complete. AI assistance: OpenAI Codex performed source inspection,
-architecture drafting, and the initial node-agent changes. No production
-resources have been changed.
+architecture drafting, and implementation. Production verification as of
+2026-11-18: cf.3 runs a socket-free control plane and five independent global
+agents; the user confirmed RBD browsing, and pagination/sort recovery was
+verified after the duplicate-volume fix. File mutation and full all-node
+acceptance remain open. See [FEATURES.md](FEATURES.md) for scope and
+[RELEASING.md](RELEASING.md) for branches, squash PRs, releases, and QA intake.
 
 The initial patch removes implicit local-agent coverage from Swarm nodes. A
 manager's own node must enroll an agent through the same path as workers. Agent
@@ -18,9 +22,10 @@ node response's local-agent status. Existing duplicate and identity-mismatch
 protections remain in effect. The adjacent service tests exercise enrollment
 and coverage for manager and worker nodes.
 
-The global agent manifest is an integration candidate. It requires a built image
-containing this patch. It has been parsed with Docker's stack tooling, but has
-not been deployed on a multi-node Swarm or tested against the RBD plugin.
+The global agent manifest is an example. The homelab Ansible role owns the
+actual GitOps deployment, including manager state and agent enrollment. Its
+global deployment was verified at five of five nodes, including the manager
+host; node-local identity storage survives task replacement.
 
 Set `ARCANE_CONTROL_PLANE=true` on the manager to run without a Docker socket.
 This mode retires the old local-agent directory entry without deleting its
@@ -38,8 +43,9 @@ needed to bring removed agents back.
 Verified with service tests and an isolated running manager using a nonexistent
 Docker socket: readiness reports database health, no local agent appears, five
 nodes enroll with one unlimited token, and all five registrations can be deleted.
-Real-node global deployment and plugin-volume integration still need separate
-verification. Legacy manager-local behavior remains available when this option
+Real-node global deployment and initial RBD browsing are also confirmed;
+console access, file mutations, and complete cross-node acceptance still need
+separate verification. Legacy manager-local behavior remains available when this option
 is not enabled, to permit a deliberate migration of existing installations.
 
 ## Initial verification
@@ -50,7 +56,7 @@ is not enabled, to permit a deliberate migration of existing installations.
 - `gofmt` on both changed Go files and `git diff --check`: passed.
 - Required `just format all` and `just lint all`: attempted, blocked by missing
   Vite Plus (`vp`) and `golangci-lint` tooling. Full checks have not passed.
-- Browser, socket-free runtime, multi-node Swarm, and RBD integration: unverified.
+- At this initial patch stage, browser/runtime/Swarm/RBD integration was unverified; current verification is recorded in Status above and FEATURES.md.
 
 The editable feature scope and progress checklist is [FEATURES.md](FEATURES.md).
 

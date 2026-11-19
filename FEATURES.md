@@ -68,14 +68,17 @@ five agents are verified in isolation; complete real-node rollout remains open.
 - [ ] VOL-06 — Support authorized rename and delete actions with clear target paths.
 - [ ] VOL-07 — Protect file operations against path traversal, escaping symlinks, stale edits, and abandoned helper containers.
 - [ ] VOL-08 — Distinguish same-named node-local volumes; do not assume a name or driver's “global” scope proves shared storage identity.
-- [ ] VOL-09 — Keep volume pagination and sorting usable when plugins repeat records; count each volume once per node and recover without clearing saved preferences.
+- [x] VOL-09 — Keep volume pagination and sorting usable when plugins repeat records; count each volume once per node and recover without clearing saved preferences.
 
 Status: the user confirmed RBD volume browsing on 2026-11-18. Full VOL-01
 acceptance across remote and manager-host agents remains open; uploading and
-editing remain unverified. The volume list currently crashes after pagination
-or sorting: duplicate same-node volume names trigger Svelte's
-`each_key_duplicate` error. Track recovery, pagination, sorting, and accurate
-counts before marking volume-list management complete.
+editing remain unverified. The pagination/sorting crash reported on 2026-11-18 was caused by duplicate
+same-node volume names (`each_key_duplicate`). Release `3.0.1-cf.3` deduplicates
+per daemon before pagination/counting. SwarmCD rolled out both images; all five
+agents and the manager are healthy. Browser verification passed saved-preference
+recovery, three pages, driver sorting in both directions, and navigation away/back.
+Volume service and pagination tests and Go lint passed. Full local format/lint
+remains blocked by missing `vp`; the manager image frontend build passed.
 
 ## Native Docker resources and onboarding
 

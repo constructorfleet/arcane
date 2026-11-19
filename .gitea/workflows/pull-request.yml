@@ -1,0 +1,77 @@
+name: Pull request validation
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: arcane-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  release-contract:
+    name: Release contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate version and release notes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          python3 scripts/ci/release.py check --base "$BASE_SHA"
+          python3 - <<'PY'
+          import os,re
+          assert re.match(r'^(feat|fix|docs|chore|refactor|test|build|ci|perf)(\([^\n)]+\))?!?: .+', os.environ['PR_TITLE']), 'Use a conventional PR title'
+          assert re.match(r'^(feat|fix|docs|chore|refactor|test|build|ci|perf)/', os.environ['HEAD_BRANCH']), 'Use a named feature/fix/docs/chore branch'
+          PY
+      - name: Test release tooling
+        run: python3 -m unittest discover -s scripts/ci -p 'test_release.py'
+  go-tests:
+    name: Go tests
+    env:
+      GOMAXPROCS: 4
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache: true
+          cache-dependency-path: |
+            backend/go.sum
+            cli/go.sum
+            types/go.sum
+      - name: Test backend
+        run: cd backend && go test -p 2 -short -tags=exclude_frontend ./internal/... ./pkg/...
+      - name: Test CLI and shared types
+        run: |
+          cd cli && go test -p 2 -short ./...
+          cd ../types && go test -p 2 -short ./...
+  frontend-checks:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76
+        with:
+          node-version: 26
+          cache: false
+          run-install: true
+      - name: Build, type check, and lint frontend
+        run: |
+          vp -C frontend run build
+          vp -C frontend run check
+          vp -C frontend run lint

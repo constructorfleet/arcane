@@ -10,8 +10,11 @@ Arcane is a Docker management platform.
 
 - Follow [AI_POLICY.md](./AI_POLICY.md), including the maintainer exemption.
 - Outside contributors: disclose AI use and meet the policy's dev and human verification rules.
-- **Git:** never run state-changing commands.
-  - No stage, commit, push, tag, stash, branch, or worktree.
+- **Git:** follow [RELEASING.md](RELEASING.md). Work on a named branch, keep commits coherent, open a Gitea PR, and squash-merge only after required checks pass.
+  - Never push directly or force-push to `main`, bypass protections, or mix unrelated changes.
+  - Every PR advances `RELEASE` and updates `RELEASE_NOTES.md`; the workflow creates the release and image links.
+  - Record QA findings as Gitea issues; link fixing PRs, checklist IDs, and release verification.
+  - GitHub is a mirror; Gitea owns review, merges, and releases.
 - **Dev stack:** maintainers do not start, restart, or rebuild it unless the user asks.
 - **Search first:** check the owning domain and existing helpers before adding functions, services, API clients, components, or utils.
   - Update existing logic and its callers directly.
@@ -256,7 +259,7 @@ Don't stop at `console.error`. Pick the matching path:
 
 ### Environment-scoped behavior
 
-- **Local Docker:** environment ID `"0"`.
+- **Local Docker:** legacy manager mode uses environment ID `"0"`. Control-plane mode retires that entry; every node, including the manager host, uses an independent agent UUID.
 - **Paths:** `/agents/{id}/...`.
 - **Before requests:** await `environmentStore.ready` or `getCurrentEnvironmentId()`.
 - **Switching:** redirect environment-specific detail pages when the environment changes.
@@ -273,12 +276,10 @@ Don't stop at `console.error`. Pick the matching path:
 
 ## Runtime modes and jobs
 
-- Manager mode serves the UI and manages environments.
-- Edge agent mode uses `ARCANE_EDGE_AGENT=true` with `ARCANE_MANAGER_API_URL` and dials the manager.
-
-- **Modes:**
-  - Manager: serves the UI and manages environments.
-  - Edge agent: `ARCANE_EDGE_AGENT=true` with `ARCANE_MANAGER_API_URL`. Dials the manager.
+- **Control plane:** `ARCANE_CONTROL_PLANE=true` serves the UI and manages agents without a Docker socket. Readiness checks only the database.
+- **Node agent:** `ARCANE_AGENT=true` with `ARCANE_MANAGER_API_URL` dials the manager. Deploy globally, including the manager host; keep Docker access and identity storage on each node.
+- **Legacy manager:** with both flags false, serves the UI and local Docker environment. Readiness checks the database and Docker.
+- Control-plane and agent modes are mutually exclusive. `ARCANE_EDGE_AGENT` is obsolete and is not a supported config variable.
 
 ### Background jobs
 

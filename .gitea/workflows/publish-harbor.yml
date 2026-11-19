@@ -1,20 +1,44 @@
-name: Publish Arcane to Harbor
-
+name: Release Arcane to Harbor
 on:
   push:
     branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
-  group: publish-harbor-${{ github.repository }}-${{ github.ref }}
+  group: arcane-release-main
   cancel-in-progress: false
-
 jobs:
+  metadata:
+    name: Release metadata
+    runs-on: ubuntu-latest
+    outputs:
+      registry: ${{ steps.release.outputs.registry }}
+      repository: ${{ steps.release.outputs.repository }}
+      version: ${{ steps.release.outputs.version }}
+      platforms: ${{ steps.release.outputs.platforms }}
+      provenance: ${{ steps.release.outputs.provenance }}
+      build_time: ${{ steps.release.outputs.build_time }}
+      published: ${{ steps.release.outputs.published }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify release identity
+        id: release
+        env:
+          GITEA_SERVER_URL: https://gitea.home.prettybaked.com
+          GITEA_REPOSITORY: ${{ github.repository }}
+          GITEA_SHA: ${{ github.sha }}
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          python3 scripts/ci/release.py metadata
   publish:
     name: Build and publish ${{ matrix.image }}
+    needs: metadata
+    if: needs.metadata.outputs.published != 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -25,56 +49,75 @@ jobs:
           - image: agent
             dockerfile: docker/Dockerfile-agent
     steps:
-      - name: Check out source
-        uses: actions/checkout@v4
-
-      - name: Read release metadata
-        id: release
-        run: |
-          value() { awk -F= -v key="$1" '$1 == key { print $2; exit }' RELEASE; }
-          registry="$(value REGISTRY)"
-          repository="$(value REPOSITORY)"
-          version="$(value VERSION)"
-          platforms="$(value PLATFORMS)"
-          provenance="$(value PROVENANCE)"
-          : "${provenance:=true}"
-          test -n "$registry" && test -n "$repository" && test -n "$version" && test -n "$platforms"
-          {
-            printf 'registry=%s\n' "$registry"
-            printf 'repository=%s\n' "$repository"
-            printf 'version=%s\n' "$version"
-            printf 'platforms=%s\n' "$platforms"
-            printf 'provenance=%s\n' "$provenance"
-            printf 'build_time=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Set up Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Harbor
-        uses: docker/login-action@v3
+      - uses: actions/checkout@v4
         with:
-          registry: ${{ steps.release.outputs.registry }}
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ needs.metadata.outputs.registry }}
           username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
           password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
-
-      - name: Build and push image
+      - name: Build immutable release images
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          builder: ${{ steps.buildx.outputs.name }}
-          platforms: ${{ steps.release.outputs.platforms }}
+          platforms: ${{ needs.metadata.outputs.platforms }}
           push: true
-          provenance: ${{ steps.release.outputs.provenance }}
+          provenance: ${{ needs.metadata.outputs.provenance }}
           build-args: |
-            VERSION=${{ steps.release.outputs.version }}
+            VERSION=${{ needs.metadata.outputs.version }}
             REVISION=${{ github.sha }}
-            BUILD_TIME=${{ steps.release.outputs.build_time }}
+            BUILD_TIME=${{ needs.metadata.outputs.build_time }}
+          labels: |
+            org.opencontainers.image.source=https://gitea.home.prettybaked.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.metadata.outputs.version }}
           tags: |
-            ${{ steps.release.outputs.registry }}/${{ steps.release.outputs.repository }}-${{ matrix.image }}:${{ steps.release.outputs.version }}
-            ${{ steps.release.outputs.registry }}/${{ steps.release.outputs.repository }}-${{ matrix.image }}:latest
-            ${{ steps.release.outputs.registry }}/${{ steps.release.outputs.repository }}-${{ matrix.image }}:sha-${{ github.sha }}
-          cache-from: type=registry,ref=${{ steps.release.outputs.registry }}/${{ steps.release.outputs.repository }}-${{ matrix.image }}:buildcache
-          cache-to: type=registry,ref=${{ steps.release.outputs.registry }}/${{ steps.release.outputs.repository }}-${{ matrix.image }}:buildcache,mode=max
+            ${{ needs.metadata.outputs.registry }}/${{ needs.metadata.outputs.repository }}-${{ matrix.image }}:${{ needs.metadata.outputs.version }}
+            ${{ needs.metadata.outputs.registry }}/${{ needs.metadata.outputs.repository }}-${{ matrix.image }}:sha-${{ github.sha }}
+          cache-from: type=registry,ref=${{ needs.metadata.outputs.registry }}/${{ needs.metadata.outputs.repository }}-${{ matrix.image }}:buildcache
+          cache-to: type=registry,ref=${{ needs.metadata.outputs.registry }}/${{ needs.metadata.outputs.repository }}-${{ matrix.image }}:buildcache,mode=max
+  release:
+    name: Publish release and promote latest
+    needs: [metadata, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    env:
+      GITEA_SERVER_URL: https://gitea.home.prettybaked.com
+      GITEA_REPOSITORY: ${{ github.repository }}
+      GITEA_SHA: ${{ github.sha }}
+      GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+      IMAGE_BASE: ${{ needs.metadata.outputs.registry }}/${{ needs.metadata.outputs.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ needs.metadata.outputs.registry }}
+          username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+      - name: Resolve exact image digests and prepare release
+        run: |
+          manager_digest=$(docker buildx imagetools inspect "$IMAGE_BASE-manager:sha-$GITEA_SHA" --format '{{json .Manifest}}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["digest"])')
+          agent_digest=$(docker buildx imagetools inspect "$IMAGE_BASE-agent:sha-$GITEA_SHA" --format '{{json .Manifest}}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["digest"])')
+          echo "MANAGER_DIGEST=$manager_digest" >> "$GITHUB_ENV"
+          echo "AGENT_DIGEST=$agent_digest" >> "$GITHUB_ENV"
+          python3 scripts/ci/release.py draft --manager-digest "$manager_digest" --agent-digest "$agent_digest"
+      - name: Check latest ownership
+        id: promotion
+        run: python3 scripts/ci/release.py promotion
+      - name: Promote both images after both builds succeed
+        if: steps.promotion.outputs.latest == 'true'
+        run: |
+          docker buildx imagetools create --tag "$IMAGE_BASE-manager:latest" "$IMAGE_BASE-manager@$MANAGER_DIGEST"
+          docker buildx imagetools create --tag "$IMAGE_BASE-agent:latest" "$IMAGE_BASE-agent@$AGENT_DIGEST"
+      - name: Publish Gitea release
+        run: python3 scripts/ci/release.py publish

@@ -1,5 +1,7 @@
 # Contributing to Arcane
 
+Constructorfleet fork: follow [RELEASING.md](RELEASING.md) for feature branches, atomic commits, required checks, squash PRs, releases, and [QA issue reports](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues/new/choose). Gitea owns fork changes; upstream-specific development guidance follows.
+
 Thanks for helping make Arcane better! We've built a modern, streamlined development experience that gets you up and running in minutes.
 
 > **Using AI tools?** Please read our [AI Usage Policy](AI_POLICY.md) before contributing.
@@ -7,7 +9,7 @@ Thanks for helping make Arcane better! We've built a modern, streamlined develop
 ## 🌟 Ways to Contribute
 
 - 🐛 **Report bugs** using our issue templates
-- 💡 **Suggest features** in [Discussions](https://github.com/getarcaneapp/arcane/discussions/new?category=feature-requests). Proposals and voting belong there. Maintainers can create linked implementation issues when work is ready.
+- 💡 **Suggest fork features** in [Gitea issues](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues). Use [upstream Discussions](https://github.com/getarcaneapp/arcane/discussions/new?category=feature-requests) only for proposals to getarcaneapp.
 - 🔧 **Code contributions** (frontend, backend, DevOps)
 - 📚 **Documentation** improvements
 - 🌍 **Translations** via [Crowdin](https://crowdin.com/project/arcane-docker-management)
@@ -293,7 +295,7 @@ When `./scripts/development/dev.sh start` fails or the app does not load, valida
    curl -f http://localhost:3552/api/health/ready
    ```
 
-   `/api/health` reports process liveness. `/api/health/ready` also pings the database and Docker and returns 503 until both answer; use it for orchestrator readiness probes if you need one.
+   `/api/health` reports process liveness. `/api/health/ready` checks the database and Docker in legacy manager mode; with `ARCANE_CONTROL_PLANE=true`, it checks only the database. It returns 503 while a required dependency is unavailable. Use it for orchestrator readiness probes.
 
 5. If a service is unhealthy, read the targeted logs first:
 
@@ -335,8 +337,8 @@ docker system prune -f
 
 ### Need Help?
 
-- **Bug Report**: [Create an issue](https://github.com/getarcaneapp/arcane/issues/new?template=bug.yml)
-- **Feature Request**: [Suggest a feature](https://github.com/getarcaneapp/arcane/discussions/new?category=feature-requests) (Discussions)
-- **Development Question**: Open a discussion in the repository
+- **Fork QA / Bug Report**: [Report a QA issue](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues/new/choose)
+- **Fork Feature / Development Question**: [Gitea issues](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues)
+- **Upstream-only requests**: [getarcaneapp issues](https://github.com/getarcaneapp/arcane/issues) and [Discussions](https://github.com/getarcaneapp/arcane/discussions/new?category=feature-requests)
 
 Thank you for contributing to Arcane! Your help makes this project better for everyone. 🚀
