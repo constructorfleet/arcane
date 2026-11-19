@@ -73,5 +73,6 @@ jobs:
       - name: Build, type check, and lint frontend
         run: |
           vp -C frontend run build
+          vp test
           vp -C frontend run check
           vp -C frontend run lint

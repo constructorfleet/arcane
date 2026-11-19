@@ -4671,5 +4671,10 @@
   "use_starttls": "Use StartTLS",
   "use_starttls_description": "Upgrade ldap:// connections to TLS before sending passwords. Turn off only if the server does not support StartTLS; passwords are then sent in plain text.",
   "query_agent": "Query Agent",
-  "discovered_agent": "Discovered agent"
+  "discovered_agent": "Discovered agent",
+  "view_task_container": "View container",
+  "task_has_no_container": "No container was assigned to this task.",
+  "task_node_agent_unavailable": "The task node has no uniquely verified connected agent. Check node agent coverage and retry.",
+  "task_container_identity_mismatch": "The container no longer matches the selected Swarm task. Refresh the task list.",
+  "task_container_unavailable": "Container unavailable: {error}"
 }

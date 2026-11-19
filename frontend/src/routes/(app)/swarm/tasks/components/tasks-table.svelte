@@ -3,6 +3,7 @@
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
 	import type { ColumnSpec, MobileFieldVisibility } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
+	import SwarmTaskContainer from '#lib/components/swarm/swarm-task-container.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { JobsIcon, ConnectionIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
@@ -33,6 +34,7 @@
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
 		...(showEnvironment ? environmentColumns<TaskRow>() : []),
 		{ accessorKey: 'name', title: m.common_name(), sortable: true },
+		{ id: 'container', title: m.container(), cell: ContainerCell },
 		{ accessorKey: 'serviceName', title: m.swarm_service(), sortable: true },
 		{ accessorKey: 'nodeName', title: m.swarm_node(), sortable: true },
 		{ accessorKey: 'currentState', title: m.swarm_current_state(), sortable: true, cell: StateCell },
@@ -48,6 +50,10 @@
 
 	let mobileFieldVisibility = $state<Record<string, boolean>>({});
 </script>
+
+{#snippet ContainerCell({ item }: { item: TaskRow })}
+	<SwarmTaskContainer task={item} environmentId={item.environmentId} />
+{/snippet}
 
 {#snippet StateCell({ value }: { value: unknown })}
 	<Badge variant={getSwarmTaskStateVariant(String(value ?? ''))} minWidth="20">{String(value ?? m.common_unknown())}</Badge>
@@ -88,7 +94,9 @@
 				show: mobileFieldVisibility['desiredState'] ?? false
 			}
 		]}
-	/>
+	>
+		<SwarmTaskContainer task={item} environmentId={item.environmentId} />
+	</UniversalMobileCard>
 {/snippet}
 
 <ArcaneTable

@@ -2,6 +2,7 @@
 	import { createQuery } from '@tanstack/svelte-query';
 
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
+	import SwarmTaskContainer from '#lib/components/swarm/swarm-task-container.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import { JobsIcon, ConnectionIcon } from '#lib/icons/index.js';
@@ -93,6 +94,9 @@
 									<ConnectionIcon class="size-3 text-muted-foreground" />
 									<span class="truncate text-sm text-foreground">{task.nodeName || m.common_na()}</span>
 								</div>
+							</div>
+							<div class="col-span-2">
+								<SwarmTaskContainer {task} {environmentId} />
 							</div>
 							{#if task.error}
 								<div class="col-span-2">

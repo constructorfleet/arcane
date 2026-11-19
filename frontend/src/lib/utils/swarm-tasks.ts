@@ -1,4 +1,4 @@
-import type { SwarmTaskSummary } from '#lib/types/swarm.js';
+import type { SwarmNode, SwarmTaskSummary } from '#lib/types/swarm.js';
 import { instantEpochMilliseconds } from '#lib/utils/formatting.js';
 
 const SWARM_TASK_STATE_ORDER: Record<string, number> = {
@@ -39,4 +39,23 @@ export function sortSwarmTasks(raw: SwarmTaskSummary[]): SwarmTaskSummary[] {
 		if (stateA !== stateB) return stateA - stateB;
 		return (updatedMs.get(b) ?? 0) - (updatedMs.get(a) ?? 0);
 	});
+}
+
+export function getSwarmTaskContainerTarget(
+	task: Pick<SwarmTaskSummary, 'nodeId' | 'containerId'>,
+	node: Pick<SwarmNode, 'id' | 'agent'>
+): { environmentId: string; containerId: string } | null {
+	const agent = node.agent;
+	if (
+		!task.containerId ||
+		!task.nodeId ||
+		node.id !== task.nodeId ||
+		agent.state !== 'connected' ||
+		agent.connected === false ||
+		agent.reportedNodeId !== task.nodeId ||
+		!agent.environmentId ||
+		agent.environmentId === '0'
+	)
+		return null;
+	return { environmentId: agent.environmentId, containerId: task.containerId };
 }

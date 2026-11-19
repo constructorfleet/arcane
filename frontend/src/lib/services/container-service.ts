@@ -42,8 +42,12 @@ class ContainerService extends BaseAPIService {
 		return res.data.data;
 	}
 
-	async getContainerForEnvironment(environmentId: string, containerId: string): Promise<ContainerDetails> {
-		return this.handleResponse(this.api.get(`/agents/${environmentId}/containers/${containerId}`));
+	async getContainerForEnvironment(
+		environmentId: string,
+		containerId: string,
+		config?: APIRequestConfig
+	): Promise<ContainerDetails> {
+		return this.handleResponse(this.api.get(`/agents/${environmentId}/containers/${containerId}`, config));
 	}
 
 	async getContainerProcesses(

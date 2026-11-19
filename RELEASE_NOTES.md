@@ -1,13 +1,12 @@
-# 3.0.1-cf.8
+# 3.0.1-cf.9
 
-## Fixes
+## Changes
 
-- Resolve a node's independently enrolled global agent from its reported Docker node identity without requiring a stored parent-agent binding (#5).
-- Show each node agent's name, UUID, and connection state in the Nodes table. Label the cluster query source separately as Query Agent.
-- Reading the Nodes page no longer tries to rebind all agents to every manager. Discovered agents remain separate from explicitly attached agents in the dialog.
-- Preserve explicit bindings and ambiguous-agent detection; multiple agents claiming one node are not silently selected.
+- Add View container actions to global, node, stack, and service task views, including mobile task cards (#8).
+- Resolve the task's Docker node to a verified connected agent, inspect the exact container there, and verify its Swarm task label before navigating with an explicit agent URL.
+- Show unavailable states for unassigned, removed, inaccessible, or mismatched containers. Historical tasks can open a retained container; no querying-manager fallback is used.
 
 ## Validation
 
-- Updated existing node-coverage tests exercise manager/worker roles with explicit bindings, independent enrollment, and ambiguous matches.
-- Required release-contract, Go, and frontend checks run before merge. Live multi-node UI acceptance remains separate from automated checks.
+- Eight target-policy tests pass for independent agents, mismatches, ambiguous/offline agents, missing containers, and retired local environment IDs. Frontend unit tests now run in required CI alongside build/type/lint checks.
+- Required release-contract, full Go tests, and frontend checks run before squash merge. Live navigation and broader console/exec behavior require separate acceptance.
