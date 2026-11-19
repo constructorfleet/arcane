@@ -43,6 +43,8 @@ func TestService_UpdateConfig_KeepsDataAndReplacesLabels(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1.41/configs":
+			assert.NoError(t, json.MarshalWrite(w, []swarm.Config{current}))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1.41/configs/config-1":
 			assert.NoError(t, json.MarshalWrite(w, current))
 		case r.Method == http.MethodPost && r.URL.Path == "/v1.41/configs/config-1/update":
@@ -78,6 +80,18 @@ func TestService_UpdateConfig_KeepsDataAndReplacesLabels(t *testing.T) {
 	assert.Equal(t, "bGlzdGVuIDgwOw==", updatedSpec["Data"])
 	assert.Equal(t, uint64(5), updated.Version.Index)
 	assert.Equal(t, map[string]string{"tier": "db"}, updated.Spec.Labels)
+	assert.Empty(t, updated.Spec.Data)
+
+	listed, _, err := svc.ListConfigs(t.Context(), pagination.QueryParams{Params: pagination.Params{Limit: 20}})
+	require.NoError(t, err)
+	require.Len(t, listed, 1)
+	assert.Equal(t, "nginx-conf", listed[0].Spec.Name)
+	assert.Equal(t, map[string]string{"tier": "db"}, listed[0].Spec.Labels)
+	assert.Empty(t, listed[0].Spec.Data)
+
+	inspected, err := svc.GetConfig(t.Context(), current.ID)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("listen 80;"), inspected.Spec.Data)
 }
 
 func configsScopeContext(t *testing.T, target string, bodies map[string]any) context.Context {
@@ -104,11 +118,11 @@ func TestAggregateMergesEnvironments(t *testing.T) {
 	ctx := configsScopeContext(t, "/api/agents/a,b,c/swarm/configs", map[string]any{
 		"a": types.Paginated[types.SwarmConfig]{
 			Success: true,
-			Data:    []types.SwarmConfig{{ID: "c1"}},
+			Data:    []types.SwarmConfig{{ID: "c1", Spec: swarm.ConfigSpec{Data: []byte("private config a")}}},
 		},
 		"b": types.Paginated[types.SwarmConfig]{
 			Success: true,
-			Data:    []types.SwarmConfig{{ID: "c2"}},
+			Data:    []types.SwarmConfig{{ID: "c2", Spec: swarm.ConfigSpec{Data: []byte("private config b")}}},
 		},
 	})
 
@@ -116,6 +130,9 @@ func TestAggregateMergesEnvironments(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, body.Data, 2)
+	for _, config := range body.Data {
+		assert.Empty(t, config.Spec.Data)
+	}
 	require.ElementsMatch(t, []string{"Env a", "Env b"}, []string{body.Data[0].Environment().Name, body.Data[1].Environment().Name})
 	require.EqualValues(t, 2, body.Pagination.TotalItems)
 	require.Len(t, body.FailedEnvironments, 1)

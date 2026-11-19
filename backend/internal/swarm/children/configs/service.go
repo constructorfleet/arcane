@@ -65,7 +65,7 @@ func (s *Service) ListConfigs(ctx context.Context, params pagination.QueryParams
 
 	items := make([]types.SwarmConfig, 0, len(listResult.Items))
 	for _, item := range listResult.Items {
-		items = append(items, types.NewSwarmConfig(item))
+		items = append(items, configMetadata(types.NewSwarmConfig(item)))
 	}
 	result := configPagination.SearchOrderAndPaginate(items, params)
 	return result.Items, pagination.BuildResponse(result.TotalCount, result.TotalAvailable, params), nil
@@ -86,6 +86,9 @@ func (s *Service) Aggregate(ctx context.Context, params pagination.QueryParams) 
 		})
 	}
 	data, resp := pagination.MergeEnvironmentPages(configPagination, pages, params)
+	for i, item := range data {
+		data[i] = configMetadata(item)
+	}
 
 	return types.Paginated[types.SwarmConfig]{
 		Success:            true,
@@ -151,7 +154,25 @@ func (s *Service) UpdateConfig(ctx context.Context, configID string, req types.S
 		return nil, fmt.Errorf("failed to update swarm config: %w", updateErr)
 	}
 
-	return s.GetConfig(ctx, current.ID)
+	updated, err := s.GetConfig(ctx, current.ID)
+	if err != nil {
+		return nil, err
+	}
+	return new(configMetadata(*updated)), nil
+}
+
+func configMetadata(config types.SwarmConfig) types.SwarmConfig {
+	return types.SwarmConfig{
+		Spec: swarm.ConfigSpec{
+			Annotations: config.Spec.Annotations,
+			Templating:  config.Spec.Templating,
+		},
+		CreatedAt:      config.CreatedAt,
+		UpdatedAt:      config.UpdatedAt,
+		EnvironmentTag: config.EnvironmentTag,
+		ID:             config.ID,
+		Version:        config.Version,
+	}
 }
 
 func (s *Service) RemoveConfig(ctx context.Context, configID string) error {
