@@ -159,7 +159,7 @@ export interface SwarmJoinEnvironmentsResponse {
 
 export type NodeAgentState = 'none' | 'pending' | 'offline' | 'connected' | 'mismatched' | 'ambiguous';
 
-export type NodeAgentBindingKind = 'local' | 'environment' | 'dedicated';
+export type NodeAgentBindingKind = 'local' | 'environment' | 'dedicated' | 'discovered';
 
 export interface NodeAgentCandidate {
 	environmentId: string;

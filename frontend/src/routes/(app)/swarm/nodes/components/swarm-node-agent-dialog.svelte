@@ -48,16 +48,24 @@
 	const agentStatus = $derived(node?.agent ?? deployment?.agent ?? { state: 'none' as const });
 	const agentStatusLabel = $derived(getSwarmNodeAgentLabel(agentStatus.state));
 	const isReady = $derived(!!deployment && !isLoading);
-	const isVisibleEnvironment = $derived(agentStatus.bindingKind === 'environment' && !!agentStatus.environmentId);
+	const isBoundEnvironment = $derived(agentStatus.bindingKind === 'environment');
+	const isVisibleEnvironment = $derived(
+		(isBoundEnvironment || agentStatus.bindingKind === 'discovered') && !!agentStatus.environmentId
+	);
+	const availableCandidates = $derived(
+		(agentStatus.candidates ?? []).filter((candidate) => candidate.environmentId !== agentStatus.environmentId)
+	);
 	const isDedicated = $derived(agentStatus.bindingKind === 'dedicated');
 	const canCreateEnvironment = $derived(!agentStatus.bindingKind && !agentStatus.candidates?.length);
-	const canShowDeployment = $derived(isVisibleEnvironment || isDedicated);
+	const canShowDeployment = $derived(isBoundEnvironment || isDedicated);
 	const bindingLabel = $derived.by(() => {
 		switch (agentStatus.bindingKind) {
 			case 'local':
 				return m.swarm_node_agent_binding_local();
 			case 'environment':
 				return m.swarm_node_agent_binding_environment();
+			case 'discovered':
+				return m.discovered_agent();
 			case 'dedicated':
 				return m.swarm_node_agent_binding_dedicated();
 			default:
@@ -93,18 +101,18 @@
 				<Badge variant={getSwarmNodeAgentVariant(agentStatus.state)} minWidth="20">{agentStatusLabel}</Badge>
 			</KeyValueCard>
 			<KeyValueCard label={m.swarm_node_agent_environment_id()}>
-				{agentStatus.environmentName ?? deployment?.environmentId ?? agentStatus.environmentId ?? m.common_na()}
+				{agentStatus.environmentId ?? deployment?.environmentId ?? m.common_na()}
 			</KeyValueCard>
 		</div>
 
-		{#if agentStatus.candidates?.length}
+		{#if availableCandidates.length}
 			<div class="space-y-3 rounded-lg border p-4">
 				<div>
 					<div class="font-medium">{m.swarm_node_agent_candidates_title()}</div>
 					<div class="text-sm text-muted-foreground">{m.swarm_node_agent_candidates_description()}</div>
 				</div>
 				<div class="space-y-2">
-					{#each agentStatus.candidates as candidate (candidate.environmentId)}
+					{#each availableCandidates as candidate (candidate.environmentId)}
 						<div class="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2">
 							<div>
 								<div class="text-sm font-medium">{candidate.environmentName}</div>
@@ -243,7 +251,7 @@
 					disabled={!node || isLoading}
 				/>
 			{/if}
-			{#if isVisibleEnvironment}
+			{#if isBoundEnvironment}
 				<ArcaneButton action="remove" customLabel={m.swarm_node_agent_detach_action()} onclick={onDetach} disabled={isLoading} />
 			{/if}
 			{#if isDedicated}

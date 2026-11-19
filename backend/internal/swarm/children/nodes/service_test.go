@@ -262,7 +262,7 @@ func TestService_BuildNodeAgentStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := svc.buildNodeAgentStatus(nodeID, tt.env, tt.runtime)
+			got := svc.buildNodeAgentStatus(nodeID, tt.env, tt.runtime, types.NodeAgentBindingKindEnvironment)
 			require.Equal(t, tt.want, got.State)
 		})
 	}
@@ -481,6 +481,25 @@ func TestNodeAgentCoverage(t *testing.T) {
 			assert.Equal(t, types.NodeAgentStateConnected, node.Agent.State)
 			assert.Equal(t, "node-agent", kit.FromPtr(node.Agent.EnvironmentID))
 			assert.Equal(t, "agent", kit.FromPtr(node.Agent.EnvironmentType))
+
+			// Independently enrolled global agents have no parent binding.
+			coverage.candidatesByNodeID = coverage.boundEnvsByNodeID
+			coverage.boundEnvsByNodeID = nil
+			svc.applyNodeAgentCoverage(node, coverage)
+			assert.Equal(t, types.NodeAgentStateConnected, node.Agent.State)
+			assert.Equal(t, "node-agent", kit.FromPtr(node.Agent.EnvironmentID))
+			assert.Equal(t, "node-agent", kit.FromPtr(node.Agent.EnvironmentName))
+			assert.Equal(t, types.NodeAgentBindingKindDiscovered, kit.FromPtr(node.Agent.BindingKind))
+			require.Len(t, node.Agent.Candidates, 1)
+
+			// Never choose between multiple agents claiming the same node.
+			coverage.candidatesByNodeID["node1"] = append(coverage.candidatesByNodeID["node1"], environment.Environment{
+				BaseModel: database.BaseModel{ID: "second-agent"}, Name: "second-agent",
+			})
+			svc.applyNodeAgentCoverage(node, coverage)
+			assert.Equal(t, types.NodeAgentStateAmbiguous, node.Agent.State)
+			assert.Nil(t, node.Agent.EnvironmentID)
+			require.Len(t, node.Agent.Candidates, 2)
 		})
 	}
 }

@@ -448,7 +448,8 @@ func (s *Service) applyNodeAgentCoverage(item *types.SwarmNode, coverage *swarmN
 	boundEnvs := coverage.boundEnvsByNodeID[nodeID]
 	if len(boundEnvs) > 0 {
 		localEnvironment := boundEnvs[max(0, slices.IndexFunc(boundEnvs, func(env environment.Environment) bool { return !env.Hidden }))]
-		item.Agent = s.buildNodeAgentStatus(nodeID, &localEnvironment, coverage.runtimeByEnvID[localEnvironment.ID])
+		bindingKind := kit.Ternary(localEnvironment.Hidden, types.NodeAgentBindingKindDedicated, types.NodeAgentBindingKindEnvironment)
+		item.Agent = s.buildNodeAgentStatus(nodeID, &localEnvironment, coverage.runtimeByEnvID[localEnvironment.ID], bindingKind)
 		return
 	}
 
@@ -458,6 +459,8 @@ func (s *Service) applyNodeAgentCoverage(item *types.SwarmNode, coverage *swarmN
 		return
 	}
 	if len(candidates) == 1 {
+		candidate := candidates[0]
+		item.Agent = s.buildNodeAgentStatus(nodeID, &candidate, coverage.runtimeByEnvID[candidate.ID], types.NodeAgentBindingKindDiscovered)
 		item.Agent.Candidates = buildNodeAgentCandidates(candidates)
 	}
 }
@@ -660,7 +663,7 @@ func (s *Service) fetchSwarmNodeIdentityViaAgent(ctx context.Context, environmen
 	return parsed.Data, nil
 }
 
-func (s *Service) buildNodeAgentStatus(nodeID string, env *environment.Environment, runtime swarmNodeAgentRuntime) types.NodeAgentStatus {
+func (s *Service) buildNodeAgentStatus(nodeID string, env *environment.Environment, runtime swarmNodeAgentRuntime, bindingKind types.NodeAgentBindingKind) types.NodeAgentStatus {
 	if env == nil {
 		return types.NodeAgentStatus{State: types.NodeAgentStateNone}
 	}
@@ -688,7 +691,7 @@ func (s *Service) buildNodeAgentStatus(nodeID string, env *environment.Environme
 
 	return types.NodeAgentStatus{
 		State:            state,
-		BindingKind:      new(kit.Ternary(env.Hidden, types.NodeAgentBindingKindDedicated, types.NodeAgentBindingKindEnvironment)),
+		BindingKind:      new(bindingKind),
 		EnvironmentID:    &env.ID,
 		EnvironmentName:  &env.Name,
 		EnvironmentType:  new("agent"),

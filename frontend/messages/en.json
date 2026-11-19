@@ -4669,5 +4669,7 @@
   "sync": "Sync",
   "ldap_sync": "LDAP Sync",
   "use_starttls": "Use StartTLS",
-  "use_starttls_description": "Upgrade ldap:// connections to TLS before sending passwords. Turn off only if the server does not support StartTLS; passwords are then sent in plain text."
+  "use_starttls_description": "Upgrade ldap:// connections to TLS before sending passwords. Turn off only if the server does not support StartTLS; passwords are then sent in plain text.",
+  "query_agent": "Query Agent",
+  "discovered_agent": "Discovered agent"
 }

@@ -304,7 +304,7 @@
 
 	const columns = [
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
-		...environmentColumns<NodeRow>(),
+		...environmentColumns<NodeRow>().map((column) => ({ ...column, title: m.query_agent() })),
 		{ accessorKey: 'hostname', title: m.hostname(), sortable: true },
 		{ accessorKey: 'role', title: m.common_role(), sortable: true, cell: RoleCell },
 		{ accessorKey: 'status', title: m.common_status(), sortable: true, cell: StatusCell },
@@ -343,10 +343,16 @@
 	<Badge variant={availabilityVariant(String(value ?? ''))} minWidth="20">{String(value ?? m.common_unknown())}</Badge>
 {/snippet}
 
-{#snippet AgentCell({ value }: { value: unknown })}
-	<Badge variant={getSwarmNodeAgentVariant(String(value ?? 'none') as SwarmNode['agent']['state'])} minWidth="20"
-		>{getSwarmNodeAgentLabel(String(value ?? 'none') as SwarmNode['agent']['state'])}</Badge
-	>
+{#snippet AgentCell({ item }: { item: NodeRow })}
+	<div class="flex flex-col items-start gap-1">
+		{#if item.agent?.environmentId}
+			<span class="text-sm font-medium">{item.agent.environmentName || item.agent.environmentId}</span>
+			<span class="font-mono text-xs text-muted-foreground">{item.agent.environmentId}</span>
+		{/if}
+		<Badge variant={getSwarmNodeAgentVariant(item.agent?.state)} minWidth="20">
+			{getSwarmNodeAgentLabel(item.agent?.state)}
+		</Badge>
+	</div>
 {/snippet}
 
 {#snippet LabelsCell({ item }: { item: NodeRow })}
@@ -435,7 +441,8 @@
 			},
 			{
 				label: m.agent(),
-				getValue: (item: NodeRow) => getSwarmNodeAgentLabel(item.agent?.state),
+				getValue: (item: NodeRow) =>
+					item.agent?.environmentName || item.agent?.environmentId || getSwarmNodeAgentLabel(item.agent?.state),
 				icon: AgentConnectionIcon,
 				iconVariant: 'gray' as const,
 				show: mobileFieldVisibility['agent'] ?? true

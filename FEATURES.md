@@ -40,15 +40,17 @@ Change this ordering whenever priorities change.
 
 - [x] CP-01 — Run the manager as a control plane with no Docker socket or local Docker daemon dependency. Implemented behind `ARCANE_CONTROL_PLANE=true`; socket-free HTTP smoke test passed.
 - [ ] CP-02 — Remove the manager's implicit local-agent selection from startup, readiness, background jobs, and the UI.
-- [ ] CP-03 — Deploy agents as one ordinary global Swarm service with no exclusion for the manager's host.
+- [x] CP-03 — Deploy agents as one ordinary global Swarm service with no exclusion for the manager's host. Live deployment verified with five global agents, including the control-plane host.
 - [ ] CP-04 — Keep each agent's connection, credentials, and node identity separate; do not route node operations through a round-robin `tasks.agent` address.
 - [ ] CP-05 — Preserve agent identity across restarts, task replacement, and enrollment-token rotation without duplicate registrations.
 - [ ] CP-06 — Select a verified, reachable manager agent for cluster operations and handle manager failover explicitly.
 - [ ] CP-07 — Show offline, stale, mismatched, and missing agents accurately; never report them as healthy because the control plane is healthy.
 
-Status: BASE-03 is service-tested. CP-01 has passed a socket-free running-manager
-smoke test. Directory retirement, independent enrollment, and API deletion of
-five agents are verified in isolation; complete real-node rollout remains open.
+Status: BASE-03 is service-tested. Socket-free deployment is verified with one
+manager and five global agents on cf.6, including the manager's host. Directory
+retirement and independent enrollment are verified; deletion of five agents was
+verified in isolation. Node-agent association UI is tracked separately in #5;
+credential rotation, failover, and complete node-local operation acceptance remain open.
 
 ## Node routing and interactive operations
 

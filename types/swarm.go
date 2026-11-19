@@ -440,6 +440,7 @@ const (
 	NodeAgentBindingKindLocal       NodeAgentBindingKind = "local"
 	NodeAgentBindingKindEnvironment NodeAgentBindingKind = "environment"
 	NodeAgentBindingKindDedicated   NodeAgentBindingKind = "dedicated"
+	NodeAgentBindingKindDiscovered  NodeAgentBindingKind = "discovered"
 
 	SwarmStackNamespaceLabel = "com.docker.stack.namespace"
 )

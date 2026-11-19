@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { createQuery } from '@tanstack/svelte-query';
-	import { onMount, untrack } from 'svelte';
-	import { SvelteSet } from 'svelte/reactivity';
+	import { untrack } from 'svelte';
 
 	import { swarmEnvironmentsQueryOptions } from '#lib/components/swarm/swarm-environments.js';
 	import * as Alert from '#lib/components/ui/alert/index.js';
@@ -9,10 +8,8 @@
 	import { ResourcePageLayout, type StatCardConfig } from '#lib/layouts/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { swarmNodeListQuery } from '#lib/query/swarm.js';
-	import { swarmService } from '#lib/services/swarm-service.js';
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
-	import { hasPermission } from '#lib/utils/auth.js';
 	import { createRefreshActionButtons } from '#lib/utils/resource-actions.js';
 	import { ResourceListPageState } from '#lib/utils/resource-list-page.svelte.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
@@ -43,29 +40,6 @@
 			message: m.common_refresh_failed({ resource: m.nodes() })
 		});
 	}
-
-	let active = true;
-	const reconciled = new SvelteSet<string>();
-	const reconcilableManagers = $derived(swarm.managers.filter((env) => hasPermission('swarm-nodes:update', env.id)));
-
-	async function reconcileEnvironments(pending: typeof reconcilableManagers) {
-		for (const env of pending) reconciled.add(env.id);
-		const results = await Promise.all(pending.map((env) => tryCatch(swarmService.reconcileNodeAgents(env.id))));
-		if (!active || results.every((result) => result.error !== null)) return;
-		await refresh();
-	}
-
-	onMount(() => () => {
-		active = false;
-	});
-
-	$effect(() => {
-		const pending = reconcilableManagers.filter((env) => !reconciled.has(env.id));
-		if (pending.length === 0) return;
-		untrack(() => {
-			void reconcileEnvironments(pending);
-		});
-	});
 
 	const totalNodes = $derived(nodes?.pagination?.totalItems ?? nodes?.data?.length ?? 0);
 	const uncoveredNodes = $derived(
