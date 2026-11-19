@@ -31,3 +31,7 @@ Use `qa`, `bug`, and `needs-triage` for incoming QA reports. Add one priority la
 ## Repository settings
 
 Maintain squash-only merging, automatic branch deletion, issues/releases enabled, and a protected `main` with direct/force pushes disabled, stale branches blocked, rejected reviews blocking merge, no admin bypass, and required checks matching the actual Gitea job contexts. Branch protection is server-side and must be audited after repository migrations; the Markdown instructions alone do not enforce it. Publishing automation creates tags/releases, never bot commits to main.
+
+## Build concurrency
+
+The release Dockerfiles use `GOMAXPROCS=4` and `go build -p 2`, matching the Go validation job. These settings bound compilation within each manager/agent build stage; they do not set runtime container limits. The swarm05 resource-pressure incident remains tracked separately in #42 until its initiating cause is established.

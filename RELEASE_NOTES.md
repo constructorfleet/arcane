@@ -1,11 +1,11 @@
-# 3.0.1-cf.15
+# 3.0.1-cf.16
 
-## Fixes
+## Build stability
 
-- Defer table filter translation labels until use, avoiding calls into not-yet-initialized translation exports across production chunk cycles (#52).
-- Preserve existing filter values, icons, and labels while allowing network details to initialize independently of previous list navigation.
+- Bound manager and agent image compilation with `GOMAXPROCS=4` and `go build -p 2`, matching the existing pull-request Go validation limits.
+- Keep this limit within the build-stage command. Runtime container configuration continues through the existing deployment configuration.
 
 ## Validation and limits
 
-- Reproduced fresh network detail failures on cf.14 for both busy and empty node perspectives, while the agent returned HTTP 200. List navigation, grouped search, per-node observations and the exact consumer link worked.
-- Validate frontend tests, production build, format/lint and required CI before merge. Fresh deep links, refresh and both node perspectives require live acceptance after publication. No production network deletion is used as a QA test.
+- Severe recent guest memory/CPU/I/O pressure was observed on swarm05 during the cf.15 publication/rollout window; its exact initiating process is unproven (#42). This limits our compilation concurrency as a mitigation, not a claim that the incident's root cause is resolved.
+- Validate release tooling, frontend build, full format/lint and required CI before merge. Published image builds and normal rollout must still pass verification.

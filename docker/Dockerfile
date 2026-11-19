@@ -62,8 +62,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     if [ -z "${GOARM}" ]; then GOARM="7"; fi; \
     export GOARM; \
     fi && \
-    CGO_ENABLED=0 GOOS=linux \
-    go build \
+    CGO_ENABLED=0 GOOS=linux GOMAXPROCS=4 \
+    go build -p 2 \
     -tags "${BUILD_TAGS}${ENABLED_FEATURES:+,buildables}" \
     -ldflags "-w -s -X 'getarcane.dev/arcane/v3/buildables.EnabledFeatures=${ENABLED_FEATURES}' -X getarcane.dev/arcane/v3/internal/config.Version=${VERSION} -X getarcane.dev/arcane/v3/internal/config.Revision=${REVISION} -X getarcane.dev/arcane/v3/internal/config.BuildTime=${BUILD_TIME} -X getarcane.dev/arcane/v3/internal/config.NodeVersion=${NODE_VERSION} -X getarcane.dev/arcane/v3/internal/config.SvelteKitVersion=${SVELTEKIT_VERSION}" \
     -trimpath \
