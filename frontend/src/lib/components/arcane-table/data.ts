@@ -20,12 +20,16 @@ import type { FilterOption } from './arcane-table.types.svelte';
 export const usageFilters: FilterOption[] = [
 	{
 		value: true,
-		label: m.common_in_use(),
+		get label() {
+			return m.common_in_use();
+		},
 		icon: VerifiedCheckIcon
 	},
 	{
 		value: false,
-		label: m.common_unused(),
+		get label() {
+			return m.common_unused();
+		},
 		icon: AlertIcon
 	}
 ];
@@ -33,22 +37,30 @@ export const usageFilters: FilterOption[] = [
 export const imageUpdateFilters: FilterOption[] = [
 	{
 		value: 'has_update',
-		label: m.images_has_updates(),
+		get label() {
+			return m.images_has_updates();
+		},
 		icon: UpdateIcon
 	},
 	{
 		value: 'up_to_date',
-		label: m.images_no_updates(),
+		get label() {
+			return m.images_no_updates();
+		},
 		icon: VerifiedCheckIcon
 	},
 	{
 		value: 'error',
-		label: m.common_error(),
+		get label() {
+			return m.common_error();
+		},
 		icon: CloseIcon
 	},
 	{
 		value: 'unknown',
-		label: m.common_unknown(),
+		get label() {
+			return m.common_unknown();
+		},
 		icon: InfoIcon
 	}
 ];
@@ -56,22 +68,30 @@ export const imageUpdateFilters: FilterOption[] = [
 export const hardenedImageFilters: FilterOption[] = [
 	{
 		value: true,
-		label: m.hardened(),
+		get label() {
+			return m.hardened();
+		},
 		icon: ShieldCheckIcon
 	},
 	{
 		value: 'ending_soon',
-		label: m.ending_soon(),
+		get label() {
+			return m.ending_soon();
+		},
 		icon: ShieldAlertIcon
 	},
 	{
 		value: 'end_of_life',
-		label: m.end_of_life(),
+		get label() {
+			return m.end_of_life();
+		},
 		icon: ShieldXIcon
 	},
 	{
 		value: false,
-		label: m.not_hardened(),
+		get label() {
+			return m.not_hardened();
+		},
 		icon: InfoIcon
 	}
 ];
@@ -79,22 +99,30 @@ export const hardenedImageFilters: FilterOption[] = [
 export const severityFilters: FilterOption[] = [
 	{
 		value: 'info',
-		label: m.info(),
+		get label() {
+			return m.info();
+		},
 		icon: InfoIcon
 	},
 	{
 		value: 'success',
-		label: m.common_success(),
+		get label() {
+			return m.common_success();
+		},
 		icon: CheckIcon
 	},
 	{
 		value: 'warning',
-		label: m.warning(),
+		get label() {
+			return m.warning();
+		},
 		icon: AlertIcon
 	},
 	{
 		value: 'error',
-		label: m.common_error(),
+		get label() {
+			return m.common_error();
+		},
 		icon: CloseIcon
 	}
 ];
@@ -102,27 +130,37 @@ export const severityFilters: FilterOption[] = [
 export const vulnerabilitySeverityFilters: FilterOption[] = [
 	{
 		value: 'CRITICAL',
-		label: m.vuln_severity_critical(),
+		get label() {
+			return m.vuln_severity_critical();
+		},
 		dotClass: 'bg-destructive'
 	},
 	{
 		value: 'HIGH',
-		label: m.vuln_severity_high(),
+		get label() {
+			return m.vuln_severity_high();
+		},
 		dotClass: 'bg-orange'
 	},
 	{
 		value: 'MEDIUM',
-		label: m.vuln_severity_medium(),
+		get label() {
+			return m.vuln_severity_medium();
+		},
 		dotClass: 'bg-warning'
 	},
 	{
 		value: 'LOW',
-		label: m.vuln_severity_low(),
+		get label() {
+			return m.vuln_severity_low();
+		},
 		dotClass: 'bg-success'
 	},
 	{
 		value: 'UNKNOWN',
-		label: m.common_unknown(),
+		get label() {
+			return m.common_unknown();
+		},
 		dotClass: 'bg-muted-foreground'
 	}
 ];
@@ -130,12 +168,16 @@ export const vulnerabilitySeverityFilters: FilterOption[] = [
 export const templateTypeFilters: FilterOption[] = [
 	{
 		value: 'false',
-		label: m.local(),
+		get label() {
+			return m.local();
+		},
 		icon: FolderOpenIcon
 	},
 	{
 		value: 'true',
-		label: m.templates_remote(),
+		get label() {
+			return m.templates_remote();
+		},
 		icon: GlobeIcon
 	}
 ];
@@ -143,22 +185,30 @@ export const templateTypeFilters: FilterOption[] = [
 export const projectStatusFilters: FilterOption[] = [
 	{
 		value: 'running',
-		label: m.common_running(),
+		get label() {
+			return m.common_running();
+		},
 		icon: PlayIcon
 	},
 	{
 		value: 'stopped',
-		label: m.common_stopped(),
+		get label() {
+			return m.common_stopped();
+		},
 		icon: StopIcon
 	},
 	{
 		value: 'partially running',
-		label: m.projects_status_partial(),
+		get label() {
+			return m.projects_status_partial();
+		},
 		icon: AlertIcon
 	},
 	{
 		value: 'unknown',
-		label: m.common_unknown(),
+		get label() {
+			return m.common_unknown();
+		},
 		icon: InfoIcon
 	}
 ];
