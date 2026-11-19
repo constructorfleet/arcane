@@ -4682,5 +4682,8 @@
   "workspace_unavailable": "Workspace unavailable",
   "check_volume_attachment": "Check the selected agent and the volume's active consumer node, then retry or return to the volume list.",
   "image_preview_unavailable": "This image could not be displayed. Download it to inspect the original file.",
-  "image_preview_limits": "Previews support PNG, JPEG and GIF images up to 5 MiB and 4096 pixels per side. Other formats and larger files can be downloaded."
+  "image_preview_limits": "Previews support PNG, JPEG and GIF images up to 5 MiB and 4096 pixels per side. Other formats and larger files can be downloaded.",
+  "cluster_administration": "Cluster administration",
+  "inspect_cluster": "Inspect cluster",
+  "cluster_settings_scope_description": "Cluster-wide settings, join tokens, and unlock keys are accessed through the listed query agent. Node availability is managed in the nodes table above."
 }

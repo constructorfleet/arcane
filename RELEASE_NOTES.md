@@ -1,12 +1,12 @@
-# 3.0.1-cf.11
+# 3.0.1-cf.12
 
-## Features
+## Fixes
 
-- Preview PNG, JPEG and GIF files in the volume workspace as read-only images (#15).
-- Bound previews to 5 MiB, 4096 pixels per side, and the configured workspace read limit. Check image headers and do not preview HTML, SVG, symlinks, special files, unsupported formats, or oversized images.
-- Keep binary bytes separate from editable text. Show metadata and an explicit download action for unsupported files; decoding failures have a visible fallback.
+- Show the existing Swarm nodes table on the Cluster page, including per-node status, availability, and permission-gated node actions (#9).
+- Add the missing Pause availability action alongside Drain and Active in the shared node menu. Requests retain the exact node ID and query-agent scope.
+- Label cluster inspection as cluster-wide administration, separate from node availability.
 
-## Validation
+## Validation and limits
 
-- Business tests cover supported formats, malformed headers, dimensions, file-size limits, and unchanged text/read-only semantics.
-- Required CI and live preview/download acceptance precede completion. Volume attachment and RBD handoff policies are unchanged.
+- Validate frontend build/type/lint, existing frontend tests, and required CI before merge.
+- Live QA must verify the node list and action scope. Production nodes are not drained or demoted as a UI smoke test.

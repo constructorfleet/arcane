@@ -54,11 +54,16 @@ credential rotation, failover, and complete node-local operation acceptance rema
 
 ## Node routing and interactive operations
 
-- [ ] NODE-01 — Resolve a service task to its node and container, then proxy requests to that node's agent.
+- [x] NODE-01 — Resolve a service task to its node and container, then proxy requests to that node's agent.
 - [ ] NODE-02 — Open container consoles and exec sessions on the selected node and replica.
 - [ ] NODE-03 — Stream container/task logs through the correct agent, with working disconnect and cancellation behavior.
 - [ ] NODE-04 — Handle task movement and agent disconnection without silently switching an existing console to another replica.
 - [ ] NODE-05 — Inspect and operate on node-local containers, images, volumes, and networks through the correct agent.
+
+Status: cf.9 global and service task links resolved exact containers on swarm02,
+swarm03, and swarm05 through their own agent UUIDs. Removed/unassigned tasks show
+clear unavailable states (#8). Console/exec, logs, migration, and disconnect
+acceptance remain open.
 
 ## Volumes and files
 

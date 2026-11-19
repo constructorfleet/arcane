@@ -2,6 +2,7 @@
 	import { createQuery } from '@tanstack/svelte-query';
 
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
+	import { swarmEnvironmentsQueryOptions } from '#lib/components/swarm/swarm-environments.js';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
@@ -10,13 +11,30 @@
 	import { ResourcePageLayout, type ActionButton } from '#lib/layouts/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
+	import { swarmNodeListQuery } from '#lib/query/swarm.js';
 	import { swarmService } from '#lib/services/swarm-service.js';
 	import type { EnvironmentRef } from '#lib/stores/environment.store.svelte.js';
+	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
+	import { extractApiErrorMessage } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { readableEnvironments, sumAcrossEnvironments } from '#lib/utils/environments.js';
 
+	import SwarmNodesTable from '../nodes/components/nodes-table.svelte';
 	import ClusterPanel from './components/cluster-panel.svelte';
 	import EasyJoinDialog from './components/easy-join-dialog.svelte';
+
+	let requestOptions = $state<SearchPaginationSortRequest>({
+		pagination: { page: 1, limit: 20 },
+		sort: { column: 'hostname', direction: 'asc' }
+	});
+	const swarmQuery = createQuery(() => swarmEnvironmentsQueryOptions('swarm-nodes:list'));
+	const nodesQuery = createQuery(() => {
+		const swarm = swarmQuery.data;
+		return {
+			...swarmNodeListQuery(swarm ?? { environments: [], managers: [], failedEnvironments: [], scope: '' }, requestOptions),
+			enabled: Boolean(swarm)
+		};
+	});
 
 	const statusQuery = createQuery(() => {
 		const environments = readableEnvironments('swarm:read');
@@ -57,6 +75,8 @@
 
 	async function refresh() {
 		await statusQuery.refetch();
+		await swarmQuery.refetch();
+		await nodesQuery.refetch();
 	}
 
 	const actionButtons: ActionButton[] = $derived([
@@ -67,8 +87,8 @@
 			iconOnly: true,
 			label: m.common_refresh(),
 			onclick: refresh,
-			loading: statusQuery.isFetching,
-			disabled: statusQuery.isFetching
+			loading: statusQuery.isFetching || nodesQuery.isFetching,
+			disabled: statusQuery.isFetching || nodesQuery.isFetching
 		}
 	]);
 </script>
@@ -89,7 +109,30 @@
 				</Alert.Root>
 			{/if}
 
+			<section class="space-y-3" aria-label={m.nodes()}>
+				<h2 class="text-lg font-semibold">{m.nodes()}</h2>
+				{#if nodesQuery.data}
+					<SwarmNodesTable
+						nodes={nodesQuery.data}
+						scope={swarmQuery.data?.scope ?? ''}
+						bind:requestOptions
+						onRetry={() => nodesQuery.refetch()}
+					/>
+				{:else if nodesQuery.isError || swarmQuery.isError}
+					<Alert.Root variant="warning-subtle" size="sm" icon={AlertIcon}>
+						<Alert.Description>{extractApiErrorMessage(nodesQuery.error ?? swarmQuery.error)}</Alert.Description>
+						<ArcaneButton action="refresh" customLabel={m.common_retry()} onclick={refresh} />
+					</Alert.Root>
+				{:else}
+					<p class="text-sm text-muted-foreground">{m.common_loading()}</p>
+				{/if}
+			</section>
+
 			<Card.Root>
+				<Card.Header>
+					<Card.Title>{m.cluster_administration()}</Card.Title>
+					<Card.Description>{m.cluster_settings_scope_description()}</Card.Description>
+				</Card.Header>
 				<Card.Content>
 					<div class="divide-y divide-border/60 text-sm">
 						{#each rows as row (row.environment.id)}
@@ -117,7 +160,7 @@
 											onclick={() => openEasyJoin(row.environment.id)}
 										/>
 									{/if}
-									<ArcaneButton action="inspect" customLabel={m.common_inspect()} onclick={() => openPanel(row.environment)} />
+									<ArcaneButton action="inspect" customLabel={m.inspect_cluster()} onclick={() => openPanel(row.environment)} />
 								</div>
 							</div>
 						{/each}
@@ -131,8 +174,8 @@
 			<ResponsiveDialog
 				bind:open={panelOpen}
 				variant="sheet"
-				title={environment.name}
-				description={m.swarm_cluster_subtitle()}
+				title={m.inspect_cluster()}
+				description={m.cluster_settings_scope_description()}
 				contentClass="sm:max-w-5xl"
 			>
 				{#key environment.id}

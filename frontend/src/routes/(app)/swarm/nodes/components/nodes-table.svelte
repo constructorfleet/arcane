@@ -483,6 +483,9 @@
 			<DropdownMenu.Item onclick={() => setAvailability(item, 'drain')} disabled={isLoading || item.availability === 'drain'}>
 				{m.drain()}
 			</DropdownMenu.Item>
+			<DropdownMenu.Item onclick={() => setAvailability(item, 'pause')} disabled={isLoading || item.availability === 'pause'}>
+				{m.common_pause()}
+			</DropdownMenu.Item>
 			<DropdownMenu.Item onclick={() => setAvailability(item, 'active')} disabled={isLoading || item.availability === 'active'}>
 				{m.swarm_node_activate()}
 			</DropdownMenu.Item>
