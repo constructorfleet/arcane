@@ -58,6 +58,7 @@
 					);
 					toast.success(m.images_tag_success());
 					await onTagged?.();
+					isTagging = false;
 					handleOpenChange(false);
 				})()
 			);
