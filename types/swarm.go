@@ -649,11 +649,6 @@ func NewSwarmTaskSummary(task swarm.Task, serviceName, nodeName string) SwarmTas
 		containerID = task.Status.ContainerStatus.ContainerID
 	}
 
-	errorMessage := task.Status.Err
-	if errorMessage == "" {
-		errorMessage = task.Status.Message
-	}
-
 	slot := task.Slot
 
 	return SwarmTaskSummary{
@@ -665,7 +660,7 @@ func NewSwarmTaskSummary(task swarm.Task, serviceName, nodeName string) SwarmTas
 		NodeName:     nodeName,
 		DesiredState: string(task.DesiredState),
 		CurrentState: string(task.Status.State),
-		Error:        errorMessage,
+		Error:        task.Status.Err,
 		ContainerID:  containerID,
 		Image:        image,
 		Slot:         slot,

@@ -1,12 +1,12 @@
-# 3.0.1-cf.6
+# 3.0.1-cf.7
 
 ## Fixes
 
-- Generate source and pull-request links from the public WEB_URL release metadata instead of runner-internal Gitea addresses.
-- Keep the internal API transport separate from user-facing web links; preserve source tags and image digest references.
+- Label current and desired state side by side on service task cards, including historical tasks (#6).
+- Populate task errors only from Docker's error field; ordinary status messages such as started and shutdown no longer appear as errors in service, stack, or cluster task views (#7).
 
 ## Validation
 
-- Release tooling covers draft generation with an internal API URL and a public web URL, including an internal PR URL returned by the API.
-- cf.5 release-note web links were corrected without changing its source tag or image digests.
-- Required release-contract, Go, and frontend checks run before merge. No application behavior or deployment configuration changes.
+- Check healthy running tasks, normal shutdown history, rejected/failed tasks, and actual Docker errors through the shared task-summary conversion.
+- Required release-contract, Go, and frontend checks run before merge.
+- Node/container navigation and node-agent coverage remain separate open QA items (#5, #8).

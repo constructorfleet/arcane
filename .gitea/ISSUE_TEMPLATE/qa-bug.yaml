@@ -17,7 +17,19 @@ body:
     id: area
     attributes:
       label: Area
-      options: ['Agents / enrollment', 'Swarm / services / stacks', 'Volumes / files / RBD', 'Containers / console', 'Images / registries', 'Networks', 'Configs / secrets / variables', 'OIDC / permissions', 'GitOps / deployment', 'Other UI']
+      options:
+        [
+          'Agents / enrollment',
+          'Swarm / services / stacks',
+          'Volumes / files / RBD',
+          'Containers / console',
+          'Images / registries',
+          'Networks',
+          'Configs / secrets / variables',
+          'OIDC / permissions',
+          'GitOps / deployment',
+          'Other UI'
+        ]
     validations:
       required: true
   - type: input
@@ -42,7 +54,13 @@ body:
     id: impact
     attributes:
       label: Impact
-      options: ['Broken workflow / no workaround', 'Works with a workaround', 'Visual / usability problem', 'Possible data loss or security issue — stop testing and contact maintainer privately']
+      options:
+        [
+          'Broken workflow / no workaround',
+          'Works with a workaround',
+          'Visual / usability problem',
+          'Possible data loss or security issue — stop testing and contact maintainer privately'
+        ]
   - type: textarea
     id: evidence
     attributes:

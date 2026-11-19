@@ -73,10 +73,19 @@
 								</div>
 								<div class="font-mono text-xs text-muted-foreground">{task.id.slice(0, 12)}</div>
 							</div>
-							<Badge variant={getSwarmTaskStateVariant(task.currentState)} minWidth="20">{task.currentState}</Badge>
 						</div>
 						<div class="grid grid-cols-2 gap-2">
 							<div>
+								<div class="mb-1 text-xs font-semibold text-muted-foreground">{m.swarm_current_state()}</div>
+								<Badge variant={getSwarmTaskStateVariant(task.currentState)} size="sm" minWidth="20">{task.currentState}</Badge>
+							</div>
+							<div>
+								<div class="mb-1 text-xs font-semibold text-muted-foreground">
+									{m.swarm_desired_state()}
+								</div>
+								<Badge variant={getSwarmTaskStateVariant(task.desiredState)} size="sm" minWidth="20">{task.desiredState}</Badge>
+							</div>
+							<div class="col-span-2">
 								<div class="mb-1 text-xs font-semibold text-muted-foreground">
 									{m.swarm_node()}
 								</div>
@@ -84,12 +93,6 @@
 									<ConnectionIcon class="size-3 text-muted-foreground" />
 									<span class="truncate text-sm text-foreground">{task.nodeName || m.common_na()}</span>
 								</div>
-							</div>
-							<div>
-								<div class="mb-1 text-xs font-semibold text-muted-foreground">
-									{m.swarm_desired_state()}
-								</div>
-								<Badge variant={getSwarmTaskStateVariant(task.desiredState)} size="sm" minWidth="20">{task.desiredState}</Badge>
 							</div>
 							{#if task.error}
 								<div class="col-span-2">
