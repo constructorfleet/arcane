@@ -327,7 +327,14 @@
 								disabled={submitting}
 								bind:input={inputs.memorySwapMb}
 							/>
-							<FormInput label={m.common_cpus()} type="number" placeholder="0" disabled={submitting} bind:input={inputs.cpus} />
+							<FormInput
+								label={m.common_cpus()}
+								type="number"
+								step="any"
+								placeholder="0"
+								disabled={submitting}
+								bind:input={inputs.cpus}
+							/>
 							<FormInput
 								label={m.cpu_shares()}
 								type="number"

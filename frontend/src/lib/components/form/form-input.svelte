@@ -19,6 +19,7 @@
 		placeholder,
 		disabled = false,
 		type = 'text',
+		step,
 		rows = 3,
 		children,
 		autocomplete = 'off',
@@ -32,6 +33,7 @@
 		placeholder?: string;
 		disabled?: boolean;
 		type?: 'text' | 'password' | 'email' | 'number' | 'checkbox' | 'date' | 'switch' | 'textarea';
+		step?: HTMLInputElement['step'];
 		rows?: number;
 		children?: Snippet;
 		autocomplete?: HTMLInputElement['autocomplete'];
@@ -58,7 +60,7 @@
 			{:else if type === 'date'}
 				<DatePicker {id} bind:value={input.value as Temporal.PlainDate} {disabled} />
 			{:else}
-				<Input {id} {placeholder} {type} bind:value={input.value} {disabled} {autocomplete} />
+				<Input {id} {placeholder} {type} {step} bind:value={input.value} {disabled} {autocomplete} />
 			{/if}
 		{/if}
 		{#if input?.error}
