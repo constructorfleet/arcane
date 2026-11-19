@@ -24,6 +24,7 @@ import (
 	"kit.getarcane.app/docker"
 	"kit.getarcane.app/docker/compat"
 
+	"getarcane.dev/arcane/v3/internal/common"
 	"getarcane.dev/arcane/v3/pkg/timeouts"
 	"getarcane.dev/arcane/v3/pkg/volumes"
 	"getarcane.dev/types/v3"
@@ -113,6 +114,19 @@ func (s *VolumeService) getVolumeHelperImage(ctx context.Context) (string, error
 
 func (s *VolumeService) acquireVolumeHelper(ctx context.Context, volumeName string) (string, func(), error) {
 	slog.DebugContext(ctx, "volume service: acquire helper container", "volume", volumeName)
+
+	inspected, inspectErr := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.VolumeInspectResult, error) {
+		return dockerClient.VolumeInspect(ctx, volumeName, client.VolumeInspectOptions{})
+	})
+	if inspectErr != nil {
+		return "", nil, fmt.Errorf("failed to inspect volume before workspace access: %w", inspectErr)
+	}
+	if inspected.Volume.Scope == "global" && inspected.Volume.Driver != "local" && inspected.Volume.Mountpoint == "" {
+		return "", nil, common.Classify(common.ErrConflict, fmt.Errorf(
+			"volume %q uses global driver %q and is not mounted on this agent; open its workspace on an agent already using this volume",
+			volumeName, inspected.Volume.Driver,
+		))
+	}
 
 	// The returned cleanup releases a hold on the shared helper; retry when the reaper wins the resolve-to-acquire race.
 	for range 3 {

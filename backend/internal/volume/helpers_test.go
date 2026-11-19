@@ -11,12 +11,14 @@ import (
 
 	"github.com/libtnb/sqlite"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/volume"
 	"github.com/moby/moby/client"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
 	"kit.getarcane.app/docker/streams/bus"
 
+	"getarcane.dev/arcane/v3/internal/common"
 	"getarcane.dev/arcane/v3/internal/config"
 	"getarcane.dev/arcane/v3/internal/database"
 	"getarcane.dev/arcane/v3/internal/docker"
@@ -37,12 +39,18 @@ func newVolumeServiceTestDockerClient(t *testing.T, server *httptest.Server) *cl
 
 func TestCreateTempContainerReusesWritableHelper(t *testing.T) {
 	var createCalls, startCalls, removeCalls int
+	inspectedVolume := volume.Volume{Name: "workspace-volume", Driver: "local", Scope: "local"}
 	var createRequest struct {
 		HostConfig      *container.HostConfig `json:"HostConfig"`
 		NetworkDisabled bool                  `json:"NetworkDisabled"`
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/volumes/workspace-volume"):
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.MarshalWrite(w, inspectedVolume); err != nil {
+				t.Errorf("encode volume inspect response: %v", err)
+			}
 		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/images/") && strings.HasSuffix(r.URL.Path, "/json"):
 			w.Header().Set("Content-Type", "application/json")
 			if err := json.MarshalWrite(w, map[string]string{"Id": "tools-image"}); err != nil {
@@ -106,6 +114,44 @@ func TestCreateTempContainerReusesWritableHelper(t *testing.T) {
 	releaseFirst()
 	releaseSecond()
 	require.Zero(t, service.helperByVolume["workspace-volume"].inUse)
+
+	for _, tc := range []struct {
+		name       string
+		driver     string
+		scope      string
+		mountpoint string
+		conflict   bool
+		fresh      bool
+	}{
+		{name: "inactive global plugin refuses cached helper", driver: "exclusive-plugin:v1", scope: "global", conflict: true},
+		{name: "inactive global plugin refuses helper creation", driver: "exclusive-plugin:v1", scope: "global", conflict: true, fresh: true},
+		{name: "attached global plugin reuses helper", driver: "exclusive-plugin:v1", scope: "global", mountpoint: "/mounted/workspace-volume"},
+		{name: "unused local volume remains accessible", driver: "local", scope: "local"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cachedHelpers := service.helperByVolume
+			if tc.fresh {
+				service.helperByVolume = make(map[string]*volumeHelper)
+				defer func() { service.helperByVolume = cachedHelpers }()
+			}
+			inspectedVolume = volume.Volume{Name: "workspace-volume", Driver: tc.driver, Scope: tc.scope, Mountpoint: tc.mountpoint}
+			helperID, release, acquireErr := service.acquireVolumeHelper(t.Context(), "workspace-volume")
+			if tc.conflict {
+				require.ErrorIs(t, acquireErr, common.ErrConflict)
+				require.ErrorContains(t, acquireErr, "not mounted on this agent")
+				require.Empty(t, helperID)
+				require.Nil(t, release)
+			} else {
+				require.NoError(t, acquireErr)
+				require.Equal(t, "helper-1", helperID)
+				release()
+			}
+			require.Equal(t, 1, createCalls)
+			require.Equal(t, 1, startCalls)
+			require.Zero(t, removeCalls)
+			require.Zero(t, cachedHelpers["workspace-volume"].inUse)
+		})
+	}
 }
 
 func TestCollectStaleHelperIDs(t *testing.T) {

@@ -1,7 +1,7 @@
-# 3.0.1-cf.35
+# 3.0.1-cf.36
 
-- Preserve the complete local path and query when an expired session or unauthenticated page redirects to sign-in (#90). Selected-agent `env`, workspace `tab`, sorting and other query parameters survive the redirect.
-- Keep existing authentication-page loop guards, refresh recovery and the root landing-page preference unchanged.
-- Extend the existing authentication browser cases to assert the returned path. A network-free harness exercises the actual API failure handler and root-layout guard, including refresh and navigation guards.
+- Inspect the selected agent's volume metadata before acquiring a workspace helper (#14). A global plugin volume with an empty driver-reported mountpoint returns a clear conflict directing the user to an agent already using it, before helper creation or cached-helper reuse.
+- Keep unused local volumes accessible and permit global plugin volumes that report an existing local mountpoint. Extend existing helper coverage for inactive fresh/cached helpers, attached plugin helpers and unused local volumes.
+- Record the preceding cf.34 local-driver lifecycle acceptance: stale-save rejection, cold reload, exact download bytes, upload, rename and move; original fixture preservation and guarded cleanup were independently checked.
 
-Full checks and release verification are recorded in the fixing PR and issue. The browser suite requires its development prerequisites and is not run against the production service. No wrong-node mutation was attempted or observed during QA.
+Volume/workspace/backup tests and required checks are recorded in the PR. The reported RBD attachment state was inspected read-only; no inactive volume was mounted to reproduce the problem. The guard does not infer shared identity from a name or global scope, choose another agent automatically, or complete broader plugin/RBD write acceptance. Runtime acceptance is tracked in #14.

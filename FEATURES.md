@@ -89,8 +89,14 @@ local-file edit saved and reloaded its bytes but changed UID/GID from 501:10 to
 ownership-preserving ACFS companion and rejects unsafe legacy updates. Live
 cf.33 Save retained 501:10/0644 and the exact persisted 102 bytes on the owned
 local fixture; native guards restored its original 60 bytes after browser
-interruption. Cold UI reload, upload/lifecycle and broader RBD coverage remain
-unaccepted. The pagination/sorting crash reported on 2026-11-18 was caused by duplicate
+interruption. Cold UI reload of that cf.33 edited file was not completed.
+On cf.34, a new disposable local file passed create/save, stale second-tab
+rejection, cold reload and exact 64-byte download verification. A separate
+53-byte upload retained its exact bytes through rename/move and reopen. Native
+checks confirmed the original readme's bytes, 501:10/0644, inode and timestamps
+were unchanged; guarded cleanup removed only the new files and their empty
+folder. RBD/plugin writes, permission-denial and UI-delete acceptance remain open.
+The pagination/sorting crash reported on 2026-11-18 was caused by duplicate
 same-node volume names (`each_key_duplicate`). Release `3.0.1-cf.3` deduplicates
 per daemon before pagination/counting. Its SwarmCD rollout and five-agent/manager
 health were verified. Browser verification passed saved-preference
@@ -102,6 +108,14 @@ cf.17 local-fixture acceptance identified the exact agent-scoped Arcane volume
 helper, retained In Use, and explained its mount ownership. Shared RBD identity,
 grouping and safe attachment-aware navigation remain open in
 [volume issue #13](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues/13).
+
+cf.36 checks driver-reported attachment metadata before workspace helper access.
+Global plugin volumes reporting no local mountpoint fail promptly, including
+cached-helper and fresh-create paths; unused local volumes remain accessible.
+The user's inactive normalizer-state entry on swarm03 was read-only verified
+as attached only on swarm04. No inactive RBD mount was attempted. The guard
+does not discover backend identity or automatically route to another agent;
+shared grouping/navigation and broader RBD acceptance remain #13/#14/#33.
 
 ## Native Docker resources and onboarding
 
