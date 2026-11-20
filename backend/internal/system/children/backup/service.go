@@ -412,7 +412,20 @@ func (s *Service) recoveryKey(ctx context.Context, supplied string) (string, err
 	return key, nil
 }
 
+func (s *Service) systemRecoveryError() error {
+	if s.config.ControlPlane {
+		return common.Classify(common.ErrConflict, errors.New("system recovery snapshots are unavailable on a control plane"))
+	}
+	if !strings.HasPrefix(s.config.DatabaseURL, "file:") {
+		return common.Classify(common.ErrConflict, errors.New("arcane system recovery currently requires the SQLite database provider"))
+	}
+	return nil
+}
+
 func (s *Service) CreateBackup(ctx context.Context, user types.Actor, trigger string, request types.CreateSystemBackupRequest) (*types.SystemBackupRun, error) {
+	if err := s.systemRecoveryError(); err != nil {
+		return nil, err
+	}
 	lease, err := s.acquireRun(ctx)
 	if err != nil {
 		return nil, err
@@ -426,8 +439,8 @@ func (s *Service) CreateBackup(ctx context.Context, user types.Actor, trigger st
 }
 
 func (s *Service) prepareBackup(ctx context.Context, trigger string, request types.CreateSystemBackupRequest) (*preparedSystemBackup, error) {
-	if !strings.HasPrefix(s.config.DatabaseURL, "file:") {
-		return nil, errors.New("arcane system recovery currently requires the SQLite database provider")
+	if err := s.systemRecoveryError(); err != nil {
+		return nil, err
 	}
 	recoveryKey, err := s.recoveryKey(ctx, request.RecoveryKey)
 	if err != nil {
@@ -1087,6 +1100,9 @@ func (s *Service) UploadBackup(ctx context.Context, id string, request types.Upl
 }
 
 func (s *Service) RestoreBackup(ctx context.Context, id, recoveryKey string) (opErr error) {
+	if err := s.systemRecoveryError(); err != nil {
+		return err
+	}
 	ctx, finish := s.startOperation(ctx, "restore", attribute.String("arcane.backup.id", id))
 	defer func() { finish(opErr) }()
 	lease, err := s.acquireRun(ctx)
@@ -1423,8 +1439,9 @@ func (s *Service) GetPolicies(ctx context.Context) (*types.SystemBackupPolicyCol
 		})
 	}
 	return &types.SystemBackupPolicyCollection{
-		Policies:          decorated,
-		RecoveryKeyStored: configured,
+		Policies:           decorated,
+		RecoveryKeyStored:  configured,
+		ExecutionSupported: s.systemRecoveryError() == nil,
 	}, nil
 }
 
@@ -1438,11 +1455,18 @@ func (s *Service) UpdatePolicies(ctx context.Context, updates []types.UpdateBack
 		if normalizeErr != nil {
 			return normalizeErr
 		}
-		if normalized.Enabled && !configured {
-			return errors.New("configure a recovery key before enabling scheduled system backups")
-		}
-		if normalized.Enabled && !strings.HasPrefix(s.config.DatabaseURL, "file:") {
-			return errors.New("scheduled system backups require the SQLite database provider")
+		if normalized.Enabled {
+			if supportErr := s.systemRecoveryError(); supportErr != nil {
+				// Collection updates include untouched policies; retain those without admitting an enable or edit.
+				if policy.Enabled && normalized.Schedule == policy.Schedule && normalized.RetentionCount == policy.RetentionCount &&
+					normalized.LocalEnabled == policy.LocalEnabled && normalized.S3Enabled == policy.S3Enabled && normalized.S3DestinationID == policy.S3DestinationID {
+					return nil
+				}
+				return supportErr
+			}
+			if !configured {
+				return errors.New("configure a recovery key before enabling scheduled system backups")
+			}
 		}
 		*policy = types.SystemBackupPolicy{ //exhaustruct:enforce
 			ID:                policy.ID,
@@ -1576,7 +1600,7 @@ func (s *Service) rescheduleSystemBackupPolicy(ctx context.Context, policy *type
 	if s.config.AgentEnabled {
 		return
 	}
-	if !policy.Enabled {
+	if !policy.Enabled || s.systemRecoveryError() != nil {
 		s.jobs.Unregister(ctx, policy.ID)
 		return
 	}
@@ -1621,7 +1645,7 @@ func (s *Service) RegisterBackupJobOnStartup(ctx context.Context) {
 		s.rescheduleSystemBackupPolicy(ctx, &policies[i])
 	}
 	volumePolicyCount := s.volumes.RegisterJobsOnStartup(ctx)
-	slog.InfoContext(ctx, "Registered backup schedules", "systemPolicies", len(policies), "volumePolicies", volumePolicyCount)
+	slog.InfoContext(ctx, "Loaded backup policies", "systemPolicies", len(policies), "volumePolicies", volumePolicyCount)
 }
 
 func (s *Service) applyRetention(ctx context.Context, policyID string, keep int, includeRemote bool) error {
@@ -1677,6 +1701,9 @@ func (s *Service) pruneUnmanagedRuns(ctx context.Context) error {
 func (s *Service) StartBackup(ctx context.Context, user types.Actor, request types.CreateSystemBackupRequest) (*types.SystemBackupRun, error) {
 	requester := backup.NewRequester(ctx, user, "0", authz.PermSystemBackupsCreate)
 	if err := s.engine.Authorize(ctx, requester); err != nil {
+		return nil, err
+	}
+	if err := s.systemRecoveryError(); err != nil {
 		return nil, err
 	}
 	if s.config.AgentEnabled && request.ID != "" {

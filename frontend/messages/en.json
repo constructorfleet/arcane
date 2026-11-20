@@ -4719,5 +4719,6 @@
   "credentials_and_repository_browsing": "Configure registry access and browse remote repositories here. Image Pull and Push run on the selected agent.",
   "repository_path_explanation": "Enter project/image without a hostname or tag. Access to a known repository can work even when catalog listing is denied or unsupported.",
   "private_image_pull_credentials_hint": "Enable for private images. Docker forwards matching saved registry credentials to the Swarm workers that pull them.",
-  "choose_role_and_scope_for_each_assignment": "Choose a role and scope for each assignment."
+  "choose_role_and_scope_for_each_assignment": "Choose a role and scope for each assignment.",
+  "system_backups_execution_unsupported": "System recovery snapshots are unavailable for this instance. Stored system policies and history are retained; new system recovery jobs cannot run. Volume backup operations use the selected agents."
 }

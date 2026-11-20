@@ -98,8 +98,9 @@ type (
 	}
 
 	SystemBackupPolicyCollection struct {
-		Policies          []SystemBackupPolicy `json:"policies"`
-		RecoveryKeyStored bool                 `json:"recoveryKeyStored"`
+		Policies           []SystemBackupPolicy `json:"policies"`
+		RecoveryKeyStored  bool                 `json:"recoveryKeyStored"`
+		ExecutionSupported bool                 `json:"executionSupported"`
 	}
 
 	UpdateSystemBackupPolicies struct {

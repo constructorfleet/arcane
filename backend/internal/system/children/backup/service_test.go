@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json/v2"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/libtnb/sqlite"
@@ -14,6 +15,7 @@ import (
 	"kit.getarcane.app/sys/crypto"
 
 	backupengine "getarcane.dev/arcane/v3/internal/backup"
+	"getarcane.dev/arcane/v3/internal/common"
 	"getarcane.dev/arcane/v3/internal/config"
 	"getarcane.dev/arcane/v3/internal/database"
 	"getarcane.dev/arcane/v3/internal/docker"
@@ -73,6 +75,60 @@ func TestHistoryDestinationDecoration(t *testing.T) {
 	history, _, err = service.ListBackupHistory(t.Context(), pagination.QueryParams{})
 	require.NoError(t, err)
 	require.Empty(t, history[0].S3DestinationName)
+
+	require.NoError(t, db.AutoMigrate(&s3.S3Destination{}, &backupengine.SystemBackupRecoveryConfig{}))
+	stored := []types.SystemBackupPolicy{
+		{ID: "one", Enabled: true, Schedule: "0 3 * * *", RetentionCount: 3, LocalEnabled: true},
+		{ID: "two", Enabled: true, Schedule: "0 4 * * *", RetentionCount: 3, LocalEnabled: true},
+	}
+	metadataService := NewService(Dependencies{
+		Config:         &config.Config{ControlPlane: true, DatabaseURL: "file:test.db"},
+		RecoveryKeys:   backupengine.NewRecoveryKeyStore(store),
+		S3Destinations: s3.NewS3DestinationService(store, func(context.Context, string) error { return nil }),
+		Store: Store{
+			Policies:        func(context.Context) ([]types.SystemBackupPolicy, error) { return slices.Clone(stored), nil },
+			LatestPolicyRun: func(context.Context, string) (*types.SystemBackupRun, error) { return nil, nil },
+			ReconcilePolicies: func(ctx context.Context, updates []types.UpdateBackupPolicy,
+				build func(context.Context, *types.SystemBackupPolicy, types.UpdateBackupPolicy) error,
+				_ func(context.Context, string), _ func(context.Context, *types.SystemBackupPolicy),
+			) error {
+				next := slices.Clone(stored)
+				for _, update := range updates {
+					index := slices.IndexFunc(next, func(policy types.SystemBackupPolicy) bool { return policy.ID == update.ID })
+					if index < 0 {
+						next = append(next, types.SystemBackupPolicy{ID: update.ID})
+						index = len(next) - 1
+					}
+					if buildErr := build(ctx, &next[index], update); buildErr != nil {
+						return buildErr
+					}
+				}
+				stored = next
+				return nil
+			},
+		},
+	})
+	updates := []types.UpdateBackupPolicy{
+		{ID: "one", Enabled: false, Schedule: "0 3 * * *", RetentionCount: 3, LocalEnabled: true},
+		{ID: "two", Enabled: true, Schedule: "0 4 * * *", RetentionCount: 3, LocalEnabled: true},
+	}
+	collection, err := metadataService.UpdatePolicies(t.Context(), updates)
+	require.NoError(t, err)
+	require.False(t, collection.ExecutionSupported)
+	require.False(t, stored[0].Enabled)
+	require.True(t, stored[1].Enabled)
+	for _, update := range []types.UpdateBackupPolicy{
+		{ID: "one", Enabled: true, Schedule: "0 3 * * *", RetentionCount: 3, LocalEnabled: true},
+		{ID: "two", Enabled: true, Schedule: "0 5 * * *", RetentionCount: 3, LocalEnabled: true},
+		{ID: "new", Enabled: true, Schedule: "0 3 * * *", RetentionCount: 3, LocalEnabled: true},
+	} {
+		_, err = metadataService.UpdatePolicies(t.Context(), []types.UpdateBackupPolicy{update})
+		require.ErrorIs(t, err, common.ErrConflict)
+		require.Len(t, stored, 2)
+		require.False(t, stored[0].Enabled)
+		require.True(t, stored[1].Enabled)
+		require.Equal(t, "0 4 * * *", stored[1].Schedule)
+	}
 }
 
 func TestBackupWorkflowDefinitions(t *testing.T) {
@@ -80,6 +136,56 @@ func TestBackupWorkflowDefinitions(t *testing.T) {
 	require.NoError(t, NewService(Dependencies{}).RegisterWorkflows(harness.Engine, nil))
 	harness.Start(t)
 	flowtest.AssertDefinitions(t, harness)
+
+	cases := []struct {
+		name         string
+		databaseURL  string
+		controlPlane bool
+		agent        bool
+		unsupported  bool
+	}{
+		{name: "standalone SQLite", databaseURL: "file:test.db"},
+		{name: "agent SQLite", databaseURL: "file:test.db", agent: true},
+		{name: "control plane", databaseURL: "file:test.db", controlPlane: true, unsupported: true},
+		{name: "other provider", databaseURL: "postgres://unused", unsupported: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			authorized := 0
+			engine := backupengine.NewEngine(nil, nil, func(context.Context, types.BackupRequester) error {
+				authorized++
+				return nil
+			})
+			service := NewService(Dependencies{
+				Config: &config.Config{DatabaseURL: tc.databaseURL, ControlPlane: tc.controlPlane, AgentEnabled: tc.agent},
+				Engine: engine,
+			})
+			if !tc.unsupported {
+				require.NoError(t, service.systemRecoveryError())
+				return
+			}
+			require.ErrorIs(t, service.systemRecoveryError(), common.ErrConflict)
+			// Unset admission, stores, recovery keys and Docker clients must never be reached.
+			run, err := service.CreateBackup(t.Context(), types.SystemUser, types.SystemBackupTriggerManual, types.CreateSystemBackupRequest{})
+			require.ErrorIs(t, err, common.ErrConflict)
+			require.Nil(t, run)
+			run, err = service.StartBackup(t.Context(), types.SystemUser, types.CreateSystemBackupRequest{})
+			require.ErrorIs(t, err, common.ErrConflict)
+			require.Nil(t, run)
+			require.Equal(t, 1, authorized)
+			prepared, err := service.prepareBackup(t.Context(), types.SystemBackupTriggerSafety, types.CreateSystemBackupRequest{})
+			require.ErrorIs(t, err, common.ErrConflict)
+			require.Nil(t, prepared)
+			require.ErrorIs(t, service.RestoreBackup(t.Context(), "not-read", "not-used"), common.ErrConflict)
+		})
+	}
+	denied := errors.New("authorization denied")
+	service := NewService(Dependencies{
+		Config: &config.Config{ControlPlane: true},
+		Engine: backupengine.NewEngine(nil, nil, func(context.Context, types.BackupRequester) error { return denied }),
+	})
+	_, err := service.StartBackup(t.Context(), types.SystemUser, types.CreateSystemBackupRequest{})
+	require.ErrorIs(t, err, denied)
 }
 
 func TestRecoveryEnvironmentIncludesRuntimeSecrets(t *testing.T) {

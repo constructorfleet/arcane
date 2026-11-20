@@ -64,6 +64,7 @@
 	}));
 	const backups = $derived(backupsQuery.data ?? data.backups);
 	let policyCollection = $derived(data.policyCollection);
+	const systemExecutionUnsupported = $derived(policyCollection.executionSupported === false);
 	let systemVolumePolicyCollection = $derived(data.systemVolumePolicyCollection);
 	let systemVolumeOptions = $state<SystemVolumeBackupOption[]>([]);
 	let scheduleOpen = $state(false);
@@ -77,7 +78,9 @@
 	let actionOpen = $state(false);
 	let action = $state<'create' | 'restore' | 'upload' | 'delete' | 'discover'>('create');
 	let selected = $state<EnvironmentRow<SystemVolumeBackupHistoryEntry> | null>(null);
-	let backupType = $state<'system' | 'volume'>('system');
+	let backupType = $state<'system' | 'volume'>(
+		untrack(() => (data.policyCollection.executionSupported === false ? 'volume' : 'system'))
+	);
 	let backupConfiguration = $state('custom');
 	let destination = $state<SystemBackupDestination>('local');
 	let s3DestinationId = $state('');
@@ -109,7 +112,9 @@
 	const destinationOptions = $derived(backupDestinationOptions(data.destinations.length > 0));
 	const s3Options = $derived(s3DestinationOptions(data.destinations));
 	const backupTypeOptions = $derived([
-		{ label: m.system(), value: 'system', description: m.system_backups_type_system_description() },
+		...(systemExecutionUnsupported
+			? []
+			: [{ label: m.system(), value: 'system', description: m.system_backups_type_system_description() }]),
 		{ label: m.resource_volume_cap(), value: 'volume', description: m.system_backups_type_volume_description() }
 	]);
 	const configurationOptions = $derived([
@@ -152,12 +157,17 @@
 			? m.volume_backup_s3_destination_required()
 			: ''
 	);
-	const invalid = $derived(Boolean(actionKeyInvalid || destinationError));
+	const invalid = $derived(
+		Boolean(
+			actionKeyInvalid || destinationError || (action === 'create' && backupType === 'system' && systemExecutionUnsupported)
+		)
+	);
 
 	function openSchedule(type: 'system' | 'volume' = 'system', id?: string) {
 		scheduleSession += 1;
-		if (type === 'volume') void loadSystemVolumeOptions();
-		scheduleType = type;
+		const chosenType = !id && type === 'system' && systemExecutionUnsupported ? 'volume' : type;
+		if (chosenType === 'volume') void loadSystemVolumeOptions();
+		scheduleType = chosenType;
 		editingScheduleId = id;
 		scheduleOpen = true;
 	}
@@ -239,7 +249,8 @@
 	function openAction(next: typeof action, backup: EnvironmentRow<SystemVolumeBackupHistoryEntry> | null = null) {
 		action = next;
 		selected = backup;
-		backupType = 'system';
+		backupType = next === 'create' && systemExecutionUnsupported ? 'volume' : 'system';
+		if (next === 'create' && backupType === 'volume') void loadSystemVolumeOptions();
 		backupConfiguration = 'custom';
 		destination = 'local';
 		stopContainers = false;
@@ -894,6 +905,12 @@
 	{#snippet mainContent()}
 		<div class="space-y-8">
 			{@render recoveryKeySummary()}
+			{#if systemExecutionUnsupported}
+				<Alert.Root>
+					<InfoIcon class="size-4" />
+					<Alert.Description>{m.system_backups_execution_unsupported()}</Alert.Description>
+				</Alert.Root>
+			{/if}
 
 			<SettingsSection title={m.system_backups_schedules()} variant="plain">
 				{#if policyCollection.policies.length || systemVolumePolicyCollection.policies.length}
@@ -966,6 +983,7 @@
 					systemPolicies={policyCollection.policies}
 					volumePolicies={systemVolumePolicyCollection.policies}
 					recoveryKeyStored={policyCollection.recoveryKeyStored}
+					executionSupported={policyCollection.executionSupported}
 					destinations={data.destinations}
 					volumeOptions={systemVolumeOptions}
 					volumeOptionsLoading={systemVolumeOptionsLoading}

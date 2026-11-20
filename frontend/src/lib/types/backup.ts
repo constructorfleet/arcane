@@ -74,6 +74,7 @@ export type UpdateBackupPolicy = {
 export type SystemBackupPolicyCollection = {
 	policies: SystemBackupPolicy[];
 	recoveryKeyStored: boolean;
+	executionSupported?: boolean;
 };
 
 export type SystemBackupRecoveryKey = {

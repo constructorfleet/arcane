@@ -27,6 +27,7 @@
 		systemPolicies,
 		volumePolicies,
 		recoveryKeyStored,
+		executionSupported,
 		destinations,
 		volumeOptions,
 		volumeOptionsLoading,
@@ -40,6 +41,7 @@
 		systemPolicies: SystemBackupPolicy[];
 		volumePolicies: SystemVolumeBackupPolicy[];
 		recoveryKeyStored: boolean;
+		executionSupported?: boolean;
 		destinations: S3Destination[];
 		volumeOptions: SystemVolumeBackupOption[];
 		volumeOptionsLoading: boolean;
@@ -55,9 +57,17 @@
 	let volumeNames = $state<string[]>([...(initialVolumePolicy?.volumeNames ?? [])]);
 	let ignoreAnonymous = $state(initialVolumePolicy?.ignoreAnonymous ?? true);
 	const typeOptions = $derived([
-		{ label: m.system(), value: 'system', description: m.system_backups_type_system_description() },
+		...(executionSupported === false && !editing
+			? []
+			: [{ label: m.system(), value: 'system', description: m.system_backups_type_system_description() }]),
 		{ label: m.resource_volume_cap(), value: 'volume', description: m.system_backups_type_volume_description() }
 	]);
+
+	const systemEnabledError = $derived.by(() => {
+		if (executionSupported === false) return m.system_backups_execution_unsupported();
+		if (!recoveryKeyStored) return m.system_backups_recovery_key_schedule_required();
+		return null;
+	});
 
 	function changeType(value: string) {
 		if (editing) return;
@@ -133,9 +143,9 @@
 		addTitle={m.system_backups_add_schedule()}
 		description={m.system_backups_schedule_type_description()}
 		enabledDescription={m.system_backups_enabled_description()}
-		enabledError={recoveryKeyStored ? null : m.system_backups_recovery_key_schedule_required()}
+		enabledError={systemEnabledError}
 		defaultSchedule="0 3 * * *"
-		defaultEnabled={recoveryKeyStored}
+		defaultEnabled={recoveryKeyStored && executionSupported !== false}
 		{destinations}
 		beforeFields={TypeField}
 		updatePolicies={updateSystemPolicies}
