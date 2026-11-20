@@ -3,7 +3,7 @@
 		hostIp: string;
 		hostPort: string;
 		containerPort: string;
-		protocol: 'tcp' | 'udp';
+		protocol: 'tcp' | 'udp' | 'sctp';
 	};
 </script>
 
@@ -53,6 +53,7 @@
 		<select bind:value={row.protocol} {disabled} class="min-w-16 rounded-md border bg-background px-3 py-2 text-sm">
 			<option value="tcp">{m.protocol_tcp()}</option>
 			<option value="udp">{m.protocol_udp()}</option>
+			<option value="sctp">{m.protocol_sctp()}</option>
 		</select>
 	{/snippet}
 </RowListEditor>

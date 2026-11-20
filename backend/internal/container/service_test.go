@@ -696,25 +696,41 @@ func TestApplyEditRecomputesExposedPorts(t *testing.T) {
 	cfg := container.Config{
 		ExposedPorts: network.PortSet{
 			network.MustParsePort("80/tcp"):   {},
+			network.MustParsePort("80/udp"):   {},
+			network.MustParsePort("80/sctp"):  {},
 			network.MustParsePort("9000/tcp"): {},
 		},
 	}
 	hc := container.HostConfig{
-		PortBindings: network.PortMap{network.MustParsePort("80/tcp"): {{HostPort: "8080"}}},
+		PortBindings: network.PortMap{
+			network.MustParsePort("80/tcp"):  {{HostPort: "8080"}},
+			network.MustParsePort("80/udp"):  {{HostPort: "8080"}},
+			network.MustParsePort("80/sctp"): {{HostPort: "8080"}},
+		},
 	}
 
-	newBindings := map[string][]types.ContainerPortBindingCreate{"443/tcp": {{HostPort: "8443"}}}
+	newBindings := map[string][]types.ContainerPortBindingCreate{
+		"443/tcp":  {{HostIP: "127.0.0.1", HostPort: "8443"}},
+		"443/udp":  {{HostIP: "127.0.0.1", HostPort: "8443"}},
+		"443/sctp": {{HostIP: "127.0.0.1", HostPort: "8443"}},
+	}
 	req := types.ContainerEdit{HostConfig: &types.ContainerHostConfigEdit{PortBindings: &newBindings}}
 
 	cfg, err := applyEditToContainerConfig(cfg, hc.PortBindings, req)
 	require.NoError(t, err)
 	require.NoError(t, applyEditToHostConfig(&hc, req))
 
-	// new binding key + previously-exposed-but-unbound port survive; the old bound port is gone
-	require.Contains(t, cfg.ExposedPorts, network.MustParsePort("443/tcp"))
+	// Each protocol stays distinct; the previously exposed but unbound port survives.
+	require.Len(t, cfg.ExposedPorts, 4)
+	require.Len(t, hc.PortBindings, 3)
+	for _, protocol := range []network.IPProtocol{network.TCP, network.UDP, network.SCTP} {
+		oldPort := network.MustParsePort("80/" + string(protocol))
+		newPort := network.MustParsePort("443/" + string(protocol))
+		require.Contains(t, cfg.ExposedPorts, newPort)
+		require.NotContains(t, cfg.ExposedPorts, oldPort)
+		require.Equal(t, []network.PortBinding{{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: "8443"}}, hc.PortBindings[newPort])
+	}
 	require.Contains(t, cfg.ExposedPorts, network.MustParsePort("9000/tcp"))
-	require.NotContains(t, cfg.ExposedPorts, network.MustParsePort("80/tcp"))
-	require.Contains(t, hc.PortBindings, network.MustParsePort("443/tcp"))
 }
 
 func TestApplyEditHostname(t *testing.T) {

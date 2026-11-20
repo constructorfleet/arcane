@@ -199,12 +199,13 @@ function portRowsFromEditConfig(cfg: ContainerEditConfig): PortMappingRow[] {
 	const ports: PortMappingRow[] = [];
 	for (const [portSpec, bindings] of Object.entries(cfg.hostConfig.portBindings ?? {})) {
 		const [portPart, protocolPart] = portSpec.split('/');
+		const protocol = protocolPart === 'udp' || protocolPart === 'sctp' ? protocolPart : 'tcp';
 		for (const binding of bindings) {
 			ports.push({
 				hostIp: binding.hostIp ?? '',
 				hostPort: binding.hostPort ?? '',
 				containerPort: portPart ?? '',
-				protocol: protocolPart === 'udp' ? 'udp' : 'tcp'
+				protocol
 			});
 		}
 	}

@@ -1,6 +1,6 @@
-# 3.0.1-cf.59
+# 3.0.1-cf.60
 
-- Preserve exact untouched native healthcheck timings when editing an existing custom healthcheck (#138 / #28 / #125). The container form sends only changed whole-second settings, retries or Test through a purpose-specific partial update contract.
-- Keep the existing full-replacement/create API and inherit/disable/new-custom paths. Partial updates reject replacement/reset conflicts, invalid values and missing/disabled custom targets; omitted fields and Test slices are preserved without mutating inspected input.
+- Preserve SCTP port mappings during standalone container edits instead of silently changing them to TCP (#139 / #28). Mixed TCP, UDP and SCTP bindings on the same numeric port stay distinct.
+- Offer SCTP alongside TCP and UDP in the shared port editor used by container and pod forms; retain host IP/port values and explicit protocol changes or removal.
 
-This fixes preservation during another field’s edit; it does not add fractional-duration authoring or exact fractional display. Native Docker constraints remain authoritative. Source/isolated checks do not establish live recreation, scheduler execution or cleanup acceptance.
+This fixes form/API fidelity. It does not claim live SCTP packet flow, listeners or host-kernel support. Runtime verification uses owned resources or canceled drafts only; no production port mapping is changed for QA.

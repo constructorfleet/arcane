@@ -4743,5 +4743,6 @@
   "static_ipv6_address": "Static IPv6 address",
   "container_network_link_local_addresses": "Link-local IP addresses",
   "container_network_link_local_hint": "Comma-separated addresses. Leave blank to clear this list.",
-  "container_network_static_ip_hint": "Leave static addresses blank to use the selected network's defaults."
+  "container_network_static_ip_hint": "Leave static addresses blank to use the selected network's defaults.",
+  "protocol_sctp": "SCTP"
 }
