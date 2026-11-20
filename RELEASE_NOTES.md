@@ -1,8 +1,9 @@
-# 3.0.1-cf.68
+# 3.0.1-cf.69
 
-- Stop container update activity from reading a departed page's missing container during navigation (#150, upstream #4925). Keep the canonical Docker container ID, including when the URL uses a short ID or name.
-- Ignore refreshes after the view unmounts or loses its container, and discard delayed replies after its agent or container changes.
+- Remove saved image-update checks for the exact deleted project in the existing project-metadata transaction (#167). Other project, global image, container and reference checks remain intact.
+- The shared deletion helper also covers existing filesystem reconciliation and failed-create rollback callers. No new lifecycle service, schema migration or legacy-orphan purge is introduced.
+- Reconcile the checklist with verified cf.67 revision retention and cf.68 unchanged-source Save acceptance (#147/#144); full project-route QA remains #150.
 
-Validation: a client DOM check using the pinned SvelteKit root, actual update tracker and the owning callback/teardown reproduces the pre-flush callback failure before the change. The corrected callback handles that transition and preserves same-component navigation. Isolated checks also cover canonical-ID aliases and delayed refresh replies. Full repository checks and release acceptance are recorded in the PR.
+Validation: extended existing project-destruction coverage reproduces two orphaned check rows on canonical cf.68. The correction removes those rows, preserves four unrelated scopes, rolls project/check deletion back on transaction failure, and retains checks/files/project state after failed Compose down. Focused owning checks pass; full format/lint, owning-package checks and release validation are recorded in the PR.
 
-The lifecycle check uses a page subset and synthetic navigation parent. Complete router loader/error-boundary behavior and the full live project Files → Updates → Container sequence remain separate acceptance work; this release does not claim the complete upstream report is resolved.
+No live project was created to reproduce this finding, and no production database cleanup was performed. Release/runtime and live owned-project lifecycle acceptance remain pending. Existing orphaned records are not purged; the rollback check covers database metadata.

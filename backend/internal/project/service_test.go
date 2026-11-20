@@ -465,13 +465,65 @@ func TestProjectService_DestroyProject_RemovesFilesWhenRequested(t *testing.T) {
 		Status:  ProjectStatusStopped,
 	}
 	require.NoError(t, db.Create(project).Error)
+	require.NoError(t, db.Create(&Project{
+		ID:     "project-destroy-unrelated",
+		Name:   "unrelated",
+		Path:   filepath.Join(projectsDir, "unrelated"),
+		Status: ProjectStatusStopped,
+	}).Error)
+	checks := []imageupdate.ImageUpdateRecord{
+		{ID: "project::" + project.ID + "::app", ProjectID: project.ID, ServiceName: "app"},
+		{ID: "project::" + project.ID + "::worker", ProjectID: project.ID, ServiceName: "worker"},
+		{ID: "project::project-destroy-unrelated::app", ProjectID: "project-destroy-unrelated", ServiceName: "app"},
+		{ID: "global-image-check", ImageID: "global-image"},
+		{ID: "container::unrelated-container", ContainerID: "unrelated-container"},
+		{ID: "ref::example.invalid/unrelated:latest"},
+	}
+	require.NoError(t, db.Create(&checks).Error)
 
 	require.NoError(t, svc.DestroyProject(ctx, project.ID, DestroyOptions{
 		RemoveFiles: true,
 	}, types.Actor{}))
 
 	_, statErr := os.Stat(projectPath)
-	assert.ErrorIs(t, statErr, os.ErrNotExist)
+	require.ErrorIs(t, statErr, os.ErrNotExist)
+	var remainingProjectChecks int64
+	require.NoError(t, db.Model(&imageupdate.ImageUpdateRecord{}).Where("project_id = ?", project.ID).Count(&remainingProjectChecks).Error)
+	assert.Zero(t, remainingProjectChecks)
+	var remainingCheckIDs []string
+	require.NoError(t, db.Model(&imageupdate.ImageUpdateRecord{}).Where("project_id <> ?", project.ID).Pluck("id", &remainingCheckIDs).Error)
+	assert.ElementsMatch(t, []string{
+		"project::project-destroy-unrelated::app",
+		"global-image-check",
+		"container::unrelated-container",
+		"ref::example.invalid/unrelated:latest",
+	}, remainingCheckIDs)
+	var remainingProject Project
+	require.NoError(t, db.First(&remainingProject, "id = ?", "project-destroy-unrelated").Error)
+
+	t.Run("transaction rollback preserves project checks", func(t *testing.T) {
+		rollbackProject := Project{
+			ID:     "project-destroy-rollback",
+			Name:   "rollback",
+			Path:   filepath.Join(projectsDir, "rollback"),
+			Status: ProjectStatusStopped,
+		}
+		require.NoError(t, db.Create(&rollbackProject).Error)
+		check := imageupdate.ImageUpdateRecord{ID: "project::" + rollbackProject.ID + "::app", ProjectID: rollbackProject.ID, ServiceName: "app"}
+		require.NoError(t, db.Create(&check).Error)
+		abort := errors.New("abort project deletion transaction")
+		require.ErrorIs(t, db.Transaction(func(tx *gorm.DB) error {
+			if err := deleteProjectWithTags(tx, rollbackProject.ID); err != nil {
+				return err
+			}
+			return abort
+		}), abort)
+		var storedProject Project
+		require.NoError(t, db.First(&storedProject, "id = ?", rollbackProject.ID).Error)
+		var storedCheck imageupdate.ImageUpdateRecord
+		require.NoError(t, db.First(&storedCheck, "id = ?", check.ID).Error)
+		assert.Equal(t, rollbackProject.ID, storedCheck.ProjectID)
+	})
 }
 
 func TestProjectService_DestroyProject_PreservesFilesWhenRequested(t *testing.T) {
@@ -553,6 +605,12 @@ func TestProjectService_DestroyProject_KeepsRowWhenDownFails(t *testing.T) {
 		Path:    projectPath,
 		Status:  ProjectStatusRunning,
 	}).Error)
+	check := imageupdate.ImageUpdateRecord{
+		ID:          "project::project-destroy-down-fails::app",
+		ProjectID:   "project-destroy-down-fails",
+		ServiceName: "app",
+	}
+	require.NoError(t, db.Create(&check).Error)
 
 	require.Error(t, svc.DestroyProject(ctx, "project-destroy-down-fails", DestroyOptions{
 		RemoveFiles:   true,
@@ -563,6 +621,9 @@ func TestProjectService_DestroyProject_KeepsRowWhenDownFails(t *testing.T) {
 	require.NoError(t, db.First(&stored, "id = ?", "project-destroy-down-fails").Error)
 	assert.Equal(t, ProjectStatusRunning, stored.Status)
 	assert.DirExists(t, projectPath)
+	var storedCheck imageupdate.ImageUpdateRecord
+	require.NoError(t, db.First(&storedCheck, "id = ?", check.ID).Error)
+	assert.Equal(t, check.ProjectID, storedCheck.ProjectID)
 }
 
 func TestProjectService_GetProjectFromDatabaseByID(t *testing.T) {

@@ -153,6 +153,7 @@ control-plane/global-agent architecture before being marked complete.
 - [ ] CMP-06 — Keep GUI editing and YAML editing consistent, and warn when an edit cannot preserve a document feature.
 - [ ] CMP-07 — Preserve source Compose, associated files, deployment history, and enough provenance to explain live drift.
 - [x] CMP-08 — Launch standalone containers from the UI through an explicitly selected node agent. cf.23 owned swarm03 launch and native command/resource/security settings matched; cf.26 also accepted 0.1 CPU creation and 0.25 CPU editing with exact native NanoCPUs (#69 closed).
+- [x] CMP-09 — Preserve full current native service Spec, resource IDs, network and source bytes/permissions on an unchanged-source UI Save. cf.68 owned zero-task acceptance passed (#144); general Compose and running-consumer round trips remain open.
 
 Status: cf.23 owned Swarm stack create/Edit/Save passed through explicitly selected
 swarm03. Original anchor/merge and synthetic `.env` input survived Source refresh;
@@ -167,7 +168,7 @@ must be surfaced rather than silently ignored.
 
 ## Configs, secrets, and reusable inputs
 
-cf.67 retains desired config/secret revisions and all current, rollback and retained-task dependencies during automatic cleanup; failed reference inventory defers removal. The existing fake-Docker SDK business coverage reproduces the prior cleanup loss and verifies retention/error cases. Source checks pass; live owned revision/rollback acceptance remains pending under #147/#144. Explicit stack removal remains separate.
+cf.67 retains desired config/secret revisions and all current, rollback and retained-task dependencies during automatic cleanup; failed reference inventory defers removal. Owning SDK coverage and live zero-task A→B PreviousSpec retention passed (#147). On cf.68, an actual unchanged-source Edit→Save preserved the complete service Spec, resource IDs, raw network and source bytes/permissions (#144). Both owned fixtures were cleaned up normally. The first fixture's external agent reference/task churn remains #166; all19 core Specs/task IDs stayed unchanged during the separate cf.68 fixture. No live rollback, running-consumer rotation or secret plaintext readback is claimed.
 
 - [ ] SEC-01 — Create Docker configs in the UI and inspect their content and usage.
 - [ ] SEC-02 — Create Docker secrets in the UI and inspect metadata and consumers.
@@ -177,6 +178,7 @@ cf.67 retains desired config/secret revisions and all current, rollback and reta
 - [ ] SEC-06 — Reference shared values from multiple stacks without copying plaintext into each Compose document.
 - [ ] SEC-07 — Read and edit authorized variable values while keeping secret values out of ordinary logs, metrics, diffs, and exports.
 - [ ] SEC-08 — Preview which stacks a shared-value change affects and select which deployments to update.
+- [x] SEC-09 — Retain referenced config/secret revisions and defer automatic removal on incomplete reference inventory. cf.67 owning checks and live rollback-reference retention passed; broader rotation and reusable-input scope remain open.
 
 Status: native config/secret counts, two next-page transitions and config name
 sorting passed a read-only cf.19/cf.20 inventory check. UI creation through swarm03
