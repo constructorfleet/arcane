@@ -1,6 +1,7 @@
-# 3.0.1-cf.40
+# 3.0.1-cf.41
 
-- Keep Docker-dependent vulnerability scan and risk jobs on node agents and legacy Docker-enabled managers. Control-plane startup reconciles away their old schedules, and settings changes cannot register them again (#97).
-- Reject accidental node-local risk computation on the control plane with a classified conflict instead of attempting to use a missing Docker socket. Agent aggregation and failed-environment coverage remain available.
+- Explain standard Docker/OCI registry host and namespace URLs, explicit docker.io, and password/access-token/robot-secret credentials (#99).
+- Clarify optional known repository names, replace the misleading /api example with project/image, and label the manual repository input. Explain that repository access can work when global catalog listing is denied or unsupported.
+- Explain that registry browsing uses the remote registry while image Pull/Push use the selected agent. Clarify private Swarm image credential forwarding with the label Send registry credentials to Swarm and an adjacent help text.
 
-Existing job-subscription and risk-aggregation business cases exercise control-plane and Docker-enabled modes. Required formatting, lint and CI results are recorded in the fixing PR. Release publication and normal deployment are separate from runtime acceptance: verify manager job metadata and agent coverage after rollout. No production scan or job is triggered by the isolated tests. This corrects these vulnerability jobs; other Docker-dependent background jobs and broader authorization acceptance are outside this change.
+Credential storage, authorization, repository access and deployment behavior are unchanged. Swarm credential forwarding remains opt-in and false by default. Production frontend build, required formatting/lint and exact-head CI are recorded in the fixing PR; post-release UI checks inspect the guidance without submitting credentials or changing registry permissions. Provider-neutral runtime acceptance remains separately tracked in #40.

@@ -141,6 +141,7 @@
 		<SelectWithLabel
 			id="registryTypeSelect"
 			label={m.registries_type_label()}
+			description={m.credentials_and_repository_browsing()}
 			options={registryTypeOptions}
 			bind:value={form.inputs.registryType.value}
 			disabled={isEditMode}
@@ -162,7 +163,7 @@
 				bind:input={form.inputs.username}
 			/>
 			<FormInput
-				label={m.common_token()}
+				label={m.password_or_access_token()}
 				type="password"
 				placeholder={isEditMode ? m.registries_token_keep_placeholder() : m.registries_token_placeholder()}
 				description={m.registries_token_description()}

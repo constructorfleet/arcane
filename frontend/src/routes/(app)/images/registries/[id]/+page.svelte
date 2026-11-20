@@ -207,7 +207,8 @@
 				{:else}
 					<InputGroup.Input
 						name="query"
-						placeholder={m.registries_open_repository_placeholder({ namespace: registry.namespace })}
+						aria-label={m.repository_path()}
+						placeholder={m.registries_open_repository_placeholder({ namespace: registry.namespace || 'project' })}
 					/>
 				{/if}
 			</InputGroup.Root>
@@ -215,6 +216,10 @@
 				<ArcaneButton action="inspect" type="submit" customLabel={m.registries_open_repository()} />
 			{/if}
 		</form>
+
+		{#if !data.catalog}
+			<p class="text-sm text-muted-foreground">{m.repository_path_explanation()}</p>
+		{/if}
 
 		{#if data.catalogError}
 			<Alert.Root variant="warning-subtle" size="sm" icon={AlertIcon}>

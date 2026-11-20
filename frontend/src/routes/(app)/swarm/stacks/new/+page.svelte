@@ -440,13 +440,20 @@
 								/>
 								<Label for="swarm-stack-prune" weight="normal">{m.swarm_stack_deploy_prune()}</Label>
 							</div>
-							<div class="flex items-center gap-2">
+							<div class="flex items-start gap-2">
 								<Checkbox
 									id="swarm-stack-registry-auth"
+									class="mt-0.5"
+									aria-describedby="swarm-stack-registry-auth-hint"
 									checked={deployOptions.withRegistryAuth}
 									onCheckedChange={(checked) => (deployOptions.withRegistryAuth = checked === true)}
 								/>
-								<Label for="swarm-stack-registry-auth" weight="normal">{m.swarm_stack_registry_auth()}</Label>
+								<div class="grid gap-1">
+									<Label for="swarm-stack-registry-auth" weight="normal">{m.swarm_stack_registry_auth()}</Label>
+									<p id="swarm-stack-registry-auth-hint" class="max-w-80 text-xs text-muted-foreground">
+										{m.private_image_pull_credentials_hint()}
+									</p>
+								</div>
 							</div>
 							<div class="flex min-w-56 items-center gap-2">
 								<Label for="swarm-stack-resolve-image" weight="normal" class="shrink-0">{m.swarm_stack_resolve_image()}</Label>
