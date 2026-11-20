@@ -1978,6 +1978,7 @@
   "registries_url_description": "Registry host, optionally with a namespace: registry.example.com or ghcr.io/team. Use docker.io for Docker Hub; Arcane adds API paths automatically.",
   "registries_token_keep_placeholder": "Leave empty to keep current token",
   "registries_token_placeholder": "Your registry password or token",
+  "registries_generic_credentials_description": "Leave username and password/token empty for anonymous public access. Otherwise provide both. When editing, an empty password/token keeps stored credentials.",
   "registries_token_description": "Registry password, personal access token, or robot account secret.",
   "registries_description_placeholder": "Optional description for this registry",
   "registries_enabled_description": "Enable this registry for authentication",

@@ -270,15 +270,15 @@ func (s *ContainerRegistryService) CreateRegistry(ctx context.Context, req types
 			return nil, common.Classify(common.ErrValidation, &types.FieldError{Field: "awsSecretAccessKey", Err: errors.New("AWS Secret Access Key is required")})
 		}
 	} else {
-		if strings.TrimSpace(req.Username) == "" {
-			return nil, common.Classify(common.ErrValidation, &types.FieldError{Field: "username", Err: errors.New("username is required")})
+		if strings.TrimSpace(req.Username) == "" && strings.TrimSpace(req.Token) != "" {
+			return nil, common.Classify(common.ErrValidation, &types.FieldError{Field: "username", Err: errors.New("username is required with a token")})
 		}
-		if strings.TrimSpace(req.Token) == "" {
+		if strings.TrimSpace(req.Username) != "" && strings.TrimSpace(req.Token) == "" {
 			return nil, common.Classify(common.ErrValidation, &types.FieldError{Field: "token", Err: errors.New("token is required")})
 		}
 	}
 
-	encryptedToken, err := crypto.Encrypt(kit.Ternary(registryType == RegistryTypeECR, "", req.Token))
+	encryptedToken, err := crypto.Encrypt(kit.Ternary(registryType == RegistryTypeECR || strings.TrimSpace(req.Token) == "", "", req.Token))
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt token: %w", err)
 	}
@@ -289,7 +289,7 @@ func (s *ContainerRegistryService) CreateRegistry(ctx context.Context, req types
 
 	registryRecord := &ContainerRegistry{
 		URL:                req.URL,
-		Username:           kit.Ternary(registryType == RegistryTypeECR, "", req.Username),
+		Username:           kit.Ternary(registryType == RegistryTypeECR, "", strings.TrimSpace(req.Username)),
 		Token:              encryptedToken,
 		Description:        req.Description,
 		Insecure:           req.Insecure,
@@ -341,7 +341,7 @@ func (s *ContainerRegistryService) UpdateRegistry(ctx context.Context, id string
 		),
 		kit.Ternary(registryRecord.RegistryType == RegistryTypeECR,
 			map[string]bool{"awsAccessKeyId": req.AWSAccessKeyID != "", "awsSecretAccessKey": req.AWSSecretAccessKey != ""},
-			map[string]bool{"token": req.Token != ""},
+			map[string]bool{"token": strings.TrimSpace(req.Token) != ""},
 		),
 	); targetErr != nil {
 		return nil, targetErr
@@ -370,11 +370,18 @@ func (s *ContainerRegistryService) UpdateRegistry(ctx context.Context, id string
 			req.AWSSecretAccessKey == "" && registryRecord.AWSSecretAccessKey == "" {
 			return nil, common.Classify(common.ErrValidation, &types.FieldError{Field: "awsSecretAccessKey", Err: errors.New("AWS Secret Access Key is required")})
 		}
-	} else if strings.TrimSpace(kit.Ternary(submitted["username"], req.Username, registryRecord.Username)) == "" {
-		return nil, common.Classify(common.ErrValidation, &types.FieldError{Field: "username", Err: errors.New("username is required")})
+	} else {
+		username := strings.TrimSpace(kit.Ternary(submitted["username"], req.Username, registryRecord.Username))
+		hasToken := strings.TrimSpace(req.Token) != "" || registryRecord.Token != ""
+		if username == "" && hasToken {
+			return nil, common.Classify(common.ErrValidation, &types.FieldError{Field: "username", Err: errors.New("username is required with a token; blank tokens keep existing credentials")})
+		}
+		if username != "" && !hasToken {
+			return nil, common.Classify(common.ErrValidation, &types.FieldError{Field: "token", Err: errors.New("token is required with a username")})
+		}
 	}
 
-	encryptedToken, err := crypto.Encrypt(kit.Ternary(registryRecord.RegistryType == RegistryTypeECR, "", req.Token))
+	encryptedToken, err := crypto.Encrypt(kit.Ternary(registryRecord.RegistryType == RegistryTypeECR || strings.TrimSpace(req.Token) == "", "", req.Token))
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt token: %w", err)
 	}
@@ -390,7 +397,7 @@ func (s *ContainerRegistryService) UpdateRegistry(ctx context.Context, id string
 	updated := ContainerRegistry{ //exhaustruct:enforce
 		BaseModel:       registryRecord.BaseModel,
 		URL:             kit.Ternary(submitted["url"], req.URL, registryRecord.URL),
-		Username:        kit.Ternary(registryRecord.RegistryType != RegistryTypeECR && submitted["username"], req.Username, registryRecord.Username),
+		Username:        kit.Ternary(registryRecord.RegistryType != RegistryTypeECR && submitted["username"], strings.TrimSpace(req.Username), registryRecord.Username),
 		Token:           cmp.Or(encryptedToken, registryRecord.Token),
 		Description:     kit.Ternary(submitted["description"], req.Description, registryRecord.Description),
 		Insecure:        kit.Ternary(submitted["insecure"], req.Insecure, registryRecord.Insecure),

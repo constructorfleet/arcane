@@ -72,14 +72,16 @@
 					});
 				}
 			} else {
-				if (!data.username?.trim()) {
+				const hasUsername = !!data.username?.trim();
+				const hasToken = !!data.token?.trim() || (isEditMode && !!registryToEdit?.username?.trim());
+				if (!hasUsername && hasToken) {
 					ctx.addIssue({
 						code: z.ZodIssueCode.custom,
 						message: m.common_username_required(),
 						path: ['username']
 					});
 				}
-				if (!isEditMode && !data.token?.trim()) {
+				if (hasUsername && !hasToken) {
 					ctx.addIssue({
 						code: z.ZodIssueCode.custom,
 						message: m.registries_token_required(),
@@ -159,7 +161,7 @@
 			<FormInput
 				label={m.common_username()}
 				type="text"
-				description={m.common_username_required()}
+				description={m.registries_generic_credentials_description()}
 				bind:input={form.inputs.username}
 			/>
 			<FormInput

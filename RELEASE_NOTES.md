@@ -1,7 +1,7 @@
-# 3.0.1-cf.45
+# 3.0.1-cf.46
 
-- Check global-volume Swarm service references before delete or rename can stop helpers or issue mutations (#109).
-- Protect current and rollback service volume mounts even on zero-replica services, plus nonterminal/orphaned task references. Force does not bypass this dependency guard; unknown membership/reference state fails closed with a conflict or unavailable error.
-- Keep local-volume and standalone-host admission unchanged when metadata is readable. Missing/unreadable inspection fails before mutation even with Force, so stale daemon records cannot be force-cleared through an unverifiable operation. A Swarm worker must use a manager agent to verify global-volume references; automatic worker-to-manager safety coordination remains broader work.
+- Allow Generic OCI/Docker registry connections without credentials for anonymous public access (#111).
+- Require paired credentials on creation and when adding authentication to an anonymous entry. Preserve stored secrets on blank-token edits and retain registry target-change protections; blank fields cannot silently clear authenticated credentials.
+- Explain anonymous setup in the form while keeping endpoint reachability distinct from verified authentication. No production registry connection, credential, TLS setting, image pull or push is changed by validation.
 
-Existing volume service coverage checks current/rollback/task references, worker/locked/omitted state, unavailable metadata and unreferenced cases with a fake Docker API and asserts no helper or mutation calls before rejection. Production validation remains read-only: no real-volume delete, rename, mapping or plugin operation is used to exercise the guard. This is a conservative Swarm dependency check, not proof of shared backend identity or an atomic cross-system transaction. Shared-volume grouping remains #13; broader plugin operations remain #33.
+Validated with isolated registry service coverage and frontend checks. Broader provider/runtime/cache integration remains #40/#31; switching an authenticated entry to anonymous access requires a separate explicit secret-clear flow.

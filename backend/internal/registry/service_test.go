@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json/v2"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -438,18 +439,51 @@ func TestContainerRegistryService_CreateRegistry_RejectsEmptyTokenForGeneric(t *
 }
 
 func TestContainerRegistryService_CreateRegistry_AcceptsValidGenericCredentials(t *testing.T) {
-	db := setupContainerRegistryTestDB(t)
-	svc := newRegistryTestService(t, db, nil)
-
-	reg, err := svc.CreateRegistry(t.Context(), types.ContainerRegistry{
-		URL:      "https://registry.example.com",
-		Username: "my-user",
-		Token:    "my-token",
-		Enabled:  true,
-	}, nil)
-	require.NoError(t, err)
-	assert.Equal(t, "my-user", reg.Username)
-	assert.NotEmpty(t, reg.Token)
+	for _, anonymous := range []bool{false, true} {
+		t.Run(fmt.Sprintf("anonymous=%v", anonymous), func(t *testing.T) {
+			db := setupContainerRegistryTestDB(t)
+			svc := newRegistryTestService(t, db, nil)
+			username, token := "my-user", "my-token"
+			if anonymous {
+				username, token = "  ", "  "
+			}
+			reg, err := svc.CreateRegistry(t.Context(), types.ContainerRegistry{
+				URL: "https://registry.example.com", Username: username, Token: token, Enabled: true,
+			}, nil)
+			require.NoError(t, err)
+			assert.Equal(t, strings.TrimSpace(username), reg.Username)
+			if !anonymous {
+				assert.NotEmpty(t, reg.Token)
+				return
+			}
+			assert.Empty(t, reg.Token)
+			updated, err := svc.UpdateRegistry(t.Context(), reg.ID, types.ContainerRegistry{
+				Username: " ", Token: " ", Description: new("anonymous metadata edit"),
+			}, map[string]bool{"username": true, "token": true, "description": true})
+			require.NoError(t, err)
+			assert.Empty(t, updated.Username)
+			assert.Empty(t, updated.Token)
+			assert.Equal(t, "anonymous metadata edit", kit.FromPtr(updated.Description))
+			for _, partial := range []types.ContainerRegistry{{Username: "user"}, {Token: "secret"}} {
+				_, err = svc.UpdateRegistry(t.Context(), reg.ID, partial, map[string]bool{"username": true, "token": true})
+				require.ErrorIs(t, err, common.ErrValidation)
+				unchanged, readErr := svc.GetRegistryByID(t.Context(), reg.ID)
+				require.NoError(t, readErr)
+				assert.Empty(t, unchanged.Username)
+				assert.Empty(t, unchanged.Token)
+			}
+			upgraded, err := svc.UpdateRegistry(t.Context(), reg.ID, types.ContainerRegistry{
+				Username: "user", Token: "secret",
+			}, map[string]bool{"username": true, "token": true})
+			require.NoError(t, err)
+			assert.Equal(t, "user", upgraded.Username)
+			assert.NotEmpty(t, upgraded.Token)
+			kept, err := svc.UpdateRegistry(t.Context(), reg.ID, types.ContainerRegistry{Token: " "}, map[string]bool{"token": true})
+			require.NoError(t, err)
+			assert.Equal(t, upgraded.Token, kept.Token)
+			assert.Equal(t, upgraded.Username, kept.Username)
+		})
+	}
 }
 
 func TestContainerRegistryService_UpdateRegistry_RejectsBlankingUsername(t *testing.T) {
@@ -503,6 +537,7 @@ func TestContainerRegistryService_UpdateRegistry_RejectsTargetChangeWhenStoredTo
 	}{
 		{name: "omitted token"},
 		{name: "empty token", token: new("")},
+		{name: "whitespace token", token: new(" \t ")},
 	}
 
 	for _, tt := range tests {
