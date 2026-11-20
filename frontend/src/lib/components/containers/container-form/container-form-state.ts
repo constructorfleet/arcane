@@ -70,7 +70,10 @@ export const containerFormSchema = z.object({
 	restartPolicy: z.string().default('no'),
 	restartMaxRetries: z.coerce.number().min(0).default(0),
 	memoryMb: z.coerce.number().min(0).default(0),
-	memorySwapMb: z.coerce.number().default(0),
+	memorySwapMb: z.coerce
+		.number()
+		.refine((value) => value === -1 || value >= 0, m.memory_swap_limit_invalid())
+		.default(0),
 	cpus: z.coerce.number().min(0).default(0),
 	cpuShares: z.coerce.number().min(0).default(0),
 	privileged: z.boolean().default(false),
@@ -157,8 +160,8 @@ export function formValuesFromEditConfig(cfg: ContainerEditConfig): ContainerFor
 		hostname: cfg.hostname ?? '',
 		restartPolicy: hc.restartPolicy?.name || 'no',
 		restartMaxRetries: hc.restartPolicy?.maximumRetryCount ?? 0,
-		memoryMb: hc.memory ? Math.round(hc.memory / (1024 * 1024)) : 0,
-		memorySwapMb: hc.memorySwap && hc.memorySwap > 0 ? Math.round(hc.memorySwap / (1024 * 1024)) : 0,
+		memoryMb: (hc.memory ?? 0) / (1024 * 1024),
+		memorySwapMb: hc.memorySwap === -1 ? -1 : (hc.memorySwap ?? 0) / (1024 * 1024),
 		cpus: hc.nanoCpus ? hc.nanoCpus / 1e9 : 0,
 		cpuShares: hc.cpuShares ?? 0,
 		privileged: !!hc.privileged,
@@ -338,6 +341,12 @@ export function toCreateRequest(values: ContainerFormValues, rows: ContainerForm
 	const portBindings = buildPortBindings(rows);
 	const binds = buildBinds(rows);
 	const endpoints = buildEndpoints(rows);
+	let memorySwap: number | undefined;
+	if (values.memorySwapMb === -1) {
+		memorySwap = -1;
+	} else if (values.memorySwapMb > 0) {
+		memorySwap = Math.round(values.memorySwapMb * 1024 * 1024);
+	}
 
 	const hostConfig: ContainerHostConfigCreate = {
 		binds: binds.length > 0 ? binds : undefined,
@@ -347,7 +356,7 @@ export function toCreateRequest(values: ContainerFormValues, rows: ContainerForm
 		readonlyRootfs: values.readonlyRootfs || undefined,
 		autoRemove: values.autoRemove || undefined,
 		memory: values.memoryMb > 0 ? Math.round(values.memoryMb * 1024 * 1024) : undefined,
-		memorySwap: values.memorySwapMb > 0 ? Math.round(values.memorySwapMb * 1024 * 1024) : undefined,
+		memorySwap,
 		nanoCpus: values.cpus > 0 ? Math.round(values.cpus * 1e9) : undefined,
 		cpuShares: values.cpuShares > 0 ? values.cpuShares : undefined,
 		capAdd: rows.capAdd.length > 0 ? [...rows.capAdd] : undefined,
@@ -404,6 +413,10 @@ export function toEditRequest(
 		}
 	}
 
+	let memorySwap: number | undefined;
+	if (values.memorySwapMb !== initial.memorySwapMb) {
+		memorySwap = values.memorySwapMb === -1 ? -1 : Math.round(values.memorySwapMb * 1024 * 1024);
+	}
 	const hostConfig: ContainerHostConfigEdit = {
 		binds: buildBinds(rows),
 		mounts: buildMounts(rows),
@@ -412,8 +425,8 @@ export function toEditRequest(
 		privileged: values.privileged,
 		readonlyRootfs: values.readonlyRootfs,
 		autoRemove: values.autoRemove,
-		memory: Math.round(values.memoryMb * 1024 * 1024),
-		memorySwap: values.memorySwapMb > 0 ? Math.round(values.memorySwapMb * 1024 * 1024) : 0,
+		memory: values.memoryMb === initial.memoryMb ? undefined : Math.round(values.memoryMb * 1024 * 1024),
+		memorySwap,
 		nanoCpus: Math.round(values.cpus * 1e9),
 		cpuShares: values.cpuShares,
 		capAdd: [...rows.capAdd],

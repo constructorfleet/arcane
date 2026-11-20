@@ -505,12 +505,17 @@ func TestApplyEditPreservesUnmanagedSettings(t *testing.T) {
 		PortBindings: network.PortMap{network.MustParsePort("80/tcp"): {{HostPort: "8080"}}},
 		Sysctls:      map[string]string{"net.core.somaxconn": "1024"},
 		LogConfig:    container.LogConfig{Type: "json-file", Config: map[string]string{"max-size": "5m"}},
-
-		Ulimits: []*container.Ulimit{{Name: "nofile", Soft: 1024, Hard: 2048}},
+		Resources: container.Resources{
+			Memory: 33554433, MemorySwap: -1, NanoCPUs: 50000000,
+			Ulimits: []*container.Ulimit{{Name: "nofile", Soft: 1024, Hard: 2048}},
+		},
 	}
 
 	env := []string{"NEW=1"}
-	req := types.ContainerEdit{Environment: &env}
+	req := types.ContainerEdit{
+		Environment: &env,
+		HostConfig:  &types.ContainerHostConfigEdit{NanoCPUs: new(int64(100000000))},
+	}
 
 	cfg, err := applyEditToContainerConfig(cfg, hc.PortBindings, req)
 	require.NoError(t, err)
@@ -533,6 +538,9 @@ func TestApplyEditPreservesUnmanagedSettings(t *testing.T) {
 	require.Len(t, hc.Ulimits, 1)
 	require.Equal(t, []string{"/data:/data"}, hc.Binds)
 	require.Contains(t, cfg.ExposedPorts, network.MustParsePort("80/tcp"))
+	require.Equal(t, int64(33554433), hc.Memory)
+	require.Equal(t, int64(-1), hc.MemorySwap)
+	require.Equal(t, int64(100000000), hc.NanoCPUs)
 
 	command := []string{"", "  literal \"double\" and 'single'  ", "line\nβ", "same", "same", ""}
 	entrypoint := []string{"/bin/echo", ""}
@@ -543,6 +551,11 @@ func TestApplyEditPreservesUnmanagedSettings(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, command, next.Cmd)
 	require.Equal(t, entrypoint, next.Entrypoint)
+	require.NoError(t, applyEditToHostConfig(&hc, types.ContainerEdit{
+		HostConfig: &types.ContainerHostConfigEdit{Memory: new(int64(67108865)), MemorySwap: new(int64(0))},
+	}))
+	require.Equal(t, int64(67108865), hc.Memory)
+	require.Zero(t, hc.MemorySwap)
 }
 
 func TestMergeEditMountsPreservesMountOptions(t *testing.T) {

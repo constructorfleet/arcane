@@ -4725,5 +4725,6 @@
   "add_argument": "Add argument",
   "command_argument": "Command argument",
   "argument": "Argument",
-  "entrypoint_argument": "Entrypoint argument"
+  "entrypoint_argument": "Entrypoint argument",
+  "memory_swap_limit_invalid": "Use -1 for unlimited swap, 0 for the default, or a positive memory + swap limit."
 }

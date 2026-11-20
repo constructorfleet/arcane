@@ -1,6 +1,6 @@
-# 3.0.1-cf.54
+# 3.0.1-cf.55
 
-- Author standalone command and entrypoint arrays as literal argument rows, matching Swarm services (#127). Preserve order, quotes, spaces, empty values, duplicates and LF text without shell-word parsing.
-- Distinguish no rows/image defaults from an intentional empty argument. Keep the original-snapshot omission of untouched execution settings and native healthcheck preservation from cf.53.
+- Preserve untouched standalone memory and memory-plus-swap limits by omitting them from unrelated edits (#129). Display fractional MiB values without rounding away native bytes.
+- Support Docker's -1 unlimited-swap sentinel in create/edit forms, with guidance and validation for the supported negative value. Explicit zero still resets the swap setting.
 
-Validation covers actual owning create/edit forms and native payload contracts. Live acceptance will use only an owned isolated container; no production workload is edited. Healthcheck authoring is unchanged; browser textarea normalization is outside an arbitrary control-character byte-preservation claim. Broader #28 remains open.
+Validation covers the actual owning form, untouched native values and intentional resource edits. Live acceptance uses only an owned isolated container; no production workload is edited. Broader #28 remains open.

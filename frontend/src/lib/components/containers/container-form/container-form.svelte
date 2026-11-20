@@ -337,13 +337,16 @@
 							<FormInput
 								label={m.memory_limit_mb()}
 								type="number"
+								step="any"
 								placeholder="0"
 								disabled={submitting}
 								bind:input={inputs.memoryMb}
 							/>
 							<FormInput
 								label={m.memory_swap_mb()}
+								description={m.podman_pod_memory_swap_description()}
 								type="number"
+								step="any"
 								placeholder="0"
 								disabled={submitting}
 								bind:input={inputs.memorySwapMb}
