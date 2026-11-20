@@ -202,7 +202,7 @@
 		() => {
 			void refreshAfterUpdate();
 		},
-		() => data.container.id
+		() => data.container?.id ?? ''
 	);
 
 	onMount(() => {
@@ -216,16 +216,17 @@
 
 	async function refreshAfterUpdate() {
 		const environmentId = currentEnvId;
-		const containerId = data.container.id;
+		const containerId = data.container?.id;
+		if (!updateViewMounted || !containerId) return;
 		const result = await tryCatch(containerService.getContainerForEnvironment(environmentId, containerId));
-		if (!updateViewMounted || environmentId !== currentEnvId || containerId !== data.container.id) return;
+		if (!updateViewMounted || environmentId !== currentEnvId || containerId !== data.container?.id) return;
 		if (result.error instanceof APIError && result.error.status === 404) {
 			await Promise.all(
 				listScopes([environmentId]).map((scope) =>
 					queryClient.invalidateQueries({ queryKey: queryKeys.containers.listPrefix(scope) })
 				)
 			);
-			if (!updateViewMounted || environmentId !== currentEnvId || containerId !== data.container.id) return;
+			if (!updateViewMounted || environmentId !== currentEnvId || containerId !== data.container?.id) return;
 			await goto(resolve('/(app)/containers'));
 			return;
 		}
