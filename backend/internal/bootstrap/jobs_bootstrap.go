@@ -247,8 +247,6 @@ func registerJobs(params registerJobsParams) error {
 		params.EventCleanup,
 		params.PruningVolumeHelper,
 		params.ScheduledPrune,
-		params.VulnerabilityScan,
-		params.VulnerabilityRisk,
 		params.AutoPatch,
 		params.AutoHeal,
 		params.ActivitySweep,
@@ -258,7 +256,7 @@ func registerJobs(params registerJobsParams) error {
 		params.UpgradeLogCleanup,
 	}
 	if !params.Config.ControlPlane {
-		jobs = append(jobs, params.DockerClientRefresh)
+		jobs = append(jobs, params.DockerClientRefresh, params.VulnerabilityScan, params.VulnerabilityRisk)
 	}
 	if !params.Config.AgentEnabled {
 		jobs = append(jobs, params.ExpiredSessionsCleanup, params.ApnsOutbox, params.LdapSync)
@@ -375,11 +373,13 @@ func setupSettingsSubscriptions(params settingsSubscriptionsParams) error {
 	})
 
 	rescheduleOn([]string{"scheduledPruneEnabled", "scheduledPruneInterval"}, params.ScheduledPrune)
-	rescheduleOn([]string{
-		types.FeatureVulnerabilityManagementSettingKey, "vulnerabilityScanEnabled", "vulnerabilityScanInterval", "trivyNetwork", "trivySecurityOpts", "trivyPrivileged",
-		"trivyResourceLimitsEnabled", "trivyCpuLimit", "trivyMemoryLimitMb", "trivyConcurrentScanContainers",
-	}, params.VulnerabilityScan)
-	rescheduleOn([]string{types.FeatureVulnerabilityManagementSettingKey}, params.VulnerabilityRisk)
+	if !params.Config.ControlPlane {
+		rescheduleOn([]string{
+			types.FeatureVulnerabilityManagementSettingKey, "vulnerabilityScanEnabled", "vulnerabilityScanInterval", "trivyNetwork", "trivySecurityOpts", "trivyPrivileged",
+			"trivyResourceLimitsEnabled", "trivyCpuLimit", "trivyMemoryLimitMb", "trivyConcurrentScanContainers",
+		}, params.VulnerabilityScan)
+		rescheduleOn([]string{types.FeatureVulnerabilityManagementSettingKey}, params.VulnerabilityRisk)
+	}
 	rescheduleOn([]string{types.FeatureVulnerabilityManagementSettingKey, "imageAutoPatchEnabled", "imageAutoPatchInterval"}, params.AutoPatch)
 	rescheduleOn([]string{"autoHealEnabled", "autoHealInterval", "autoHealExcludedContainers", "autoHealMaxRestarts", "autoHealRestartWindow"}, params.AutoHeal)
 

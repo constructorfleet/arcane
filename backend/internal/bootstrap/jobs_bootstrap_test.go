@@ -51,27 +51,39 @@ func (s *settingsSubscriptionSchedulerStub) AddJob(_ context.Context, job types.
 }
 
 func TestFeatureChangeReschedulesScanAndPatchJobs(t *testing.T) {
-	lifecycle := fxtest.NewLifecycle(t)
-	settings := &settingsSubscriptionStub{}
-	schedulerStub := &settingsSubscriptionSchedulerStub{rescheduled: make(chan struct{})}
-	require.NoError(t, setupSettingsSubscriptions(settingsSubscriptionsParams{
-		Lifecycle:         lifecycle,
-		LifecycleCtx:      t.Context(),
-		Config:            &config.Config{},
-		Scheduler:         schedulerStub,
-		Settings:          settings,
-		VulnerabilityScan: scheduler.NewVulnerabilityScanJob(nil, &vulnerability.VulnerabilityService{}, nil),
-		VulnerabilityRisk: scheduler.NewVulnerabilityRiskJob(nil, nil),
-		AutoPatch:         scheduler.NewAutoPatchJob(nil, &image.ImageService{}, nil),
-	}))
-	require.Len(t, settings.featureCallbacks, 3)
-	for _, callback := range settings.featureCallbacks {
-		callback([]types.SettingUpdate{{Key: types.FeatureVulnerabilityManagementSettingKey, Value: "false"}})
+	for _, mode := range []struct {
+		name string
+		cfg  *config.Config
+		jobs []string
+	}{
+		{name: "legacy manager", cfg: &config.Config{}, jobs: []string{scheduler.VulnerabilityScanJobName, scheduler.VulnerabilityRiskJobName, scheduler.AutoPatchJobName}},
+		{name: "node agent", cfg: &config.Config{AgentEnabled: true}, jobs: []string{scheduler.VulnerabilityScanJobName, scheduler.VulnerabilityRiskJobName, scheduler.AutoPatchJobName}},
+		{name: "control plane", cfg: &config.Config{ControlPlane: true}, jobs: []string{scheduler.AutoPatchJobName}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			lifecycle := fxtest.NewLifecycle(t)
+			settings := &settingsSubscriptionStub{}
+			schedulerStub := &settingsSubscriptionSchedulerStub{rescheduled: make(chan struct{})}
+			require.NoError(t, setupSettingsSubscriptions(settingsSubscriptionsParams{
+				Lifecycle:         lifecycle,
+				LifecycleCtx:      t.Context(),
+				Config:            mode.cfg,
+				Scheduler:         schedulerStub,
+				Settings:          settings,
+				VulnerabilityScan: scheduler.NewVulnerabilityScanJob(nil, &vulnerability.VulnerabilityService{}, nil),
+				VulnerabilityRisk: scheduler.NewVulnerabilityRiskJob(nil, nil),
+				AutoPatch:         scheduler.NewAutoPatchJob(nil, &image.ImageService{}, nil),
+			}))
+			require.Len(t, settings.featureCallbacks, len(mode.jobs))
+			for _, callback := range settings.featureCallbacks {
+				callback([]types.SettingUpdate{{Key: types.FeatureVulnerabilityManagementSettingKey, Value: "false"}})
+			}
+			require.ElementsMatch(t, mode.jobs, schedulerStub.jobs)
+			stopCtx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+			require.NoError(t, lifecycle.Stop(stopCtx))
+		})
 	}
-	require.ElementsMatch(t, []string{scheduler.VulnerabilityScanJobName, scheduler.VulnerabilityRiskJobName, scheduler.AutoPatchJobName}, schedulerStub.jobs)
-	stopCtx, cancel := context.WithTimeout(t.Context(), time.Second)
-	defer cancel()
-	require.NoError(t, lifecycle.Stop(stopCtx))
 }
 
 func (s *settingsSubscriptionKeysStub) SubscribeSettingsChanges(keys []string, _ func([]types.SettingUpdate)) func() {
