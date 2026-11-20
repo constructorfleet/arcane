@@ -34,6 +34,7 @@ export interface ContainerEndpointSettingsCreate {
 	aliases?: string[];
 	ipv4Address?: string;
 	ipv6Address?: string;
+	linkLocalIPs?: string[];
 }
 
 export interface ContainerMountCreate {
@@ -329,6 +330,7 @@ export interface ContainerEditConfigNetwork {
 	aliases?: string[];
 	ipv4Address?: string;
 	ipv6Address?: string;
+	linkLocalIPs?: string[];
 }
 
 export interface ContainerEditConfigHostConfig {

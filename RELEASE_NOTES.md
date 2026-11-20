@@ -1,8 +1,6 @@
-# 3.0.1-cf.57
+# 3.0.1-cf.58
 
-- Show separate matching-name/driver records on other permitted agents for global-driver volumes (#132 / #13), with reported mountpoints and container references. Explicit links open the chosen agent's Overview.
-- Label shared-storage identity as unverified; expose failed or excluded metadata reads. Discovery requires volume-list access, destination links require volume-read access, and inactive Workspace guidance offers a route back to these observations.
+- Round-trip and edit static IPv6 and link-local addresses alongside IPv4 and aliases in standalone create/edit network rows (#136). Alias-only changes retain all represented IPAM values instead of dropping hidden fields.
+- Share complete address parsing between create/edit, reject wrong address families, scoped IPv6/link-local entries and malformed addresses before container creation or recreation, and retain omission for untouched network rows.
 
-- Require active Workspace intent for folder/file reads, reset that intent on Overview, and start a fresh detail view when changing agents (#134). Confirm discarding pending drafts on ordinary agent-link clicks; modified/new-tab navigation keeps the current draft. Already-issued file reads are not newly promised cancellation.
-
-This is metadata discovery/navigation, not shared-backend deduplication or automatic attachment routing. It creates no workspace helper and does not mount an inactive RBD volume. Application/helper/unknown consumer classification remains on each destination's Overview; reference counts can include helpers/stopped containers and are not proof of active application use. Broader #13 remains open.
+Blank static fields return address allocation to Docker; a blank link-local list clears that configured list. This does not claim detach-all from removing network rows, disable IPv6 on the network, or implement network connectivity testing. Validation/live acceptance uses owned isolated resources; broader #28/#13 remains open.

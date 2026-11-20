@@ -46,9 +46,10 @@ type (
 	}
 
 	ContainerEndpointSettingsCreate struct {
-		IPv4Address string   `json:"ipv4Address,omitempty"`
-		IPv6Address string   `json:"ipv6Address,omitempty"`
-		Aliases     []string `json:"aliases,omitempty"`
+		IPv4Address  string   `json:"ipv4Address,omitempty"`
+		IPv6Address  string   `json:"ipv6Address,omitempty"`
+		LinkLocalIPs []string `json:"linkLocalIPs,omitempty"`
+		Aliases      []string `json:"aliases,omitempty"`
 	}
 
 	ContainerMountCreate struct {
@@ -381,9 +382,10 @@ type (
 	}
 
 	ContainerEditConfigNetwork struct {
-		IPv4Address string   `json:"ipv4Address,omitempty"`
-		IPv6Address string   `json:"ipv6Address,omitempty"`
-		Aliases     []string `json:"aliases,omitempty"`
+		IPv4Address  string   `json:"ipv4Address,omitempty"`
+		IPv6Address  string   `json:"ipv6Address,omitempty"`
+		LinkLocalIPs []string `json:"linkLocalIPs,omitempty"`
+		Aliases      []string `json:"aliases,omitempty"`
 	}
 
 	ContainerEditConfigHostConfig struct {
@@ -877,7 +879,8 @@ func mapEditNetworks(c *container.InspectResponse) map[string]ContainerEditConfi
 
 	out := make(map[string]ContainerEditConfigNetwork, len(c.NetworkSettings.Networks))
 	for name, endpoint := range c.NetworkSettings.Networks {
-		mapped := ContainerEditConfigNetwork{}
+		var aliases, linkLocalIPs []string
+		var ipv4Address, ipv6Address string
 		if endpoint != nil {
 			// The daemon injects the container short ID as an implicit alias;
 			// it is regenerated on recreate and must not round-trip as a
@@ -886,18 +889,26 @@ func mapEditNetworks(c *container.InspectResponse) map[string]ContainerEditConfi
 				if alias == "" || alias == shortID {
 					continue
 				}
-				mapped.Aliases = append(mapped.Aliases, alias)
+				aliases = append(aliases, alias)
 			}
 			if endpoint.IPAMConfig != nil {
 				if endpoint.IPAMConfig.IPv4Address.IsValid() {
-					mapped.IPv4Address = endpoint.IPAMConfig.IPv4Address.String()
+					ipv4Address = endpoint.IPAMConfig.IPv4Address.String()
 				}
 				if endpoint.IPAMConfig.IPv6Address.IsValid() {
-					mapped.IPv6Address = endpoint.IPAMConfig.IPv6Address.String()
+					ipv6Address = endpoint.IPAMConfig.IPv6Address.String()
+				}
+				for _, address := range endpoint.IPAMConfig.LinkLocalIPs {
+					if address.IsValid() {
+						linkLocalIPs = append(linkLocalIPs, address.String())
+					}
 				}
 			}
 		}
-		out[name] = mapped
+		out[name] = ContainerEditConfigNetwork{
+			IPv4Address: ipv4Address, IPv6Address: ipv6Address,
+			LinkLocalIPs: linkLocalIPs, Aliases: aliases,
+		}
 	}
 
 	return out

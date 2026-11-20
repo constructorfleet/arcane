@@ -730,10 +730,17 @@ func TestBuildEditNetworkingConfig(t *testing.T) {
 	require.Equal(t, containerInspect.NetworkSettings.Networks["my-net"].IPAMConfig, out.EndpointsConfig["my-net"].IPAMConfig)
 	require.NotSame(t, containerInspect.NetworkSettings.Networks["my-net"].IPAMConfig, out.EndpointsConfig["my-net"].IPAMConfig)
 	require.NotSame(t, &containerInspect.NetworkSettings.Networks["my-net"].IPAMConfig.LinkLocalIPs[0], &out.EndpointsConfig["my-net"].IPAMConfig.LinkLocalIPs[0])
+	editConfig := types.NewContainerEditConfigFromInspect(&containerInspect, false, false)
+	require.Equal(t, "fd00:5::8", editConfig.Networks["my-net"].IPv6Address)
+	require.Equal(t, []string{"fe80::8"}, editConfig.Networks["my-net"].LinkLocalIPs)
 
 	req := &types.ContainerNetworkingConfigCreate{
 		EndpointsConfig: map[string]types.ContainerEndpointSettingsCreate{
-			"my-net":    {Aliases: []string{"renamed"}, IPv4Address: "10.5.0.9"},
+			"my-net": {
+				Aliases: []string{"renamed"}, IPv4Address: "10.5.0.9",
+				IPv6Address:  editConfig.Networks["my-net"].IPv6Address,
+				LinkLocalIPs: editConfig.Networks["my-net"].LinkLocalIPs,
+			},
 			"other-net": {},
 		},
 	}
@@ -742,7 +749,33 @@ func TestBuildEditNetworkingConfig(t *testing.T) {
 	require.Len(t, out.EndpointsConfig, 2)
 	require.Equal(t, []string{"renamed"}, out.EndpointsConfig["my-net"].Aliases)
 	require.Equal(t, netip.MustParseAddr("10.5.0.9"), out.EndpointsConfig["my-net"].IPAMConfig.IPv4Address)
+	require.Equal(t, netip.MustParseAddr("fd00:5::8"), out.EndpointsConfig["my-net"].IPAMConfig.IPv6Address)
+	require.Equal(t, []netip.Addr{netip.MustParseAddr("fe80::8")}, out.EndpointsConfig["my-net"].IPAMConfig.LinkLocalIPs)
 	require.Equal(t, []string{"svc"}, out.EndpointsConfig["my-net"].DNSNames)
+	linkLocalOnly, err := endpointIPAMFromCreate(types.ContainerEndpointSettingsCreate{LinkLocalIPs: []string{"fe80::9", "169.254.5.9"}})
+	require.NoError(t, err)
+	require.Equal(t, []netip.Addr{netip.MustParseAddr("fe80::9"), netip.MustParseAddr("169.254.5.9")}, linkLocalOnly.LinkLocalIPs)
+	cleared, err := endpointIPAMFromCreate(types.ContainerEndpointSettingsCreate{IPv4Address: "10.5.0.9"})
+	require.NoError(t, err)
+	require.False(t, cleared.IPv6Address.IsValid())
+	require.Empty(t, cleared.LinkLocalIPs)
+	empty, err := endpointIPAMFromCreate(types.ContainerEndpointSettingsCreate{})
+	require.NoError(t, err)
+	require.Nil(t, empty)
+	for _, invalid := range []types.ContainerEndpointSettingsCreate{
+		{IPv4Address: "fd00:5::9"},
+		{IPv6Address: "10.5.0.9"},
+		{IPv6Address: "::ffff:10.5.0.9"},
+		{IPv6Address: "fd00:5::9%eth0"},
+		{IPv4Address: "invalid"},
+		{IPv6Address: "invalid"},
+		{LinkLocalIPs: []string{"invalid"}},
+		{LinkLocalIPs: []string{"fe80::9%eth0"}},
+		{LinkLocalIPs: []string{""}},
+	} {
+		_, addressErr := endpointIPAMFromCreate(invalid)
+		require.Error(t, addressErr)
+	}
 
 	// host network mode: endpoint edits are skipped entirely
 	hostModeInspect := container.InspectResponse{HostConfig: &container.HostConfig{NetworkMode: "host"}}

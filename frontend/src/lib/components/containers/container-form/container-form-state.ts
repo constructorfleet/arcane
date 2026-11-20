@@ -251,7 +251,9 @@ export function rowsFromEditConfig(cfg: ContainerEditConfig): ContainerFormRows 
 		rows.networks.push({
 			network,
 			aliases: (endpoint.aliases ?? []).join(', '),
-			ipv4Address: endpoint.ipv4Address ?? ''
+			ipv4Address: endpoint.ipv4Address ?? '',
+			ipv6Address: endpoint.ipv6Address ?? '',
+			linkLocalAddresses: (endpoint.linkLocalIPs ?? []).join(', ')
 		});
 	}
 
@@ -323,6 +325,12 @@ function buildEndpoints(rows: ContainerFormRows): Record<string, ContainerEndpoi
 			.filter(Boolean);
 		if (aliases.length > 0) endpoint.aliases = aliases;
 		if (row.ipv4Address.trim()) endpoint.ipv4Address = row.ipv4Address.trim();
+		if (row.ipv6Address.trim()) endpoint.ipv6Address = row.ipv6Address.trim();
+		const linkLocalIPs = row.linkLocalAddresses
+			.split(',')
+			.map((address) => address.trim())
+			.filter(Boolean);
+		if (linkLocalIPs.length > 0) endpoint.linkLocalIPs = linkLocalIPs;
 		endpoints[row.network.trim()] = endpoint;
 	}
 	return endpoints;

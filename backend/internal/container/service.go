@@ -1253,7 +1253,7 @@ func portMapFromCreate(bindings map[string][]types.ContainerPortBindingCreate) (
 }
 
 func endpointIPAMFromCreate(ep types.ContainerEndpointSettingsCreate) (*network.EndpointIPAMConfig, error) {
-	if strings.TrimSpace(ep.IPv4Address) == "" && strings.TrimSpace(ep.IPv6Address) == "" {
+	if strings.TrimSpace(ep.IPv4Address) == "" && strings.TrimSpace(ep.IPv6Address) == "" && len(ep.LinkLocalIPs) == 0 {
 		return nil, nil
 	}
 
@@ -1261,11 +1261,28 @@ func endpointIPAMFromCreate(ep types.ContainerEndpointSettingsCreate) (*network.
 	if ipv4Err != nil && strings.TrimSpace(ep.IPv4Address) != "" {
 		return nil, fmt.Errorf("invalid IPv4 address %s: %w", strings.TrimSpace(ep.IPv4Address), ipv4Err)
 	}
+	if strings.TrimSpace(ep.IPv4Address) != "" && !ipv4.Is4() {
+		return nil, fmt.Errorf("invalid IPv4 address %s", strings.TrimSpace(ep.IPv4Address))
+	}
 	ipv6, ipv6Err := netip.ParseAddr(strings.TrimSpace(ep.IPv6Address))
 	if ipv6Err != nil && strings.TrimSpace(ep.IPv6Address) != "" {
 		return nil, fmt.Errorf("invalid IPv6 address %s: %w", strings.TrimSpace(ep.IPv6Address), ipv6Err)
 	}
-	return &network.EndpointIPAMConfig{IPv4Address: ipv4, IPv6Address: ipv6}, nil
+	if strings.TrimSpace(ep.IPv6Address) != "" && (!ipv6.Is6() || ipv6.Is4In6() || ipv6.Zone() != "") {
+		return nil, fmt.Errorf("invalid unscoped IPv6 address %s", strings.TrimSpace(ep.IPv6Address))
+	}
+	linkLocalIPs := make([]netip.Addr, 0, len(ep.LinkLocalIPs))
+	for _, value := range ep.LinkLocalIPs {
+		address, err := netip.ParseAddr(strings.TrimSpace(value))
+		if err != nil {
+			return nil, fmt.Errorf("invalid link-local address %s: %w", strings.TrimSpace(value), err)
+		}
+		if address.Zone() != "" {
+			return nil, fmt.Errorf("invalid unscoped link-local address %s", strings.TrimSpace(value))
+		}
+		linkLocalIPs = append(linkLocalIPs, address)
+	}
+	return &network.EndpointIPAMConfig{IPv4Address: ipv4, IPv6Address: ipv6, LinkLocalIPs: linkLocalIPs}, nil
 }
 
 func applyEditToContainerConfig(cfg container.Config, previousBindings network.PortMap, req types.ContainerEdit) (container.Config, error) {

@@ -4739,5 +4739,9 @@
   "volume_agent_records_reference_note": "References may include workspace helpers and stopped containers.",
   "volume_agent_records_show": "View other agent records",
   "volume_agent_records_discard_warning": "Opening another agent’s overview will discard unsaved text and staged file operations in this workspace.",
-  "volume_agent_records_discard_open": "Discard changes and open overview"
+  "volume_agent_records_discard_open": "Discard changes and open overview",
+  "static_ipv6_address": "Static IPv6 address",
+  "container_network_link_local_addresses": "Link-local IP addresses",
+  "container_network_link_local_hint": "Comma-separated addresses. Leave blank to clear this list.",
+  "container_network_static_ip_hint": "Leave static addresses blank to use the selected network's defaults."
 }
