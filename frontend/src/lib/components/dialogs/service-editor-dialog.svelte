@@ -4,11 +4,13 @@
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
 	import EnvironmentDestinationSelect from '#lib/components/form/environment-destination-select.svelte';
 	import FormInput from '#lib/components/form/form-input.svelte';
+	import RowListEditor from '#lib/components/form/row-list-editor.svelte';
 	import * as Accordion from '#lib/components/ui/accordion/index.js';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { ResponsiveDialog } from '#lib/components/ui/responsive-dialog/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { AddIcon, TrashIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { EnvironmentRef } from '#lib/stores/environment.store.svelte.js';
@@ -111,8 +113,8 @@
 		image: TextFieldState;
 		mode: ServiceEditorMode;
 		replicas: TextFieldState<number | null | undefined>;
-		command: TextFieldState;
-		args: TextFieldState;
+		command: TextFieldState[];
+		args: TextFieldState[];
 		workingDir: TextFieldState;
 		user: TextFieldState;
 		hostname: TextFieldState;
@@ -152,8 +154,8 @@
 			image: createTextField(),
 			mode: 'replicated',
 			replicas: { value: 1, error: '' },
-			command: createTextField(),
-			args: createTextField(),
+			command: [],
+			args: [],
 			workingDir: createTextField(),
 			user: createTextField(),
 			hostname: createTextField(),
@@ -206,8 +208,8 @@
 			image: createTextField(containerSpec.Image),
 			mode,
 			replicas: { value: serviceMode.Replicated?.Replicas ?? 1, error: '' },
-			command: createTextField(containerSpec.Command?.join(' ')),
-			args: createTextField(containerSpec.Args?.join(' ')),
+			command: containerSpec.Command?.map(createTextField) ?? [],
+			args: containerSpec.Args?.map(createTextField) ?? [],
 			workingDir: createTextField(containerSpec.Dir),
 			user: createTextField(containerSpec.User),
 			hostname: createTextField(containerSpec.Hostname),
@@ -327,19 +329,17 @@
 			}
 		}
 
-		if (form.command.value !== initial.command.value) {
-			const commandParts = form.command.value.trim().split(' ').filter(Boolean);
-			if (commandParts.length > 0) {
-				containerSpec['Command'] = commandParts;
+		if (JSON.stringify(form.command) !== JSON.stringify(initial.command)) {
+			if (form.command.length > 0) {
+				containerSpec['Command'] = form.command.map((argument) => argument.value);
 			} else {
 				delete containerSpec['Command'];
 			}
 		}
 
-		if (form.args.value !== initial.args.value) {
-			const argParts = form.args.value.trim().split(' ').filter(Boolean);
-			if (argParts.length > 0) {
-				containerSpec['Args'] = argParts;
+		if (JSON.stringify(form.args) !== JSON.stringify(initial.args)) {
+			if (form.args.length > 0) {
+				containerSpec['Args'] = form.args.map((argument) => argument.value);
 			} else {
 				delete containerSpec['Args'];
 			}
@@ -562,8 +562,28 @@
 					<Accordion.Trigger>{m.swarm_service_form_advanced()}</Accordion.Trigger>
 					<Accordion.Content>
 						<div class="space-y-5 pt-6 pb-5">
-							<FormInput input={form.command} label={m.common_command()} placeholder="/bin/sh" disabled={isLoading} />
-							<FormInput input={form.args} label={m.common_args()} placeholder="-c echo hello" disabled={isLoading} />
+							<p class="text-xs text-muted-foreground">{m.literal_arguments_description()}</p>
+							<fieldset class="space-y-2">
+								<legend class="text-sm font-medium">{m.common_command()}</legend>
+								<RowListEditor
+									bind:rows={form.command}
+									createRow={createTextField}
+									disabled={isLoading}
+									addLabel={m.add_argument()}
+								>
+									{#snippet children(argument)}
+										<Textarea aria-label={m.command_argument()} bind:value={argument.value} rows={2} mono disabled={isLoading} />
+									{/snippet}
+								</RowListEditor>
+							</fieldset>
+							<fieldset class="space-y-2">
+								<legend class="text-sm font-medium">{m.common_args()}</legend>
+								<RowListEditor bind:rows={form.args} createRow={createTextField} disabled={isLoading} addLabel={m.add_argument()}>
+									{#snippet children(argument)}
+										<Textarea aria-label={m.argument()} bind:value={argument.value} rows={2} mono disabled={isLoading} />
+									{/snippet}
+								</RowListEditor>
+							</fieldset>
 							<FormInput input={form.workingDir} label={m.common_working_directory()} placeholder="/app" disabled={isLoading} />
 							<FormInput input={form.user} label={m.common_user()} placeholder="1000:1000" disabled={isLoading} />
 							<FormInput input={form.hostname} label={m.hostname()} placeholder="my-service" disabled={isLoading} />
