@@ -27,7 +27,7 @@
 	let revokingAll = $state(false);
 	const passwordValid = $derived(
 		currentPassword.length > 0 &&
-			[...newPassword].length >= (settingsStore.current?.authPasswordMinLength ?? 8) &&
+			[...newPassword].length >= (settingsStore.current?.authPasswordMinLength ?? 12) &&
 			newPassword === confirmPassword
 	);
 

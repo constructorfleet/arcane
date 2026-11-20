@@ -15,6 +15,7 @@
 	import type { Role } from '#lib/types/role.js';
 	import type { UserUpdate } from '#lib/types/ui/user.js';
 	import type { User } from '#lib/types/user.js';
+	import { passwordRequirements } from '#lib/utils/password-policy.js';
 	import { changedFields } from '#lib/utils/payload.js';
 	import { createForm, preventDefault } from '#lib/utils/settings.svelte.js';
 
@@ -66,11 +67,11 @@
 		if (isOidcUser) return m.users_password_description_oidc();
 		if (isDirectoryUser) return undefined;
 		if (isEditMode) return m.users_password_description_edit();
-		return m.users_password_description_create();
+		return passwordRequirements();
 	});
 	let oidcAssignments = $derived(userToEdit?.roleAssignments?.filter((a) => a.source !== 'manual') ?? []);
 	const userFieldMaxLength = 255;
-	const passwordMinLength = 8;
+	const passwordMinLength = $derived(settingsStore.current?.authPasswordMinLength ?? 12);
 
 	const formSchema = z.object({
 		username: z
@@ -83,9 +84,9 @@
 			)
 			// Legacy usernames may contain @; only new or changed usernames are restricted
 			.refine((value) => value === userToEdit?.username.trim() || !value.includes('@'), m.users_username_no_at()),
-		password: z
-			.string()
-			.refine((value) => (isEditMode && value === '') || [...value].length >= passwordMinLength, m.first_login_error_length()),
+		password: z.string().refine((value) => (isEditMode && value === '') || [...value].length >= passwordMinLength, {
+			error: () => passwordRequirements()
+		}),
 		displayName: z
 			.string()
 			.trim()
