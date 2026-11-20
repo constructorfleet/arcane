@@ -1,8 +1,6 @@
-# 3.0.1-cf.47
+# 3.0.1-cf.48
 
-- Preserve authored Compose, env and project override text through stack/project/template source form validation, including final newlines and leading/trailing blank lines (#113).
-- Keep normal field trimming and reject whitespace-only required Compose without rewriting valid source. Project creation retains whitespace-only env text in its multipart request, file writer and direct env edits; imported templates also persist a new whitespace-only env file.
+- Validate user passwords without trimming meaningful boundary whitespace, matching the raw value submitted and the server password policy (#115).
+- Preserve username/profile normalization, optional blank passwords on Edit and server composition enforcement. Reuse the explicit form-field preservation option from cf.47.
 
-Local verification checks exact form/request values, native project/template file bytes and existing frontend coverage; runtime source-save acceptance remains separate. No deployed application stack or global default template is edited by local validation. Broader Compose/template acceptance remains #28/#17.
-
-Git-managed effective env/override derivation keeps its existing semantic merge behavior; this change does not promise raw byte preservation of derived files.
+Validated using synthetic compiled-form cases, existing native password-policy coverage and frontend checks. No account, password, role or credential is changed by this validation; live credential entry is not part of acceptance.

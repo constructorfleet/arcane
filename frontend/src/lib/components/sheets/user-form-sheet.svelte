@@ -117,7 +117,8 @@
 			displayName: userToEdit?.displayName || '',
 			email: userToEdit?.email || '',
 			roleAssignments: availableRoleAssignments
-		}))
+		})),
+		{ preserveWhitespace: ['password'] }
 	);
 
 	async function submitUser(data: UserFormSubmission) {
