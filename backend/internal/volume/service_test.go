@@ -2,6 +2,7 @@ package volume
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/binary"
 	"encoding/json/v2"
@@ -18,17 +19,22 @@ import (
 	"time"
 
 	"github.com/libtnb/sqlite"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/api/types/system"
 	"github.com/moby/moby/api/types/volume"
 	"github.com/moby/moby/client"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
+	"kit.getarcane.app"
 	"kit.getarcane.app/acfs"
 	acfstypes "kit.getarcane.app/acfs/types"
 
 	"getarcane.dev/arcane/v3/internal/common"
 	"getarcane.dev/arcane/v3/internal/config"
 	"getarcane.dev/arcane/v3/internal/database"
+	"getarcane.dev/arcane/v3/internal/event"
 	"getarcane.dev/arcane/v3/internal/s3"
 	"getarcane.dev/arcane/v3/internal/settings"
 	"getarcane.dev/arcane/v3/pkg/httpx"
@@ -97,17 +103,180 @@ func TestIsInternalVolume(t *testing.T) {
 	require.False(t, svc.isInternalVolume(types.Volume{Name: "user-volume"}))
 }
 
-func TestRenameVolumeRejectsInvalidAndProtectedNames(t *testing.T) {
+func TestVolumeMutationGuards(t *testing.T) {
 	service := &VolumeService{backupVolumeName: "arcane-backups"}
-
 	_, err := service.RenameVolume(t.Context(), "data", "data", types.Actor{})
 	require.ErrorIs(t, err, common.ErrVolumeRenameInvalid)
-
 	_, err = service.RenameVolume(t.Context(), "arcane-backups", "renamed-backups", types.Actor{})
 	require.ErrorIs(t, err, common.ErrVolumeRenameProtected)
-
 	_, err = service.RenameVolume(t.Context(), "data", "arcane-backups", types.Actor{})
 	require.ErrorIs(t, err, common.ErrVolumeRenameProtected)
+	db := &database.DB{DB: newVolumeBackupTestDB(t, "volume-mutation-guards")}
+	for _, tc := range []struct {
+		wantErr            error
+		name               string
+		scope              string
+		state              swarm.LocalNodeState
+		mountType          mount.Type
+		taskState          swarm.TaskState
+		reads              []string
+		inspectStatus      int
+		infoStatus         int
+		serviceStatus      int
+		taskStatus         int
+		wantStatus         int
+		manager            bool
+		referenced         bool
+		previousReferenced bool
+		taskReferenced     bool
+		emptyName          bool
+	}{
+		{
+			name: "referenced global with zero replicas", state: swarm.LocalNodeStateActive, manager: true, referenced: true,
+			reads: []string{"GET /info", "GET /services"}, wantErr: common.ErrConflict, wantStatus: http.StatusConflict,
+		},
+		{
+			name: "rollback configuration reference", state: swarm.LocalNodeStateActive, manager: true, previousReferenced: true,
+			reads: []string{"GET /info", "GET /services"}, wantErr: common.ErrConflict, wantStatus: http.StatusConflict,
+		},
+		{
+			name: "old running task reference", state: swarm.LocalNodeStateActive, manager: true, taskReferenced: true,
+			reads: []string{"GET /info", "GET /services", "GET /tasks"}, wantErr: common.ErrConflict, wantStatus: http.StatusConflict,
+		},
+		{
+			name: "orphaned task does not prove volume release", state: swarm.LocalNodeStateActive,
+			manager: true, taskReferenced: true, taskState: swarm.TaskStateOrphaned,
+			reads:   []string{"GET /info", "GET /services", "GET /tasks"},
+			wantErr: common.ErrConflict, wantStatus: http.StatusConflict,
+		},
+		{
+			name: "worker cannot verify references", state: swarm.LocalNodeStateActive,
+			reads: []string{"GET /info"}, wantErr: common.ErrConflict, wantStatus: http.StatusConflict,
+		},
+		{
+			name: "locked membership cannot verify references", state: swarm.LocalNodeStateLocked,
+			reads: []string{"GET /info"}, wantErr: common.ErrConflict, wantStatus: http.StatusConflict,
+		},
+		{
+			name:  "omitted membership is not standalone",
+			reads: []string{"GET /info"}, wantErr: common.ErrConflict, wantStatus: http.StatusConflict,
+		},
+		{
+			name: "unavailable membership", infoStatus: http.StatusInternalServerError,
+			reads: []string{"GET /info"}, wantErr: common.ErrUnavailable, wantStatus: http.StatusServiceUnavailable,
+		},
+		{
+			name: "unavailable service references", state: swarm.LocalNodeStateActive, manager: true, serviceStatus: http.StatusForbidden,
+			reads: []string{"GET /info", "GET /services"}, wantErr: common.ErrUnavailable, wantStatus: http.StatusServiceUnavailable,
+		},
+		{
+			name: "unavailable task references", state: swarm.LocalNodeStateActive, manager: true, taskStatus: http.StatusInternalServerError,
+			reads: []string{"GET /info", "GET /services", "GET /tasks"}, wantErr: common.ErrUnavailable, wantStatus: http.StatusServiceUnavailable,
+		},
+		{
+			name: "missing inspection cannot be bypassed by force", inspectStatus: http.StatusNotFound,
+			wantErr: common.ErrNotFound, wantStatus: http.StatusNotFound,
+		},
+		{
+			name: "missing global identity", emptyName: true,
+			wantErr: common.ErrConflict, wantStatus: http.StatusConflict,
+		},
+		{
+			name: "unreferenced global manager", state: swarm.LocalNodeStateActive, manager: true,
+			reads: []string{"GET /info", "GET /services", "GET /tasks"},
+		},
+		{
+			name: "bind source is not a volume reference", state: swarm.LocalNodeStateActive, manager: true, referenced: true, mountType: mount.TypeBind,
+			reads: []string{"GET /info", "GET /services", "GET /tasks"},
+		},
+		{
+			name: "terminal task history is not active use", state: swarm.LocalNodeStateActive, manager: true, taskReferenced: true, taskState: swarm.TaskStateShutdown,
+			reads: []string{"GET /info", "GET /services", "GET /tasks"},
+		},
+		{name: "standalone global keeps existing admission", state: swarm.LocalNodeStateInactive, reads: []string{"GET /info"}},
+		{name: "local volume keeps existing admission", scope: "local", state: swarm.LocalNodeStateActive, referenced: true},
+	} {
+		operations := kit.Ternary(tc.wantErr == nil, []string{"preflight"}, []string{"delete", "force delete", "rename"})
+		for _, operation := range operations {
+			t.Run(tc.name+"/"+operation, func(t *testing.T) {
+				var calls []string
+				var callsMu sync.Mutex
+				vol := volume.Volume{Name: kit.Ternary(tc.emptyName, "", "shared-data"), Driver: "rbd:test", Scope: cmp.Or(tc.scope, "global")}
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					callsMu.Lock()
+					calls = append(calls, r.Method+" "+strings.TrimPrefix(r.URL.Path, "/v1.41"))
+					callsMu.Unlock()
+					var status int
+					var payload any
+					switch {
+					case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/volumes/shared-data"):
+						status, payload = cmp.Or(tc.inspectStatus, http.StatusOK), vol
+					case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/info"):
+						status = cmp.Or(tc.infoStatus, http.StatusOK)
+						payload = system.Info{Swarm: swarm.Info{LocalNodeState: tc.state, ControlAvailable: tc.manager}}
+					case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/services"):
+						status = cmp.Or(tc.serviceStatus, http.StatusOK)
+						payload = []swarm.Service{{
+							Spec: swarm.ServiceSpec{
+								Mode: swarm.ServiceMode{Replicated: &swarm.ReplicatedService{Replicas: new(uint64(0))}},
+								TaskTemplate: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{
+									Mounts: []mount.Mount{{Type: cmp.Or(tc.mountType, mount.TypeVolume), Source: kit.Ternary(tc.referenced, "shared-data", "other-data")}},
+								}},
+							},
+							PreviousSpec: &swarm.ServiceSpec{TaskTemplate: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{
+								Mounts: []mount.Mount{{Type: mount.TypeVolume, Source: kit.Ternary(tc.previousReferenced, "shared-data", "previous-data")}},
+							}}},
+						}}
+					case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/tasks"):
+						status = cmp.Or(tc.taskStatus, http.StatusOK)
+						payload = []swarm.Task{{
+							Status: swarm.TaskStatus{State: cmp.Or(tc.taskState, swarm.TaskStateRunning)},
+							Spec: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{
+								Mounts: []mount.Mount{{Type: mount.TypeVolume, Source: kit.Ternary(tc.taskReferenced, "shared-data", "other-task-data")}},
+							}},
+						}}
+					default:
+						status = http.StatusInternalServerError
+					}
+					if status >= http.StatusBadRequest {
+						payload = map[string]string{"message": "metadata unavailable"}
+					}
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(status)
+					_ = json.MarshalWrite(w, payload)
+				}))
+				t.Cleanup(server.Close)
+				svc := NewVolumeService(VolumeServiceParams{
+					Config: &config.Config{}, DB: db,
+					EventService:  event.NewEventService(db, &config.Config{}, server.Client()),
+					DockerService: newVolumeTestDockerService(t, newVolumeServiceTestDockerClient(t, server)),
+				})
+				helper := &volumeHelper{id: "existing-helper"}
+				svc.helperByVolume["shared-data"] = helper
+				var guardErr error
+				switch operation {
+				case "delete", "force delete":
+					guardErr = svc.DeleteVolume(t.Context(), "shared-data", operation == "force delete", types.Actor{})
+				case "rename":
+					_, guardErr = svc.RenameVolume(t.Context(), "shared-data", "renamed-data", types.Actor{})
+				default:
+					guardErr = svc.ensureGlobalVolumeUnreferenced(t.Context(), vol)
+				}
+				if tc.wantErr != nil {
+					require.ErrorIs(t, guardErr, tc.wantErr)
+					require.Equal(t, tc.wantStatus, common.ToAPIError(common.ClassifyDockerError(guardErr)).HTTPStatus())
+				} else {
+					require.NoError(t, guardErr)
+				}
+				wantCalls := append(kit.Ternary(operation == "preflight", []string(nil), []string{"GET /volumes/shared-data"}), tc.reads...)
+				callsMu.Lock()
+				gotCalls := slices.Clone(calls)
+				callsMu.Unlock()
+				require.Equal(t, wantCalls, gotCalls, "only metadata reads may precede admission or rejection; helpers and mutations are forbidden")
+				require.Same(t, helper, svc.helperByVolume["shared-data"])
+			})
+		}
+	}
 }
 
 func newVolumeBackupTestDB(t *testing.T, name string) *gorm.DB {
@@ -645,11 +814,38 @@ func TestVolumePaginationConfig_FiltersByLabel(t *testing.T) {
 		filter string
 		want   []string
 	}{
-		{name: "key only", filter: "backup", want: []string{"tagged", "other"}},
-		{name: "key and value", filter: "backup=daily", want: []string{"tagged"}},
-		{name: "value containing comma", filter: "tags=a,b", want: []string{"tagged"}},
-		{name: "missing key", filter: "missing", want: nil},
-		{name: "blank is a no-op", filter: " ", want: []string{"tagged", "other", "bare"}},
+		{
+			name:   "key only",
+			filter: "backup",
+			want: []string{
+				"tagged",
+				"other",
+			},
+		},
+		{
+			name:   "key and value",
+			filter: "backup=daily",
+			want:   []string{"tagged"},
+		},
+		{
+			name:   "value containing comma",
+			filter: "tags=a,b",
+			want:   []string{"tagged"},
+		},
+		{
+			name:   "missing key",
+			filter: "missing",
+			want:   nil,
+		},
+		{
+			name:   "blank is a no-op",
+			filter: " ",
+			want: []string{
+				"tagged",
+				"other",
+				"bare",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

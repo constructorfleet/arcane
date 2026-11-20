@@ -16,6 +16,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/api/types/volume"
 	"github.com/moby/moby/client"
 	"github.com/samber/mo"
@@ -504,6 +505,61 @@ func (s *VolumeService) CreateVolume(ctx context.Context, options client.VolumeC
 	return new(types.NewVolume(vol.Volume)), nil
 }
 
+func (s *VolumeService) ensureGlobalVolumeUnreferenced(ctx context.Context, vol volume.Volume) error {
+	if vol.Scope != "global" {
+		return nil
+	}
+	if vol.Name == "" {
+		return common.Classify(common.ErrConflict, errors.New("global volume identity is unavailable"))
+	}
+	info, err := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.SystemInfoResult, error) {
+		return dockerClient.Info(ctx, client.InfoOptions{})
+	})
+	if err != nil {
+		return common.Classify(common.ErrUnavailable, fmt.Errorf("verify Swarm membership before global volume mutation: %w", err))
+	}
+	state := info.Info.Swarm
+	if state.LocalNodeState == swarm.LocalNodeStateInactive {
+		return nil
+	}
+	if state.LocalNodeState != swarm.LocalNodeStateActive || !state.ControlAvailable {
+		return common.Classify(common.ErrConflict, errors.New("global volume mutation requires a manager agent to verify Swarm service references"))
+	}
+	services, err := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.ServiceListResult, error) {
+		return dockerClient.ServiceList(ctx, client.ServiceListOptions{})
+	})
+	if err != nil {
+		return common.Classify(common.ErrUnavailable, fmt.Errorf("verify Swarm service references before global volume mutation: %w", err))
+	}
+	referencesVolume := func(spec swarm.TaskSpec) bool {
+		return slices.ContainsFunc(kit.FromPtr(spec.ContainerSpec).Mounts, func(entry mount.Mount) bool {
+			return entry.Type == mount.TypeVolume && entry.Source == vol.Name
+		})
+	}
+	if slices.ContainsFunc(services.Items, func(service swarm.Service) bool {
+		return referencesVolume(service.Spec.TaskTemplate) || referencesVolume(kit.FromPtr(service.PreviousSpec).TaskTemplate)
+	}) {
+		return common.Classify(common.ErrConflict, errors.New("global volume is referenced by current or rollback Swarm service configuration; remove that reference before deleting or renaming the volume"))
+	}
+	tasks, err := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.TaskListResult, error) {
+		return dockerClient.TaskList(ctx, client.TaskListOptions{})
+	})
+	if err != nil {
+		return common.Classify(common.ErrUnavailable, fmt.Errorf("verify Swarm task references before global volume mutation: %w", err))
+	}
+	if slices.ContainsFunc(tasks.Items, func(task swarm.Task) bool {
+		switch task.Status.State {
+		case swarm.TaskStateComplete, swarm.TaskStateShutdown, swarm.TaskStateFailed, swarm.TaskStateRejected, swarm.TaskStateRemove:
+			return false
+		default:
+			return referencesVolume(task.Spec)
+		}
+	}) {
+		return common.Classify(common.ErrConflict, errors.New("global volume is referenced by an active or uncertain Swarm task; verify that reference before deleting or renaming the volume"))
+	}
+	return nil
+}
+
 func (s *VolumeService) DeleteVolume(ctx context.Context, name string, force bool, user types.Actor) error {
 	slog.DebugContext(ctx, "volume service: delete volume", "volume", name, "force", force, "user", user.ID)
 	// Clients may not know this environment's backup volume name, so its removal is refused here.
@@ -523,6 +579,16 @@ func (s *VolumeService) DeleteVolume(ctx context.Context, name string, force boo
 			Metadata:      database.JSON{"action": "delete", "force": force},
 		}, err)
 		return fmt.Errorf("failed to connect to Docker: %w", err)
+	}
+
+	inspected, inspectErr := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.VolumeInspectResult, error) {
+		return dockerClient.VolumeInspect(ctx, name, client.VolumeInspectOptions{})
+	})
+	if inspectErr != nil {
+		return common.ClassifyDockerError(fmt.Errorf("inspect volume before removal: %w", inspectErr))
+	}
+	if guardErr := s.ensureGlobalVolumeUnreferenced(ctx, inspected.Volume); guardErr != nil {
+		return guardErr
 	}
 
 	// Stop any read-only browse helper first; a helper mounting the volume would
@@ -1060,6 +1126,9 @@ func (s *VolumeService) RenameVolume(ctx context.Context, oldName, newName strin
 	}
 	if s.isInternalVolume(types.NewVolume(source.Volume)) {
 		return nil, common.ErrVolumeRenameProtected
+	}
+	if guardErr := s.ensureGlobalVolumeUnreferenced(ctx, source.Volume); guardErr != nil {
+		return nil, guardErr
 	}
 
 	// Stop any read-only browse helper first; a helper mounting the volume would

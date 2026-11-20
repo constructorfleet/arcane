@@ -71,6 +71,8 @@ nodes have manager role; worker-role, migration and failure/disconnect cases rem
 
 ## Volumes and files
 
+cf.45 targets backend reference guards for global-volume delete/rename (#109), including declared zero-replica service mounts. Read-only production acceptance and broader storage identity/routing remain separate; no production volume mutation is claimed.
+
 - [ ] VOL-01 — Browse plugin-backed volumes, including the homelab RBD plugin, through remote agents as well as the manager's node.
 - [ ] VOL-02 — Mount volumes through Docker by name rather than assuming a host path for plugin mountpoints.
 - [ ] VOL-03 — Select the existing consumer's node for an attached RBD volume; verify attachment semantics before using another node.
