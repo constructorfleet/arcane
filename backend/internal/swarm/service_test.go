@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -68,6 +69,33 @@ func TestAggregateTasksMergesEnvironments(t *testing.T) {
 	require.EqualValues(t, 2, body.Pagination.TotalItems)
 	require.Len(t, body.FailedEnvironments, 1)
 	require.Equal(t, "c", body.FailedEnvironments[0].Environment.ID)
+}
+
+func TestServiceTaskPaginationFiltersBeforeSlicing(t *testing.T) {
+	items := make([]types.SwarmTaskSummary, 0, 120)
+	for i := range 120 {
+		items = append(items, types.SwarmTaskSummary{
+			ID: fmt.Sprintf("task-%03d", i), ServiceName: "node-exporter", NodeName: fmt.Sprintf("node-%03d", i),
+			CurrentState: "running", DesiredState: "running",
+		})
+	}
+	params := pagination.QueryParams{
+		Params:     pagination.Params{Start: 100, Limit: 20},
+		SortParams: pagination.SortParams{Sort: "nodeName", Order: pagination.SortAsc},
+	}
+	page := taskPagination.SearchOrderAndPaginate(items, params)
+	require.EqualValues(t, 120, page.TotalCount)
+	require.Len(t, page.Items, 20)
+	require.Equal(t, "task-100", page.Items[0].ID)
+
+	params.Start = 0
+	params.Filters = map[string]string{"nodeName": "node-105,node-115", "currentState": "running", "desiredState": "running"}
+	page = taskPagination.SearchOrderAndPaginate(items, params)
+	require.EqualValues(t, 120, page.TotalAvailable)
+	require.EqualValues(t, 2, page.TotalCount)
+	require.Len(t, page.Items, 2)
+	require.Equal(t, "task-105", page.Items[0].ID)
+	require.Equal(t, "task-115", page.Items[1].ID)
 }
 
 func TestAggregateStatusReportsEachEnvironment(t *testing.T) {

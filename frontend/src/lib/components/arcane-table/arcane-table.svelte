@@ -86,6 +86,7 @@
 		columnVisibility = $bindable<ColumnVisibilityState>({}),
 		preferencesReady = $bindable(false),
 		viewMode = $bindable<TableViewMode>('list'),
+		listOnly = false,
 		hiddenSortFallback,
 		groupedRows = null,
 		groupBy,
@@ -134,6 +135,7 @@
 		columnVisibility?: ColumnVisibilityState;
 		preferencesReady?: boolean;
 		viewMode?: TableViewMode;
+		listOnly?: boolean;
 		hiddenSortFallback?: SortState;
 		groupedRows?: GroupedData<TData>[] | null;
 		groupBy?: (item: TData) => string;
@@ -304,7 +306,7 @@
 			return;
 		}
 		const snapshot = extractPersistedPreferences(prefs?.current, getEffectiveLimit());
-		if (snapshot.viewMode) viewMode = snapshot.viewMode;
+		if (snapshot.viewMode && !listOnly) viewMode = snapshot.viewMode;
 		if (!restoreAllPageSize && snapshot.limit === TABLE_PAGE_SIZE_ALL) {
 			snapshot.limit = DEFAULT_LIMIT;
 		}
@@ -825,7 +827,7 @@
 					{wrapText}
 					onToggleWrapText={toggleWrapText}
 					{viewMode}
-					onViewModeChange={isMobile.current ? undefined : setViewMode}
+					onViewModeChange={isMobile.current || listOnly ? undefined : setViewMode}
 					{isFiltered}
 					onResetFilters={resetFilters}
 					pagination={withoutPagination || emptyFirstPage ? undefined : PaginationSnippet}
@@ -882,7 +884,7 @@
 			</div>
 		{/if}
 
-		{#if !isMobile.current && viewMode === 'grid'}
+		{#if !isMobile.current && !listOnly && viewMode === 'grid'}
 			<div
 				{@attach (node) => restoreScroll(node, 'grid')}
 				{@attach trackOverflow((value) => (overflow = value))}

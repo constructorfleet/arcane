@@ -1,7 +1,7 @@
 <script lang="ts">
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
-	import type { ColumnSpec, MobileFieldVisibility } from '#lib/components/arcane-table/index.js';
+	import type { ColumnSpec, FilterOption, MobileFieldVisibility } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
 	import SwarmTaskContainer from '#lib/components/swarm/swarm-task-container.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -11,6 +11,7 @@
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import type { SwarmTasksPaginatedResponse } from '#lib/types/ui/swarm.js';
 	import type { EnvironmentPage, EnvironmentRow } from '#lib/utils/environments.js';
+	import { formatDateTimeShort } from '#lib/utils/formatting.js';
 	import { getSwarmTaskIconVariant, getSwarmTaskStateVariant } from '#lib/utils/swarm-tasks.js';
 
 	let {
@@ -18,35 +19,84 @@
 		requestOptions = $bindable(),
 		onRetry,
 		persistKey = 'arcane-swarm-tasks-table',
-		showEnvironment = true
+		showEnvironment = true,
+		serviceScoped = false,
+		nodeFilters = [],
+		loading = false,
+		refreshError
 	}: {
 		tasks: TaskPage;
 		requestOptions: SearchPaginationSortRequest;
 		onRetry: () => Promise<unknown>;
 		persistKey?: string;
 		showEnvironment?: boolean;
+		serviceScoped?: boolean;
+		nodeFilters?: FilterOption[];
+		loading?: boolean;
+		refreshError?: unknown;
 	} = $props();
 
 	type TaskRow = EnvironmentRow<SwarmTaskSummary>;
 	type TaskPage = EnvironmentPage<SwarmTasksPaginatedResponse>;
 
+	const stateFilters = [
+		'new',
+		'allocated',
+		'pending',
+		'assigned',
+		'accepted',
+		'preparing',
+		'ready',
+		'starting',
+		'running',
+		'complete',
+		'shutdown',
+		'failed',
+		'rejected',
+		'remove',
+		'orphaned'
+	].map((state) => ({ label: state, value: state }));
+
+	const serviceColumns: ColumnSpec<TaskRow>[] = [
+		{ accessorKey: 'updatedAt', id: 'updated', title: m.common_updated(), sortable: true, cell: UpdatedCell },
+		{ accessorKey: 'error', title: m.common_error(), cell: ErrorCell }
+	];
+
 	const columns = $derived([
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
 		...(showEnvironment ? environmentColumns<TaskRow>() : []),
-		{ accessorKey: 'name', title: m.common_name(), sortable: true },
+		{ accessorKey: 'name', title: m.common_name(), sortable: true, cell: serviceScoped ? TaskNameCell : undefined },
 		{ id: 'container', title: m.container(), cell: ContainerCell },
-		{ accessorKey: 'serviceName', title: m.swarm_service(), sortable: true },
-		{ accessorKey: 'nodeName', title: m.swarm_node(), sortable: true },
-		{ accessorKey: 'currentState', title: m.swarm_current_state(), sortable: true, cell: StateCell },
-		{ accessorKey: 'desiredState', title: m.swarm_desired_state(), sortable: true, cell: DesiredStateCell }
+		...(serviceScoped ? [] : [{ accessorKey: 'serviceName', title: m.swarm_service(), sortable: true } as const]),
+		{
+			accessorKey: 'nodeName',
+			title: m.swarm_node(),
+			sortable: true,
+			filterOptions: nodeFilters.length ? nodeFilters : undefined
+		},
+		{
+			accessorKey: 'currentState',
+			title: m.swarm_current_state(),
+			sortable: true,
+			cell: StateCell,
+			filterOptions: serviceScoped ? stateFilters : undefined
+		},
+		{
+			accessorKey: 'desiredState',
+			title: m.swarm_desired_state(),
+			sortable: true,
+			cell: DesiredStateCell,
+			filterOptions: serviceScoped ? stateFilters : undefined
+		},
+		...(serviceScoped ? serviceColumns : [])
 	] satisfies ColumnSpec<TaskRow>[]);
 
-	const mobileFields = [
-		{ id: 'serviceName', label: m.swarm_service(), defaultVisible: true },
+	const mobileFields = $derived([
+		...(serviceScoped ? [] : [{ id: 'serviceName', label: m.swarm_service(), defaultVisible: true }]),
 		{ id: 'nodeName', label: m.swarm_node(), defaultVisible: true },
 		{ id: 'currentState', label: m.swarm_current_state(), defaultVisible: true },
-		{ id: 'desiredState', label: m.swarm_desired_state(), defaultVisible: false }
-	];
+		{ id: 'desiredState', label: m.swarm_desired_state(), defaultVisible: serviceScoped }
+	]);
 
 	let mobileFieldVisibility = $state<Record<string, boolean>>({});
 </script>
@@ -63,19 +113,41 @@
 	<Badge variant={getSwarmTaskStateVariant(String(value ?? ''))} minWidth="20">{String(value ?? m.common_unknown())}</Badge>
 {/snippet}
 
+{#snippet TaskNameCell({ item }: { item: TaskRow })}
+	<div title={item.id}>
+		{#if item.name}<div class="truncate" title={item.name}>{item.name}</div>{/if}
+		<div class="font-mono text-xs text-muted-foreground">{item.id.slice(0, 12)}</div>
+	</div>
+{/snippet}
+
+{#snippet UpdatedCell({ item }: { item: TaskRow })}
+	{formatDateTimeShort(item.updatedAt) || m.common_na()}
+{/snippet}
+
+{#snippet ErrorCell({ item }: { item: TaskRow })}
+	{#if item.error}
+		<span class="wrap-anywhere text-destructive">{item.error}</span>
+	{/if}
+{/snippet}
+
 {#snippet TaskMobileCardSnippet({ item, mobileFieldVisibility }: { item: TaskRow; mobileFieldVisibility: MobileFieldVisibility })}
 	<UniversalMobileCard
 		{item}
+		class={serviceScoped ? 'my-1 rounded-lg border border-border bg-card p-3' : undefined}
 		icon={() => ({
 			component: JobsIcon,
 			variant: getSwarmTaskIconVariant(item.currentState)
 		})}
-		title={(item: TaskRow) => item.name}
-		subtitle={(item: TaskRow) => ((mobileFieldVisibility['serviceName'] ?? true) ? item.serviceName : null)}
+		title={(item: TaskRow) => (serviceScoped ? item.name || item.id.slice(0, 12) : item.name)}
+		subtitle={(item: TaskRow) =>
+			serviceScoped ? item.id.slice(0, 12) : (mobileFieldVisibility['serviceName'] ?? true) ? item.serviceName : null}
 		badges={[
 			(item: TaskRow) =>
 				(mobileFieldVisibility['currentState'] ?? true)
-					? { variant: getSwarmTaskStateVariant(item.currentState), text: item.currentState }
+					? {
+							variant: getSwarmTaskStateVariant(item.currentState),
+							text: serviceScoped ? `${m.swarm_current_state()}: ${item.currentState}` : item.currentState
+						}
 					: null
 		]}
 		fields={[
@@ -91,11 +163,14 @@
 				getValue: (item: TaskRow) => item.desiredState,
 				icon: ConnectionIcon,
 				iconVariant: 'gray' as const,
-				show: mobileFieldVisibility['desiredState'] ?? false
+				show: mobileFieldVisibility['desiredState'] ?? serviceScoped
 			}
 		]}
 	>
 		<SwarmTaskContainer task={item} environmentId={item.environmentId} />
+		{#if serviceScoped && item.error}
+			<p class="mt-1 text-sm wrap-anywhere text-destructive">{item.error}</p>
+		{/if}
 	</UniversalMobileCard>
 {/snippet}
 
@@ -106,6 +181,9 @@
 	bind:mobileFieldVisibility
 	selectionDisabled={true}
 	{onRetry}
+	{loading}
+	listOnly={serviceScoped}
+	{refreshError}
 	{columns}
 	{mobileFields}
 	mobileCard={TaskMobileCardSnippet}

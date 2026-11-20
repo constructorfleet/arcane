@@ -119,6 +119,14 @@
 	const tagsColumnFilterOptions = $derived(tagsColumn?.columnDef.meta?.filterOptions ?? []);
 	const labelColumn = $derived(table.getAllColumns().some((col) => col.id === 'label') ? table.getColumn('label') : undefined);
 
+	const additionalFacets = $derived(
+		table.getAllColumns().flatMap((column) => {
+			const options = column.columnDef.meta?.filterOptions;
+			if (!options?.length || column.id === 'type' || column.id === 'tags') return [];
+			return [{ column, title: column.columnDef.meta?.title ?? column.id, options }];
+		})
+	);
+
 	const debouncedSetGlobal = debounced((v: string) => table.setGlobalFilter(v), 300);
 	const imageNameFilterOptionsFormatted = $derived(imageNameFilterOptions.map((name) => ({ label: name, value: name })));
 	const hasSelection = $derived(!selectionDisabled && (selectedIds?.length ?? 0) > 0);
@@ -128,6 +136,7 @@
 		!withoutFilters &&
 			[
 				environmentColumn,
+				additionalFacets.length > 0,
 				typeColumn && typeColumnFilterOptions.length > 0,
 				tagsColumn && tagsColumnFilterOptions.length > 0,
 				labelColumn,
@@ -176,6 +185,9 @@
 	{#if statusColumn && serviceCountColumn}
 		<DataTableFacetedFilter column={statusColumn} title={m.common_status()} options={projectStatusFilters} />
 	{/if}
+	{#each additionalFacets as { column, title, options } (column.id)}
+		<DataTableFacetedFilter {column} {title} {options} />
+	{/each}
 {/snippet}
 
 {#snippet viewModeButton(mode: TableViewMode, Icon: IconType, label: string)}

@@ -130,6 +130,8 @@ Corrected live UI and no-helper acceptance remain tracked in #14.
 
 ## Native Docker resources and onboarding
 
+- [ ] Service Tasks table (#171). Verify pagination, total counts, node and state filters, and vertical cards on mobile. Network and Storage use vertical detail panels.
+
 - [ ] RES-01 — Discover resources on an existing Swarm regardless of whether Ansible, SwarmCD, Docker CLI, Arcane, or another UI deployed them.
 - [ ] RES-02 — Manage existing stacks/services without recreating or relabeling them merely to onboard them.
 - [ ] RES-03 — Inspect services/tasks and edit native service settings, replicas, constraints, labels, mounts, ports, and update policies.

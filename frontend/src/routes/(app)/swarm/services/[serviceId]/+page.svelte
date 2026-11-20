@@ -388,7 +388,9 @@
 
 			<Tabs.Content value="tasks" class="h-full">
 				{#if selectedTab === 'tasks'}
-					<ServiceTasksPanel environmentId={envId} {serviceName} serviceId={service.id} />
+					{#key JSON.stringify([envId, service.id])}
+						<ServiceTasksPanel environmentId={envId} serviceId={service.id} />
+					{/key}
 				{/if}
 			</Tabs.Content>
 

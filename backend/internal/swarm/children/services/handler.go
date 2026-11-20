@@ -54,6 +54,9 @@ type (
 		Search        string `query:"search" doc:"Search query"`
 		Sort          string `query:"sort" doc:"Column to sort by"`
 		Order         string `query:"order" default:"asc" doc:"Sort direction (asc or desc)"`
+		NodeName      string `query:"nodeName" doc:"Node hostnames (comma-separated)"`
+		CurrentState  string `query:"currentState" doc:"Current task states (comma-separated)"`
+		DesiredState  string `query:"desiredState" doc:"Desired task states (comma-separated)"`
 		Start         int    `query:"start" default:"0" doc:"Start index for pagination"`
 		Limit         int    `query:"limit" default:"20" doc:"Number of items per page"`
 	}
@@ -145,6 +148,12 @@ func (h *Handler) DeleteService(ctx context.Context, input *DeleteSwarmServiceIn
 
 func (h *Handler) ListServiceTasks(ctx context.Context, input *ListSwarmServiceTasksInput) (*handlerutil.Page[types.SwarmTaskSummary], error) {
 	params := handlerutil.PaginationParams(input.Start, input.Limit, input.Sort, input.Order, input.Search)
+	params.Filters = make(map[string]string)
+	for key, value := range map[string]string{"nodeName": input.NodeName, "currentState": input.CurrentState, "desiredState": input.DesiredState} {
+		if value != "" {
+			params.Filters[key] = value
+		}
+	}
 	items, paginationResp, err := h.service.ListServiceTasksPaginated(ctx, input.ServiceID, params)
 	if err != nil {
 		return nil, h.mapError(err, "Failed to list swarm tasks: "+err.Error())

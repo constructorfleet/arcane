@@ -2,112 +2,79 @@
 	import { createQuery } from '@tanstack/svelte-query';
 
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
-	import SwarmTaskContainer from '#lib/components/swarm/swarm-task-container.svelte';
-	import { Badge } from '#lib/components/ui/badge/index.js';
-	import * as Card from '#lib/components/ui/card/index.js';
-	import { JobsIcon, ConnectionIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { swarmService } from '#lib/services/swarm-service.js';
+	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
+	import type { SwarmTasksPaginatedResponse } from '#lib/types/ui/swarm.js';
 	import { hasPermission } from '#lib/utils/auth.js';
-	import { getSwarmTaskStateVariant, sortSwarmTasks } from '#lib/utils/swarm-tasks.js';
+	import { environmentName, environmentRows, type EnvironmentPage } from '#lib/utils/environments.js';
 
-	let {
-		environmentId,
-		serviceName,
-		serviceId
-	}: {
-		environmentId: string;
-		serviceName: string;
-		serviceId: string;
-	} = $props();
+	import SwarmTasksTable from '../../tasks/components/tasks-table.svelte';
 
-	const tasksQuery = createQuery(() => {
-		const requestedEnvironmentId = environmentId;
-		const requestedServiceId = serviceId;
+	let { environmentId, serviceId }: { environmentId: string; serviceId: string } = $props();
+	let requestOptions = $state<SearchPaginationSortRequest>({
+		pagination: { page: 1, limit: 20 },
+		sort: { column: 'updated', direction: 'desc' }
+	});
+	const nodeRequest: SearchPaginationSortRequest = { pagination: { page: 1, limit: -1 } };
+	const nodesQuery = createQuery(() => {
+		const agent = environmentId;
 		return {
-			queryKey: queryKeys.swarm.serviceTasks(requestedEnvironmentId, requestedServiceId),
-			queryFn: () =>
-				swarmService.getServiceTasks(requestedServiceId, { pagination: { page: 1, limit: 100 } }, requestedEnvironmentId),
-			enabled: !!serviceName && !!requestedServiceId && hasPermission('swarm-services:read', requestedEnvironmentId)
+			queryKey: queryKeys.swarm.nodes(agent, nodeRequest),
+			queryFn: () => swarmService.getNodes(nodeRequest, agent),
+			enabled: !!agent && hasPermission('swarm-nodes:read', agent)
 		};
 	});
-	const tasks = $derived(sortSwarmTasks(tasksQuery.data?.data ?? []));
-	const isLoading = $derived(tasksQuery.isFetching);
-	const hasLoaded = $derived(tasksQuery.isFetched);
+	const nodeFilters = $derived(
+		[...new Set((nodesQuery.data?.data ?? []).map((node) => node.hostname).filter(Boolean))]
+			.sort((a, b) => a.localeCompare(b))
+			.map((name) => ({ value: name, label: name }))
+	);
+	const tasksQuery = createQuery(() => {
+		const agent = environmentId;
+		const service = serviceId;
+		const options = $state.snapshot(requestOptions);
+		return {
+			queryKey: queryKeys.swarm.serviceTasks(agent, service, options),
+			queryFn: () => swarmService.getServiceTasks(service, options, agent),
+			enabled: !!service && hasPermission('swarm-services:read', agent)
+		};
+	});
+	const result = $derived(tasksQuery.data);
+	const tasks: EnvironmentPage<SwarmTasksPaginatedResponse> = $derived({
+		data: environmentRows(result?.data ?? [], [{ id: environmentId, name: environmentName(environmentId) }]),
+		pagination: result?.pagination ?? {
+			totalItems: 0,
+			totalPages: 1,
+			currentPage: requestOptions.pagination?.page ?? 1,
+			itemsPerPage: requestOptions.pagination?.limit ?? 20
+		}
+	});
 </script>
 
-<Card.Root>
-	<Card.Header icon={JobsIcon}>
-		<div class="flex flex-1 items-center justify-between">
-			<div class="flex flex-col gap-1.5">
-				<Card.Title>
-					<h2>{m.tasks()}</h2>
-				</Card.Title>
-				<Card.Description>
-					{m.swarm_service_tasks_count({ count: tasks.length })}
-				</Card.Description>
-			</div>
-			<ArcaneButton action="refresh" onclick={() => tasksQuery.refetch()} disabled={isLoading}>
-				{m.common_refresh()}
-			</ArcaneButton>
-		</div>
-	</Card.Header>
-	<Card.Content>
-		{#if isLoading && !hasLoaded}
-			<div class="py-12 text-center text-sm text-muted-foreground">{m.swarm_service_tasks_loading()}</div>
-		{:else if tasks.length === 0}
-			<div class="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
-				<div class="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted/30">
-					<JobsIcon class="size-6 text-muted-foreground" />
-				</div>
-				<div class="text-sm">{m.swarm_service_tasks_empty()}</div>
-			</div>
-		{:else}
-			<div class="grid grid-cols-1 gap-x-8 lg:grid-cols-2 xl:grid-cols-3">
-				{#each tasks as task (task.id)}
-					<div class="border-b border-border/50 py-3">
-						<div class="mb-2 flex items-center justify-between">
-							<div class="min-w-0 flex-1">
-								<div class="truncate text-sm font-semibold text-foreground" title={task.name}>
-									{task.name}
-								</div>
-								<div class="font-mono text-xs text-muted-foreground">{task.id.slice(0, 12)}</div>
-							</div>
-						</div>
-						<div class="grid grid-cols-2 gap-2">
-							<div>
-								<div class="mb-1 text-xs font-semibold text-muted-foreground">{m.swarm_current_state()}</div>
-								<Badge variant={getSwarmTaskStateVariant(task.currentState)} size="sm" minWidth="20">{task.currentState}</Badge>
-							</div>
-							<div>
-								<div class="mb-1 text-xs font-semibold text-muted-foreground">
-									{m.swarm_desired_state()}
-								</div>
-								<Badge variant={getSwarmTaskStateVariant(task.desiredState)} size="sm" minWidth="20">{task.desiredState}</Badge>
-							</div>
-							<div class="col-span-2">
-								<div class="mb-1 text-xs font-semibold text-muted-foreground">
-									{m.swarm_node()}
-								</div>
-								<div class="flex items-center gap-1">
-									<ConnectionIcon class="size-3 text-muted-foreground" />
-									<span class="truncate text-sm text-foreground">{task.nodeName || m.common_na()}</span>
-								</div>
-							</div>
-							<div class="col-span-2">
-								<SwarmTaskContainer {task} {environmentId} />
-							</div>
-							{#if task.error}
-								<div class="col-span-2">
-									<div class="mb-1 text-xs font-semibold text-muted-foreground">{m.common_error()}</div>
-									<div class="text-sm break-all text-destructive">{task.error}</div>
-								</div>
-							{/if}
-						</div>
-					</div>
-				{/each}
-			</div>
-		{/if}
-	</Card.Content>
-</Card.Root>
+<div class="flex flex-col gap-3">
+	<div class="flex flex-wrap items-center justify-between gap-2">
+		<h2 class="text-sm font-semibold">
+			{#if result}
+				{m.swarm_service_tasks_count({ count: result.pagination.grandTotalItems ?? result.pagination.totalItems })}
+			{:else}
+				{m.tasks()}
+			{/if}
+		</h2>
+		<ArcaneButton action="refresh" onclick={() => tasksQuery.refetch()} disabled={tasksQuery.isFetching}>
+			{m.common_refresh()}
+		</ArcaneButton>
+	</div>
+	<SwarmTasksTable
+		{tasks}
+		bind:requestOptions
+		showEnvironment={false}
+		serviceScoped
+		{nodeFilters}
+		persistKey="arcane-swarm-service-tasks-table"
+		loading={tasksQuery.isFetching && !result}
+		refreshError={tasksQuery.error}
+		onRetry={() => tasksQuery.refetch()}
+	/>
+</div>

@@ -101,11 +101,23 @@ var (
 			func(task types.SwarmTaskSummary) (string, error) { return task.CurrentState, nil },
 		},
 		SortBindings: []pagination.SortBinding[types.SwarmTaskSummary]{
-			{Key: "service", Fn: func(a, b types.SwarmTaskSummary) int { return strings.Compare(a.ServiceName, b.ServiceName) }},
+			{Key: "service", Fn: func(a, b types.SwarmTaskSummary) int {
+				return cmp.Or(strings.Compare(a.ServiceName, b.ServiceName), strings.Compare(a.ID, b.ID))
+			}},
 			{Key: "node", Fn: func(a, b types.SwarmTaskSummary) int { return strings.Compare(a.NodeName, b.NodeName) }},
 			{Key: "state", Fn: func(a, b types.SwarmTaskSummary) int { return strings.Compare(a.CurrentState, b.CurrentState) }},
 			{Key: "created", Fn: func(a, b types.SwarmTaskSummary) int { return a.CreatedAt.Compare(b.CreatedAt) }},
 			{Key: "updated", Fn: func(a, b types.SwarmTaskSummary) int { return a.UpdatedAt.Compare(b.UpdatedAt) }},
+			{Key: "name", Fn: func(a, b types.SwarmTaskSummary) int { return strings.Compare(a.Name, b.Name) }},
+			{Key: "nodeName", Fn: func(a, b types.SwarmTaskSummary) int { return strings.Compare(a.NodeName, b.NodeName) }},
+			{Key: "currentState", Fn: func(a, b types.SwarmTaskSummary) int { return strings.Compare(a.CurrentState, b.CurrentState) }},
+			{Key: "desiredState", Fn: func(a, b types.SwarmTaskSummary) int { return strings.Compare(a.DesiredState, b.DesiredState) }},
+			{Key: "serviceName", Fn: func(a, b types.SwarmTaskSummary) int { return strings.Compare(a.ServiceName, b.ServiceName) }},
+		},
+		FilterAccessors: []pagination.FilterAccessor[types.SwarmTaskSummary]{
+			{Key: "nodeName", Fn: func(task types.SwarmTaskSummary, value string) bool { return task.NodeName == value }},
+			{Key: "currentState", Fn: func(task types.SwarmTaskSummary, value string) bool { return task.CurrentState == value }},
+			{Key: "desiredState", Fn: func(task types.SwarmTaskSummary, value string) bool { return task.DesiredState == value }},
 		},
 	}
 )
