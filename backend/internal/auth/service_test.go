@@ -19,8 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
-	"kit.getarcane.app/docker/streams/bus"
-
 	"getarcane.dev/arcane/v3/buildables"
 	"getarcane.dev/arcane/v3/internal/apikey"
 	"getarcane.dev/arcane/v3/internal/common"
@@ -96,7 +94,7 @@ func newBootstrapTestVersionService(t *testing.T, db *database.DB) *version.Vers
 	return version.NewVersionService(version.VersionServiceParams{
 		AppVersion:      "1.2.3",
 		Revision:        "revision",
-		DockerService:   docker.NewDockerClientService(t.Context(), nil, versionSettings, bus.Config{}).WithClient(dockerClient),
+		DockerService:   docker.NewDockerClientService(t.Context(), nil, versionSettings, docker.ClientOptions{}).WithClient(dockerClient),
 		SettingsService: versionSettings,
 	})
 }

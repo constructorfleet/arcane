@@ -141,8 +141,10 @@ func startJobScheduler(p startJobSchedulerParams) {
 			}
 			p.GitOpsSync.RegisterAutoSyncJobsOnStartup(ctx)
 			p.GitOpsSync.SubscribeProjectFileChanges()
-			if registerBusWatcherErr := p.Scheduler.RegisterBusWatcher(p.ImageUpdateWatcher, true); registerBusWatcherErr != nil {
-				return registerBusWatcherErr
+			if !p.Config.ControlPlane {
+				if registerBusWatcherErr := p.Scheduler.RegisterBusWatcher(p.ImageUpdateWatcher, true); registerBusWatcherErr != nil {
+					return registerBusWatcherErr
+				}
 			}
 			if startSchedulerErr := p.Scheduler.StartScheduler(ctx); startSchedulerErr != nil {
 				return fmt.Errorf("start scheduler: %w", startSchedulerErr)
@@ -242,13 +244,8 @@ func reconcileCoordinatorStartup(ctx context.Context, p startJobSchedulerParams)
 
 func registerJobs(params registerJobsParams) error {
 	jobs := []types.SchedulerJob{
-		params.AutoUpdate,
 		params.Analytics,
 		params.EventCleanup,
-		params.PruningVolumeHelper,
-		params.ScheduledPrune,
-		params.AutoPatch,
-		params.AutoHeal,
 		params.ActivitySweep,
 		params.UploadSessionsCleanup,
 		params.GitCloneCleanup,
@@ -256,7 +253,11 @@ func registerJobs(params registerJobsParams) error {
 		params.UpgradeLogCleanup,
 	}
 	if !params.Config.ControlPlane {
-		jobs = append(jobs, params.DockerClientRefresh, params.VulnerabilityScan, params.VulnerabilityRisk)
+		jobs = append(jobs,
+			params.DockerClientRefresh, params.AutoUpdate, params.ScheduledPrune,
+			params.AutoPatch, params.AutoHeal, params.PruningVolumeHelper,
+			params.VulnerabilityScan, params.VulnerabilityRisk,
+		)
 	}
 	if !params.Config.AgentEnabled {
 		jobs = append(jobs, params.ExpiredSessionsCleanup, params.ApnsOutbox, params.LdapSync)
@@ -301,7 +302,9 @@ func registerJobs(params registerJobsParams) error {
 }
 
 func registerDynamicJobs(params dynamicJobsParams) {
-	params.Volume.RegisterBackupJobsOnStartup(params.AppCtx)
+	if !params.Config.ControlPlane {
+		params.Volume.RegisterBackupJobsOnStartup(params.AppCtx)
+	}
 	if !params.Config.AgentEnabled {
 		params.System.RegisterBackupJobOnStartup(params.AppCtx)
 	}
@@ -329,13 +332,16 @@ func setupSettingsSubscriptions(params settingsSubscriptionsParams) error {
 			}
 		})
 	}
-	subscribe([]string{"pollingEnabled", "pollingInterval"}, func(_ []types.SettingUpdate) {
-		params.ImageUpdateWatcher.RefreshSchedule()
-		params.ImageUpdateWatcher.Trigger()
-		if err := params.Scheduler.AddJob(params.LifecycleCtx, params.AutoUpdate); err != nil {
-			slog.WarnContext(params.LifecycleCtx, "Failed to reschedule auto-update job", "error", err)
-		}
-	})
+	if !params.Config.ControlPlane {
+		subscribe([]string{"pollingEnabled", "pollingInterval"}, func(_ []types.SettingUpdate) {
+			params.ImageUpdateWatcher.RefreshSchedule()
+			params.ImageUpdateWatcher.Trigger()
+			if err := params.Scheduler.AddJob(params.LifecycleCtx, params.AutoUpdate); err != nil {
+				slog.WarnContext(params.LifecycleCtx, "Failed to reschedule auto-update job", "error", err)
+			}
+		})
+		rescheduleOn([]string{"autoUpdate", "autoUpdateInterval"}, params.AutoUpdate)
+	}
 
 	if !params.Config.AgentEnabled {
 		subscribe([]string{"apnsEnabled"}, func(updates []types.SettingUpdate) {
@@ -346,9 +352,11 @@ func setupSettingsSubscriptions(params settingsSubscriptionsParams) error {
 		rescheduleOn([]string{"ldapEnabled", "ldapSyncInterval"}, params.LdapSync)
 	}
 
-	rescheduleOn([]string{"autoUpdate", "autoUpdateInterval"}, params.AutoUpdate)
-
-	subscribe([]string{"dockerClientRefreshInterval", "environmentHealthInterval"}, func(updates []types.SettingUpdate) {
+	healthKeys := []string{"environmentHealthInterval"}
+	if !params.Config.ControlPlane {
+		healthKeys = append(healthKeys, "dockerClientRefreshInterval")
+	}
+	subscribe(healthKeys, func(updates []types.SettingUpdate) {
 		changedKeys := make([]string, 0, len(updates))
 		for _, update := range updates {
 			changedKeys = append(changedKeys, update.Key)
@@ -372,16 +380,16 @@ func setupSettingsSubscriptions(params settingsSubscriptionsParams) error {
 		}
 	})
 
-	rescheduleOn([]string{"scheduledPruneEnabled", "scheduledPruneInterval"}, params.ScheduledPrune)
 	if !params.Config.ControlPlane {
+		rescheduleOn([]string{"scheduledPruneEnabled", "scheduledPruneInterval"}, params.ScheduledPrune)
 		rescheduleOn([]string{
 			types.FeatureVulnerabilityManagementSettingKey, "vulnerabilityScanEnabled", "vulnerabilityScanInterval", "trivyNetwork", "trivySecurityOpts", "trivyPrivileged",
 			"trivyResourceLimitsEnabled", "trivyCpuLimit", "trivyMemoryLimitMb", "trivyConcurrentScanContainers",
 		}, params.VulnerabilityScan)
 		rescheduleOn([]string{types.FeatureVulnerabilityManagementSettingKey}, params.VulnerabilityRisk)
+		rescheduleOn([]string{types.FeatureVulnerabilityManagementSettingKey, "imageAutoPatchEnabled", "imageAutoPatchInterval"}, params.AutoPatch)
+		rescheduleOn([]string{"autoHealEnabled", "autoHealInterval", "autoHealExcludedContainers", "autoHealMaxRestarts", "autoHealRestartWindow"}, params.AutoHeal)
 	}
-	rescheduleOn([]string{types.FeatureVulnerabilityManagementSettingKey, "imageAutoPatchEnabled", "imageAutoPatchInterval"}, params.AutoPatch)
-	rescheduleOn([]string{"autoHealEnabled", "autoHealInterval", "autoHealExcludedContainers", "autoHealMaxRestarts", "autoHealRestartWindow"}, params.AutoHeal)
 
 	params.Lifecycle.Append(fx.Hook{
 		OnStop: func(context.Context) error {

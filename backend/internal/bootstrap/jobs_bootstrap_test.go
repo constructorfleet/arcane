@@ -52,13 +52,13 @@ func (s *settingsSubscriptionSchedulerStub) AddJob(_ context.Context, job types.
 
 func TestFeatureChangeReschedulesScanAndPatchJobs(t *testing.T) {
 	for _, mode := range []struct {
-		name string
 		cfg  *config.Config
+		name string
 		jobs []string
 	}{
 		{name: "legacy manager", cfg: &config.Config{}, jobs: []string{scheduler.VulnerabilityScanJobName, scheduler.VulnerabilityRiskJobName, scheduler.AutoPatchJobName}},
 		{name: "node agent", cfg: &config.Config{AgentEnabled: true}, jobs: []string{scheduler.VulnerabilityScanJobName, scheduler.VulnerabilityRiskJobName, scheduler.AutoPatchJobName}},
-		{name: "control plane", cfg: &config.Config{ControlPlane: true}, jobs: []string{scheduler.AutoPatchJobName}},
+		{name: "control plane", cfg: &config.Config{ControlPlane: true}, jobs: []string{}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
 			lifecycle := fxtest.NewLifecycle(t)
@@ -99,11 +99,12 @@ func TestExpiredSessionsCleanupJobMetadata(t *testing.T) {
 
 func TestSetupSettingsSubscriptions_AgentEnabled(t *testing.T) {
 	for _, tc := range []struct {
-		name         string
-		agentEnabled bool
+		cfg  *config.Config
+		name string
 	}{
-		{name: "agent", agentEnabled: true},
-		{name: "manager", agentEnabled: false},
+		{name: "agent", cfg: &config.Config{AgentEnabled: true}},
+		{name: "manager", cfg: &config.Config{}},
+		{name: "control plane", cfg: &config.Config{ControlPlane: true}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			lifecycle := fxtest.NewLifecycle(t)
@@ -112,7 +113,7 @@ func TestSetupSettingsSubscriptions_AgentEnabled(t *testing.T) {
 			require.NoError(t, setupSettingsSubscriptions(settingsSubscriptionsParams{
 				Lifecycle:    lifecycle,
 				LifecycleCtx: t.Context(),
-				Config:       &config.Config{AgentEnabled: tc.agentEnabled},
+				Config:       tc.cfg,
 				Scheduler:    schedulerStub,
 				Settings:     settings,
 			}))
@@ -122,10 +123,20 @@ func TestSetupSettingsSubscriptions_AgentEnabled(t *testing.T) {
 					hasApnsSub = true
 				}
 			}
-			if tc.agentEnabled {
+			if tc.cfg.AgentEnabled {
 				require.False(t, hasApnsSub)
 			} else {
 				require.True(t, hasApnsSub)
+			}
+			for _, key := range []string{
+				"pollingEnabled", "autoUpdate", "dockerClientRefreshInterval", "scheduledPruneEnabled",
+				"imageAutoPatchEnabled", "autoHealEnabled", types.FeatureVulnerabilityManagementSettingKey,
+			} {
+				subscribed := slices.ContainsFunc(settings.subscribedKeys, func(keys []string) bool { return slices.Contains(keys, key) })
+				require.Equal(t, !tc.cfg.ControlPlane, subscribed, key)
+			}
+			for _, key := range []string{"environmentHealthInterval", "projectsDirectory", "templatesDirectory"} {
+				require.True(t, slices.ContainsFunc(settings.subscribedKeys, func(keys []string) bool { return slices.Contains(keys, key) }), key)
 			}
 			stopCtx, cancel := context.WithTimeout(t.Context(), time.Second)
 			defer cancel()

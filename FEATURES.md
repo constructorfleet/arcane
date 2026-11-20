@@ -39,7 +39,7 @@ Change this ordering whenever priorities change.
 ## Control plane and global agents
 
 - [x] CP-01 — Run the manager as a control plane with no Docker socket or local Docker daemon dependency. Implemented behind `ARCANE_CONTROL_PLANE=true`; socket-free HTTP smoke test passed.
-- [ ] CP-02 — Remove the manager's implicit local-agent selection from startup, readiness, background jobs, and the UI.
+- [ ] CP-02 — Remove the manager's implicit local-agent selection from startup, readiness, background jobs, and the UI. cf.42 targets remaining node-local automation registration and prevents control-plane Docker client acquisition; socket-free system backup execution remains unsupported and broader acceptance stays open (#102).
 - [x] CP-03 — Deploy agents as one ordinary global Swarm service with no exclusion for the manager's host. Live deployment verified with five global agents, including the control-plane host.
 - [ ] CP-04 — Keep each agent's connection, credentials, and node identity separate; do not route node operations through a round-robin `tasks.agent` address.
 - [ ] CP-05 — Preserve agent identity across restarts, task replacement, and enrollment-token rotation without duplicate registrations.

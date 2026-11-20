@@ -23,6 +23,7 @@ import (
 	"kit.getarcane.app/concurrency"
 	"kit.getarcane.app/docker/streams/bus"
 
+	"getarcane.dev/arcane/v3/internal/common"
 	"getarcane.dev/arcane/v3/internal/config"
 	"getarcane.dev/arcane/v3/internal/database"
 	"getarcane.dev/arcane/v3/internal/settings"
@@ -67,7 +68,11 @@ func TestDockerClientService_GetClientPinsEffectiveAPIVersion(t *testing.T) {
 }
 
 func TestDockerClientService_GetClientReturnsCachedClientUntilRefresh(t *testing.T) {
-	server := newDockerPingTestServer(t, func() string { return "1.41" })
+	var probes atomic.Int32
+	server := newDockerPingTestServer(t, func() string {
+		probes.Add(1)
+		return "1.41"
+	})
 	svc := newDockerClientServiceForTest(t, server.URL)
 
 	firstClient, err := svc.GetClient(t.Context())
@@ -81,6 +86,19 @@ func TestDockerClientService_GetClientReturnsCachedClientUntilRefresh(t *testing
 
 	assert.Same(t, firstClient, secondClient)
 	assert.Equal(t, "1.41", secondClient.ClientVersion())
+	assert.EqualValues(t, 1, probes.Load())
+
+	for _, bound := range []bool{false, true} {
+		controlPlane := NewDockerClientService(t.Context(), svc.db, svc.settingsService, ClientOptions{ControlPlane: true})
+		if bound {
+			controlPlane = controlPlane.WithClient(firstClient)
+		}
+		localClient, clientErr := controlPlane.GetClient(t.Context())
+		require.ErrorIs(t, clientErr, common.ErrConflict)
+		require.Nil(t, localClient)
+		require.ErrorIs(t, controlPlane.RefreshClient(t.Context()), common.ErrConflict)
+		assert.EqualValues(t, 1, probes.Load(), "control-plane clients never probe the daemon, including bound copies")
+	}
 }
 
 func TestDockerClientService_RefreshClientRecreatesCachedClientAfterAPIVersionChange(t *testing.T) {
@@ -544,7 +562,7 @@ func newDockerClientServiceForTest(t *testing.T, host string) *DockerClientServi
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, settingsService.Stop(context.WithoutCancel(t.Context()))) })
 	require.NoError(t, settingsService.UpdateSettings(t.Context(), types.SettingsUpdate{"dockerHost": host}))
-	return NewDockerClientService(t.Context(), db, settingsService, bus.Config{})
+	return NewDockerClientService(t.Context(), db, settingsService, ClientOptions{})
 }
 
 func newDockerPingTestServer(t *testing.T, apiVersion func() string) *httptest.Server {

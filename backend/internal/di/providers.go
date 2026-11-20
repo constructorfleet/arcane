@@ -191,10 +191,13 @@ func provideTunnelRegistry(lc fx.Lifecycle) *agent.TunnelRegistry {
 }
 
 func provideDockerClientService(p dockerClientServiceParams) *docker.DockerClientService {
-	service := docker.NewDockerClientService(p.Ctx, p.DB, p.LocalSettings, bus.Config{OnDrop: func(message events.Message) {
-		// Overflow is recovered synchronously, applying backpressure instead of losing log entries.
-		p.EventService.RecordDockerEvent(p.Ctx, message)
-	}})
+	service := docker.NewDockerClientService(p.Ctx, p.DB, p.LocalSettings, docker.ClientOptions{
+		ControlPlane: p.Config.ControlPlane,
+		EventBus: bus.Config{OnDrop: func(message events.Message) {
+			// Overflow is recovered synchronously, applying backpressure instead of losing log entries.
+			p.EventService.RecordDockerEvent(p.Ctx, message)
+		}},
+	})
 	var stopStream, stopLog func(context.Context) error
 	var unsubscribe func()
 	p.Lifecycle.Append(fx.Hook{

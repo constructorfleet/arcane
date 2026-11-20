@@ -27,6 +27,7 @@ import (
 	"kit.getarcane.app/docker/compat"
 	"kit.getarcane.app/docker/streams/bus"
 
+	"getarcane.dev/arcane/v3/internal/common"
 	"getarcane.dev/arcane/v3/internal/database"
 	"getarcane.dev/arcane/v3/internal/settings"
 	"getarcane.dev/arcane/v3/pkg/dhi"
@@ -57,7 +58,13 @@ type (
 		clientVersion string
 		clientHost    string
 		boundHost     string
+		controlPlane  bool
 		mu            sync.Mutex
+	}
+
+	ClientOptions struct {
+		EventBus     bus.Config
+		ControlPlane bool
 	}
 
 	dockerInventory struct {
@@ -71,12 +78,15 @@ const (
 	dockerEventStreamHealthyAfter  = 30 * time.Second
 )
 
-func NewDockerClientService(ctx context.Context, db *database.DB, settingsService *settings.SettingsService, eventBusConfig bus.Config) *DockerClientService {
+var errControlPlaneDocker = common.Classify(common.ErrConflict, errors.New("the control plane has no local Docker agent; select a registered node agent"))
+
+func NewDockerClientService(ctx context.Context, db *database.DB, settingsService *settings.SettingsService, options ClientOptions) *DockerClientService {
 	service := &DockerClientService{
 		db:              db,
 		settingsService: settingsService,
-		eventBus:        bus.NewDockerEventBus(eventBusConfig),
+		eventBus:        bus.NewDockerEventBus(options.EventBus),
 		streamConnected: concurrency.NewSignal[struct{}](),
+		controlPlane:    options.ControlPlane,
 	}
 	context.AfterFunc(ctx, settingsService.SubscribeSettingsChanges([]string{"dockerHost"}, func([]types.SettingUpdate) {
 		service.Close()
@@ -92,6 +102,7 @@ func (s *DockerClientService) WithClient(dockerClient *client.Client) *DockerCli
 		boundHost:       dockerClient.DaemonHost(),
 		eventBus:        s.eventBus,
 		streamConnected: s.streamConnected,
+		controlPlane:    s.controlPlane,
 	}
 }
 
@@ -106,6 +117,9 @@ func closeDockerClient(ctx context.Context, cli *client.Client, purpose string) 
 }
 
 func (s *DockerClientService) GetClient(ctx context.Context) (*client.Client, error) {
+	if s.controlPlane {
+		return nil, errControlPlaneDocker
+	}
 	s.mu.Lock()
 	cli := s.Client
 	s.mu.Unlock()
@@ -125,6 +139,9 @@ func (s *DockerClientService) GetClient(ctx context.Context) (*client.Client, er
 // RefreshClient probes the Docker daemon and recreates the cached client when
 // the daemon's effective API version changed.
 func (s *DockerClientService) RefreshClient(ctx context.Context) error {
+	if s.controlPlane {
+		return errControlPlaneDocker
+	}
 	host := s.DockerHost()
 	probeClient, err := client.New(client.WithHost(host))
 	if err != nil {

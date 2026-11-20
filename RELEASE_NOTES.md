@@ -1,7 +1,7 @@
-# 3.0.1-cf.41
+# 3.0.1-cf.42
 
-- Explain standard Docker/OCI registry host and namespace URLs, explicit docker.io, and password/access-token/robot-secret credentials (#99).
-- Clarify optional known repository names, replace the misleading /api example with project/image, and label the manual repository input. Explain that repository access can work when global catalog listing is denied or unsupported.
-- Explain that registry browsing uses the remote registry while image Pull/Push use the selected agent. Clarify private Swarm image credential forwarding with the label Send registry credentials to Swarm and an adjacent help text.
+- Keep image polling, auto-update, auto-patch, auto-heal, scheduled prune, stale volume helper cleanup and local volume backup job registration on Docker-capable node agents or legacy managers (#102, CP-02).
+- Prevent settings changes from registering those Docker-only jobs on the control plane. Preserve remote-agent health checks, GitOps coordination, project/template file watching and database/file maintenance.
+- Reject control-plane Docker client acquisition and refresh with a classified conflict before probing any daemon, including bound client copies. Node-agent and legacy client behavior is preserved.
 
-Credential storage, authorization, repository access and deployment behavior are unchanged. Swarm credential forwarding remains opt-in and false by default. Production frontend build, required formatting/lint and exact-head CI are recorded in the fixing PR; post-release UI checks inspect the guidance without submitting credentials or changing registry permissions. Provider-neutral runtime acceptance remains separately tracked in #40.
+Existing Docker client, scheduler settings and dependency-wiring tests cover the mode boundary. Full release CI and deployed runtime verification are recorded in the PR/issue. This does not implement socket-free system backup execution: manager backup coordination and repository retention remain registered, and Docker-dependent execution fails at the client boundary. Backup support and broader CP-02 acceptance remain follow-ups.

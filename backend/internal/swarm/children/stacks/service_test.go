@@ -21,8 +21,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
-	"kit.getarcane.app/docker/streams/bus"
-
 	"getarcane.dev/arcane/v3/internal/common"
 	"getarcane.dev/arcane/v3/internal/config"
 	"getarcane.dev/arcane/v3/internal/database"
@@ -205,7 +203,7 @@ func TestService_UpdateAndGetStackSource_UsesStoredFilesWithoutSwarmManager(t *t
 		require.NoError(t, setupErr)
 		t.Cleanup(func() { _ = dockerClient.Close() })
 		service := NewService(ServiceParams{
-			DockerService:   dockerInternal.NewDockerClientService(failureCtx, failureDB, failureSettings, bus.Config{}).WithClient(dockerClient),
+			DockerService:   dockerInternal.NewDockerClientService(failureCtx, failureDB, failureSettings, dockerInternal.ClientOptions{}).WithClient(dockerClient),
 			EnsureManager:   func(context.Context) error { return nil },
 			SettingsService: failureSettings,
 		})
@@ -477,7 +475,7 @@ func newDownStackTestService(t *testing.T, removed *[]string) *Service {
 	t.Cleanup(func() { _ = cli.Close() })
 
 	return NewService(ServiceParams{
-		DockerService:   dockerInternal.NewDockerClientService(ctx, db, settingsSvc, bus.Config{}).WithClient(cli),
+		DockerService:   dockerInternal.NewDockerClientService(ctx, db, settingsSvc, dockerInternal.ClientOptions{}).WithClient(cli),
 		EnsureManager:   func(context.Context) error { return nil },
 		SettingsService: settingsSvc,
 	})
@@ -591,7 +589,7 @@ func newSharedStackTestService(t *testing.T, db *database.DB, settingsSvc *setti
 	t.Cleanup(func() { _ = cli.Close() })
 
 	service := NewService(ServiceParams{
-		DockerService: dockerInternal.NewDockerClientService(ctx, db, settingsSvc, bus.Config{}).WithClient(cli),
+		DockerService: dockerInternal.NewDockerClientService(ctx, db, settingsSvc, dockerInternal.ClientOptions{}).WithClient(cli),
 		EnsureManager: func(context.Context) error { return nil }, SettingsService: settingsSvc,
 	})
 	return service, recorded
