@@ -1,6 +1,6 @@
-# 3.0.1-cf.58
+# 3.0.1-cf.59
 
-- Round-trip and edit static IPv6 and link-local addresses alongside IPv4 and aliases in standalone create/edit network rows (#136). Alias-only changes retain all represented IPAM values instead of dropping hidden fields.
-- Share complete address parsing between create/edit, reject wrong address families, scoped IPv6/link-local entries and malformed addresses before container creation or recreation, and retain omission for untouched network rows.
+- Preserve exact untouched native healthcheck timings when editing an existing custom healthcheck (#138 / #28 / #125). The container form sends only changed whole-second settings, retries or Test through a purpose-specific partial update contract.
+- Keep the existing full-replacement/create API and inherit/disable/new-custom paths. Partial updates reject replacement/reset conflicts, invalid values and missing/disabled custom targets; omitted fields and Test slices are preserved without mutating inspected input.
 
-Blank static fields return address allocation to Docker; a blank link-local list clears that configured list. This does not claim detach-all from removing network rows, disable IPv6 on the network, or implement network connectivity testing. Validation/live acceptance uses owned isolated resources; broader #28/#13 remains open.
+This fixes preservation during another field’s edit; it does not add fractional-duration authoring or exact fractional display. Native Docker constraints remain authoritative. Source/isolated checks do not establish live recreation, scheduler execution or cleanup acceptance.

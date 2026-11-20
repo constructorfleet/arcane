@@ -568,6 +568,74 @@ func TestApplyEditPreservesUnmanagedSettings(t *testing.T) {
 	}))
 	require.Equal(t, int64(67108865), hc.Memory)
 	require.Zero(t, hc.MemorySwap)
+
+	t.Run("partial healthcheck keeps exact omitted native timings", func(t *testing.T) {
+		native := container.Config{
+			Image: "never-run:synthetic", Env: []string{"UNCHANGED=literal"}, Labels: map[string]string{"owner": "isolated"},
+			Healthcheck: &container.HealthConfig{
+				Test:     []string{"CMD", "/bin/echo", "literal $VALUE", ""},
+				Interval: 1500 * time.Millisecond, Timeout: 1250 * time.Millisecond,
+				StartPeriod: 2250 * time.Millisecond, StartInterval: 750 * time.Millisecond, Retries: 4,
+			},
+		}
+		updated, updateErr := applyEditToContainerConfig(native, nil, types.ContainerEdit{
+			HealthcheckUpdate: &types.ContainerHealthcheckUpdate{Retries: new(5)},
+		})
+		require.NoError(t, updateErr)
+		require.Equal(t, &container.HealthConfig{
+			Test:     []string{"CMD", "/bin/echo", "literal $VALUE", ""},
+			Interval: 1500 * time.Millisecond, Timeout: 1250 * time.Millisecond,
+			StartPeriod: 2250 * time.Millisecond, StartInterval: 750 * time.Millisecond, Retries: 5,
+		}, updated.Healthcheck)
+		require.Equal(t, native.Env, updated.Env)
+		require.Equal(t, native.Labels, updated.Labels)
+		require.Equal(t, 4, native.Healthcheck.Retries)
+		zeroed, zeroErr := applyEditToContainerConfig(native, nil, types.ContainerEdit{
+			HealthcheckUpdate: &types.ContainerHealthcheckUpdate{Interval: new(int64(0)), Retries: new(0)},
+		})
+		require.NoError(t, zeroErr)
+		require.Zero(t, zeroed.Healthcheck.Interval)
+		require.Zero(t, zeroed.Healthcheck.Retries)
+		require.Equal(t, native.Healthcheck.StartInterval, zeroed.Healthcheck.StartInterval)
+		require.NotSame(t, &native.Healthcheck.Test[0], &updated.Healthcheck.Test[0])
+		newTest := []string{"CMD-SHELL", "echo literal"}
+		retested, retestErr := applyEditToContainerConfig(native, nil, types.ContainerEdit{
+			HealthcheckUpdate: &types.ContainerHealthcheckUpdate{Test: &newTest},
+		})
+		require.NoError(t, retestErr)
+		require.Equal(t, newTest, retested.Healthcheck.Test)
+		require.NotSame(t, &newTest[0], &retested.Healthcheck.Test[0])
+		require.Equal(t, native.Healthcheck.Timeout, retested.Healthcheck.Timeout)
+	})
+	t.Run("partial healthcheck has explicit admission and mode boundaries", func(t *testing.T) {
+		for _, request := range []types.ContainerEdit{
+			{HealthcheckUpdate: &types.ContainerHealthcheckUpdate{}, Healthcheck: &types.ContainerHealthcheckCreate{}},
+			{HealthcheckUpdate: &types.ContainerHealthcheckUpdate{}, ClearHealthcheck: true},
+			{HealthcheckUpdate: &types.ContainerHealthcheckUpdate{Retries: new(-1)}},
+			{HealthcheckUpdate: &types.ContainerHealthcheckUpdate{Interval: new(int64(-1))}},
+			{HealthcheckUpdate: &types.ContainerHealthcheckUpdate{Timeout: new(int64(1 << 62))}},
+			{HealthcheckUpdate: &types.ContainerHealthcheckUpdate{Test: new([]string{})}},
+			{HealthcheckUpdate: &types.ContainerHealthcheckUpdate{Test: new([]string{"NONE"})}},
+		} {
+			_, updateErr := applyEditToContainerConfig(cfg, nil, request)
+			require.ErrorIs(t, updateErr, common.ErrValidation)
+		}
+		for _, original := range []*container.HealthConfig{nil, {}, {Test: []string{"NONE"}}} {
+			_, updateErr := healthConfigFromUpdate(original, types.ContainerHealthcheckUpdate{Retries: new(5)})
+			require.ErrorIs(t, updateErr, common.ErrValidation)
+		}
+		reset, resetErr := applyEditToContainerConfig(cfg, nil, types.ContainerEdit{
+			Healthcheck: &types.ContainerHealthcheckCreate{Test: []string{"NONE"}}, ClearHealthcheck: true,
+		})
+		require.NoError(t, resetErr)
+		require.Nil(t, reset.Healthcheck)
+		replaced, replaceErr := applyEditToContainerConfig(cfg, nil, types.ContainerEdit{
+			Healthcheck: &types.ContainerHealthcheckCreate{Test: []string{"CMD-SHELL", "echo replacement"}, Interval: 2},
+		})
+		require.NoError(t, replaceErr)
+		require.Equal(t, 2*time.Second, replaced.Healthcheck.Interval)
+		require.Zero(t, replaced.Healthcheck.Timeout)
+	})
 }
 
 func TestMergeEditMountsPreservesMountOptions(t *testing.T) {

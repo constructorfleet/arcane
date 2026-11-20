@@ -53,6 +53,15 @@ export interface ContainerHealthcheckCreate {
 	retries?: number;
 }
 
+export interface ContainerHealthcheckUpdate {
+	test?: string[];
+	interval?: number;
+	timeout?: number;
+	startPeriod?: number;
+	startInterval?: number;
+	retries?: number;
+}
+
 export interface ContainerNetworkingConfigCreate {
 	endpointsConfig?: Record<string, ContainerEndpointSettingsCreate>;
 }
@@ -321,6 +330,7 @@ export interface ContainerEdit {
 	environment?: string[];
 	labels?: Record<string, string>;
 	healthcheck?: ContainerHealthcheckCreate;
+	healthcheckUpdate?: ContainerHealthcheckUpdate;
 	clearHealthcheck?: boolean;
 	hostConfig?: ContainerHostConfigEdit;
 	networkingConfig?: ContainerNetworkingConfigCreate;

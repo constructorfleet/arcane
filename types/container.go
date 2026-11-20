@@ -72,6 +72,15 @@ type (
 		Retries       int   `json:"retries,omitempty"`
 	}
 
+	ContainerHealthcheckUpdate struct {
+		Test          *[]string `json:"test,omitempty"`
+		Interval      *int64    `json:"interval,omitempty"`
+		Timeout       *int64    `json:"timeout,omitempty"`
+		StartPeriod   *int64    `json:"startPeriod,omitempty"`
+		StartInterval *int64    `json:"startInterval,omitempty"`
+		Retries       *int      `json:"retries,omitempty"`
+	}
+
 	ContainerNetworkingConfigCreate struct {
 		EndpointsConfig map[string]ContainerEndpointSettingsCreate `json:"endpointsConfig,omitempty"`
 	}
@@ -374,7 +383,9 @@ type (
 		Environment *[]string                   `json:"environment,omitempty" doc:"Full KEY=VALUE list replacing the current one; omitted keeps it"`
 		Labels      *map[string]string          `json:"labels,omitempty" doc:"Full label set replacing the current one; omitted keeps it"`
 		Healthcheck *ContainerHealthcheckCreate `json:"healthcheck,omitempty" doc:"Replaces the current healthcheck, durations in seconds; omitted keeps it"`
-		HostConfig  *ContainerHostConfigEdit    `json:"hostConfig,omitempty" doc:"Host settings to change; each omitted field keeps its current value"`
+		// HealthcheckUpdate cannot be combined with replacement or clearHealthcheck.
+		HealthcheckUpdate *ContainerHealthcheckUpdate `json:"healthcheckUpdate,omitempty" doc:"Patches a custom healthcheck; omitted fields keep native values, durations in whole seconds"`
+		HostConfig        *ContainerHostConfigEdit    `json:"hostConfig,omitempty" doc:"Host settings to change; each omitted field keeps its current value"`
 
 		NetworkingConfig *ContainerNetworkingConfigCreate `json:"networkingConfig,omitempty" doc:"Full set of endpoints keyed by network name; omitted keeps the current ones"`
 		Credentials      []ContainerRegistryCredential    `json:"credentials,omitempty" doc:"Registry credentials for pulling a missing image"`

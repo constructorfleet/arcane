@@ -1184,6 +1184,37 @@ func healthConfigFromCreate(hc *types.ContainerHealthcheckCreate) *container.Hea
 	}
 }
 
+func healthConfigFromUpdate(original *container.HealthConfig, update types.ContainerHealthcheckUpdate) (*container.HealthConfig, error) {
+	if original == nil || len(original.Test) == 0 || original.Test[0] == "NONE" {
+		return nil, common.Classify(common.ErrValidation, errors.New("healthcheck updates require an existing custom healthcheck; use replacement or reset for mode changes"))
+	}
+	if update.Test != nil {
+		test := kit.FromPtr(update.Test)
+		if len(test) == 0 || test[0] == "NONE" {
+			return nil, common.Classify(common.ErrValidation, errors.New("use healthcheck replacement or reset to change healthcheck mode"))
+		}
+	}
+	for field, seconds := range map[string]*int64{
+		"interval": update.Interval, "timeout": update.Timeout,
+		"startPeriod": update.StartPeriod, "startInterval": update.StartInterval,
+	} {
+		if seconds != nil && (kit.FromPtr(seconds) < 0 || kit.FromPtr(seconds) > int64((1<<63-1)/time.Second)) {
+			return nil, common.Classify(common.ErrValidation, fmt.Errorf("healthcheck %s must be nonnegative whole seconds within the native duration range", field))
+		}
+	}
+	if update.Retries != nil && kit.FromPtr(update.Retries) < 0 {
+		return nil, common.Classify(common.ErrValidation, errors.New("healthcheck retries must be nonnegative"))
+	}
+	return &container.HealthConfig{
+		Test:          kit.Ternary(update.Test != nil, slices.Clone(kit.FromPtr(update.Test)), slices.Clone(original.Test)),
+		Interval:      kit.Ternary(update.Interval != nil, time.Duration(kit.FromPtr(update.Interval))*time.Second, original.Interval),
+		Timeout:       kit.Ternary(update.Timeout != nil, time.Duration(kit.FromPtr(update.Timeout))*time.Second, original.Timeout),
+		StartPeriod:   kit.Ternary(update.StartPeriod != nil, time.Duration(kit.FromPtr(update.StartPeriod))*time.Second, original.StartPeriod),
+		StartInterval: kit.Ternary(update.StartInterval != nil, time.Duration(kit.FromPtr(update.StartInterval))*time.Second, original.StartInterval),
+		Retries:       mo.PointerToOption(update.Retries).OrElse(original.Retries),
+	}, nil
+}
+
 func retainedVolumeMountPoints(original, updated container.HostConfig, mountPoints []container.MountPoint) []container.MountPoint {
 	specAt := func(hc container.HostConfig, destination string) (bool, bool) {
 		if i := slices.IndexFunc(hc.Mounts, func(m mount.Mount) bool { return path.Clean(m.Target) == destination }); i >= 0 {
@@ -1286,6 +1317,22 @@ func endpointIPAMFromCreate(ep types.ContainerEndpointSettingsCreate) (*network.
 }
 
 func applyEditToContainerConfig(cfg container.Config, previousBindings network.PortMap, req types.ContainerEdit) (container.Config, error) {
+	if req.HealthcheckUpdate != nil && (req.Healthcheck != nil || req.ClearHealthcheck) {
+		return container.Config{}, common.Classify(common.ErrValidation, errors.New("healthcheckUpdate cannot be combined with healthcheck replacement or clearHealthcheck"))
+	}
+	healthcheck := cfg.Healthcheck
+	switch {
+	case req.ClearHealthcheck:
+		healthcheck = nil
+	case req.HealthcheckUpdate != nil:
+		var updateErr error
+		healthcheck, updateErr = healthConfigFromUpdate(cfg.Healthcheck, kit.FromPtr(req.HealthcheckUpdate))
+		if updateErr != nil {
+			return container.Config{}, updateErr
+		}
+	case req.Healthcheck != nil:
+		healthcheck = healthConfigFromCreate(req.Healthcheck)
+	}
 	if hostname := strings.TrimSpace(kit.FromPtr(req.Hostname)); req.Hostname != nil && hostname != cfg.Hostname {
 		if err := validateContainerHostname(hostname); err != nil {
 			return container.Config{}, err
@@ -1318,7 +1365,7 @@ func applyEditToContainerConfig(cfg container.Config, previousBindings network.P
 		StdinOnce:       cfg.StdinOnce,
 		Env:             kit.Ternary(req.Environment != nil, append([]string{}, kit.FromPtr(req.Environment)...), cfg.Env),
 		Cmd:             kit.Ternary(req.Command != nil, append([]string{}, kit.FromPtr(req.Command)...), cfg.Cmd),
-		Healthcheck:     kit.Ternary(req.ClearHealthcheck, nil, cmp.Or(healthConfigFromCreate(req.Healthcheck), cfg.Healthcheck)),
+		Healthcheck:     healthcheck,
 		ArgsEscaped:     cfg.ArgsEscaped,
 		Image:           cmp.Or(strings.TrimSpace(kit.FromPtr(req.Image)), cfg.Image),
 		Volumes:         cfg.Volumes,

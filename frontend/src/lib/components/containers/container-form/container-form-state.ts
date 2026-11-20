@@ -9,6 +9,7 @@ import type {
 	ContainerEditConfig,
 	ContainerEdit,
 	ContainerHealthcheckCreate,
+	ContainerHealthcheckUpdate,
 	ContainerHostConfigEdit,
 	ContainerEndpointSettingsCreate,
 	ContainerHostConfigCreate,
@@ -409,15 +410,24 @@ export function toEditRequest(
 	const healthFields = ['healthMode', 'healthInterval', 'healthTimeout', 'healthStartPeriod', 'healthRetries'] as const;
 	const healthTestChanged = values.healthTest.trim() !== initial.healthTest.trim();
 	let healthcheck: ContainerHealthcheckCreate | undefined;
+	let healthcheckUpdate: ContainerHealthcheckUpdate | undefined;
 	let clearHealthcheck = false;
 	if (healthTestChanged || healthFields.some((field) => values[field] !== initial[field])) {
-		healthcheck = buildHealthcheck(values);
 		clearHealthcheck = values.healthMode === 'inherit';
-		if (healthcheck && values.healthMode === 'custom' && original.healthcheck) {
-			healthcheck = { ...structuredClone(original.healthcheck), ...healthcheck };
-			if (!healthTestChanged && initial.healthMode === 'custom') {
-				healthcheck.test = original.healthcheck.test?.slice();
+		if (values.healthMode === 'custom' && initial.healthMode === 'custom' && values.healthTest.trim()) {
+			const update: ContainerHealthcheckUpdate = {};
+			if (healthTestChanged) update.test = ['CMD-SHELL', values.healthTest.trim()];
+			for (const [field, target] of [
+				['healthInterval', 'interval'],
+				['healthTimeout', 'timeout'],
+				['healthStartPeriod', 'startPeriod'],
+				['healthRetries', 'retries']
+			] as const) {
+				if (values[field] !== initial[field]) update[target] = values[field];
 			}
+			if (Object.keys(update).length > 0) healthcheckUpdate = update;
+		} else {
+			healthcheck = buildHealthcheck(values);
 		}
 	}
 
@@ -452,6 +462,7 @@ export function toEditRequest(
 		environment: buildEnv(rows),
 		labels: buildLabels(rows),
 		healthcheck,
+		healthcheckUpdate,
 		clearHealthcheck,
 		hostConfig,
 		networkingConfig:
