@@ -4726,5 +4726,18 @@
   "command_argument": "Command argument",
   "argument": "Argument",
   "entrypoint_argument": "Entrypoint argument",
-  "memory_swap_limit_invalid": "Use -1 for unlimited swap, 0 for the default, or a positive memory + swap limit."
+  "memory_swap_limit_invalid": "Use -1 for unlimited swap, 0 for the default, or a positive memory + swap limit.",
+  "volume_agent_records_title": "Other agent records with this name and driver",
+  "volume_agent_records_description": "Matching names and drivers do not establish shared storage. Inspect an agent’s overview before opening its workspace.",
+  "volume_agent_records_no_agents": "No other enabled agents are available with volume-list access.",
+  "volume_agent_records_error": "Unable to read other agent records: {message}",
+  "volume_agent_records_excluded": "Not searched because of the configured agent limit: {agents}",
+  "volume_agent_records_mountpoint": "Reported mountpoint",
+  "volume_agent_records_references": "Reported container references: {count}",
+  "volume_agent_records_view": "View this agent’s overview",
+  "volume_agent_records_none": "No matching records were returned by the searched agents.",
+  "volume_agent_records_reference_note": "References may include workspace helpers and stopped containers.",
+  "volume_agent_records_show": "View other agent records",
+  "volume_agent_records_discard_warning": "Opening another agent’s overview will discard unsaved text and staged file operations in this workspace.",
+  "volume_agent_records_discard_open": "Discard changes and open overview"
 }

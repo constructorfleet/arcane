@@ -1,6 +1,8 @@
-# 3.0.1-cf.56
+# 3.0.1-cf.57
 
-- Preserve native network attachments when a standalone-container edit leaves the network rows untouched (#130). Omit the frontend network replacement and retain explicit IPv4/IPv6/link-local IPAM through the shared backend recreation path used by edit, redeploy and rollback.
-- Keep the existing Docker API compatibility sanitization and clone native endpoint settings rather than aliasing inspected data. Filter the previous container’s generated short-ID alias so the daemon can regenerate it.
+- Show separate matching-name/driver records on other permitted agents for global-driver volumes (#132 / #13), with reported mountpoints and container references. Explicit links open the chosen agent's Overview.
+- Label shared-storage identity as unverified; expose failed or excluded metadata reads. Discovery requires volume-list access, destination links require volume-read access, and inactive Workspace guidance offers a route back to these observations.
 
-Validation covers actual owning form payloads and the existing backend network-edit test. This bounded fix preserves untouched networking; intentional network-row edits retain the existing replacement contract. Full IPv6/link-local authoring and reset controls remain follow-up work under #28. No production network is changed for QA.
+- Require active Workspace intent for folder/file reads, reset that intent on Overview, and start a fresh detail view when changing agents (#134). Confirm discarding pending drafts on ordinary agent-link clicks; modified/new-tab navigation keeps the current draft. Already-issued file reads are not newly promised cancellation.
+
+This is metadata discovery/navigation, not shared-backend deduplication or automatic attachment routing. It creates no workspace helper and does not mount an inactive RBD volume. Application/helper/unknown consumer classification remains on each destination's Overview; reference counts can include helpers/stopped containers and are not proof of active application use. Broader #13 remains open.

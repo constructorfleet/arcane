@@ -72,6 +72,7 @@
 		workspaceFileServerPath
 	} from '#lib/utils/workspace-files.js';
 
+	import VolumeAgentRecords from '../components/volume-agent-records.svelte';
 	import BackupList from '../components/volume-backup-table.svelte';
 	import { volumeWorkspaceReadOnlyMessage } from '../components/volume-workspace-utils';
 
@@ -109,6 +110,7 @@
 	const queryClient = useQueryClient();
 
 	let workspaceRequested = $state(false);
+	const workspaceEnabled = $derived(!!volume?.name && selectedTab === 'workspace' && workspaceRequested && canReadVolume);
 	let workspaceFileChanges = $state<VolumeWorkspaceFileChange[]>([]);
 	let workspaceFileContents = $state<Record<string, string>>({});
 	let loadedWorkspaceFileContents = $state<Record<string, string>>({});
@@ -152,7 +154,7 @@
 
 	const workspaceFolders = useWorkspaceFolders({
 		folderQuery: (path) => volumeWorkspaceFolderQuery(currentEnvId, volume?.name ?? '', path),
-		enabled: () => !!volume?.name && workspaceRequested && canReadVolume,
+		enabled: () => workspaceEnabled,
 		changes: () => workspaceFileChanges
 	});
 
@@ -230,9 +232,11 @@
 		activeWorkspaceTab.startsWith('file:') ? workspaceFileMetadata[activeWorkspaceTab.slice(5)] : undefined
 	);
 
-	afterNavigate(() => {
+	afterNavigate(async () => {
+		workspaceRequested = selectedTab === 'workspace';
 		initializeVolumePreferences();
-		if (selectedTab === 'workspace') workspaceRequested = true;
+		await tick();
+		if (active && workspaceEnabled) loadSelectedWorkspaceFile();
 	});
 
 	function initializeVolumePreferences() {
@@ -293,7 +297,7 @@
 	}
 
 	async function loadWorkspaceFile(relativePath: string) {
-		if (!active || !volume?.name) return;
+		if (!active || !workspaceEnabled || !volume?.name) return;
 		if (!relativePath || workspaceFileMetadata[relativePath] || workspaceFileLoading[relativePath]) return;
 		const entry = visibleWorkspaceFiles.find((file) => file.relativePath === relativePath);
 		if (!entry || entry.isDirectory) return;
@@ -383,6 +387,7 @@
 	}
 
 	function loadSelectedWorkspaceFile() {
+		if (!workspaceEnabled) return;
 		if (!activeWorkspaceTab.startsWith('file:')) return;
 		const relativePath = activeWorkspaceTab.slice(5);
 		if (!workspaceFileMetadata[relativePath] && !workspaceFileLoadErrors[relativePath]) void loadWorkspaceFile(relativePath);
@@ -866,7 +871,7 @@
 	}
 
 	function onTabChange(value: string) {
-		if (value === 'workspace') workspaceRequested = true;
+		workspaceRequested = value === 'workspace';
 		urlTab.select(value);
 	}
 </script>
@@ -1101,6 +1106,11 @@
 			<p class="max-w-lg text-muted-foreground">{m.check_volume_attachment()}</p>
 			<div class="flex flex-wrap justify-center gap-2">
 				<ArcaneButton action="refresh" customLabel={m.common_retry()} onclick={() => workspaceFolders.root?.refetch()} />
+				{#if volume.scope === 'global'}
+					<ArcaneButton action="base" tone="outline" onclick={stopWorkspaceLoad}>
+						{m.volume_agent_records_show()}
+					</ArcaneButton>
+				{/if}
 				<ArcaneButton action="base" tone="outline" href={resolve('/(app)/volumes')}>{m.resource_volumes_cap()}</ArcaneButton>
 			</div>
 		</div>
@@ -1160,6 +1170,7 @@
 	/>
 
 	{@render volumeContainers(volume)}
+	<VolumeAgentRecords {volume} environmentId={currentEnvId} {hasWorkspaceChanges} />
 
 	{#if volume.labels && Object.keys(volume.labels).length > 0}
 		<DetailSection title={m.common_labels()} icon={TagIcon}>
