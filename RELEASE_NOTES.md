@@ -1,6 +1,5 @@
-# 3.0.1-cf.60
+# 3.0.1-cf.61
 
-- Preserve SCTP port mappings during standalone container edits instead of silently changing them to TCP (#139 / #28). Mixed TCP, UDP and SCTP bindings on the same numeric port stay distinct.
-- Offer SCTP alongside TCP and UDP in the shared port editor used by container and pod forms; retain host IP/port values and explicit protocol changes or removal.
+- Render repeated template-registry tag badges without duplicate-key errors in the gallery (#142 / #17). Reuse the existing occurrence keys while preserving the first four tags' order, repeated values and overflow count.
 
-This fixes form/API fidelity. It does not claim live SCTP packet flow, listeners or host-kernel support. Runtime verification uses owned resources or canceled drafts only; no production port mapping is changed for QA.
+Verified with the actual owning client component under development and production runtime conditions using an isolated DOM. No live registry/template was changed; broader template deployment and branding acceptance remains separate.

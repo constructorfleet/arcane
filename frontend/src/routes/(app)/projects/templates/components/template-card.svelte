@@ -14,6 +14,7 @@
 	import type { Template } from '#lib/types/template.js';
 	import { getThemedIconUrl } from '#lib/utils/docker.js';
 	import { hasShownPermission } from '#lib/utils/environments.js';
+	import { withOccurrenceKeys } from '#lib/utils/formatting.js';
 
 	let {
 		template,
@@ -110,8 +111,8 @@
 
 	{#if tags.length > 0}
 		<div class="mt-auto flex flex-wrap gap-1">
-			{#each tags.slice(0, MAX_TAGS) as tag (tag)}
-				<Badge variant="outline">{tag}</Badge>
+			{#each withOccurrenceKeys(tags.slice(0, MAX_TAGS)) as tag (tag.key)}
+				<Badge variant="outline">{tag.value}</Badge>
 			{/each}
 			{#if tags.length > MAX_TAGS}
 				<Badge variant="outline">+{tags.length - MAX_TAGS}</Badge>
