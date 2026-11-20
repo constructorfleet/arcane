@@ -1,9 +1,11 @@
-# 3.0.1-cf.63
+# 3.0.1-cf.64
 
-- Discover registry namespaces/projects, then repositories and tags without entering every repository manually (#146 / #40). Standard Docker/OCI catalog browsing remains supported; when it is unavailable, an available Harbor project/repository API uses the existing saved credential.
-- Browse a specific project even when global project listing is denied, while retaining a configured URL namespace boundary. Known repositories remain an optional fallback for registries without discovery support. Add/Help guidance distinguishes host-only discovery, optional project scope and repository shortcuts.
-- Paginate namespaces and repositories; bound provider requests/responses and reject incomplete or repeated pages. Upstream authentication failures retain their category, credentials are not forwarded across redirects, and existing TLS/authentication settings remain unchanged.
+## Fixed
 
-Validation: fake-HTTP registry business tests (including CLI-style and robot credentials, project-list denial, pagination, shared request budgets, malformed/oversized/incomplete responses and redirects); eight actual client-component DOM cases and nine owning-loader cases; ten frontend tests, production build, full format/lint and release tooling checks. Child UI/API boundaries are stubbed in isolated frontend checks.
+- Registry project discovery now uses the same HTTPS-first negotiation as OCI browsing. Allowing insecure connections permits a plain HTTP fallback instead of forcing project API requests onto HTTP.
+- Discovery probes reject redirects and foreign origins. Authenticated project requests remain on the configured host, do not follow redirects, and retain certificate verification. Probe attempts reserve slots in the existing shared request budget.
 
-Live private-Harbor browsing with the user's existing connection is pending release/runtime acceptance. Project discovery remains subject to the registry account's permissions; no access is granted or credentials changed. No live registry writes, pulls or pushes were performed for this implementation.
+## Validation and limits
+
+- Existing browse tests cover verified HTTPS with insecure fallback enabled, explicitly permitted HTTP, refused HTTP fallback, HTTPS permission errors, redirect boundaries, and bounded project enumeration. The trusted TLS case reproduces the previous forced-HTTP failure against canonical cf.63.
+- This fixes the cf.63 live transport mismatch reported in #160 (parent #146/#40). Existing-profile namespace/repository/tag UI acceptance remains pending the cf.64 rollout; no registry credentials, permissions, TLS flags, pulls, or pushes were changed by this work.

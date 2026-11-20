@@ -1,6 +1,7 @@
 package browse
 
 import (
+	"cmp"
 	"context"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
@@ -16,6 +17,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 
 	"kit.getarcane.app"
 	"kit.getarcane.app/cache"
@@ -25,16 +27,30 @@ import (
 	"getarcane.dev/types/v3"
 )
 
-type harborPage struct {
-	Names []string
-	Total int
-}
+type (
+	harborPage struct {
+		Names []string
+		Total int
+	}
+	discoveryTransport struct {
+		base http.RoundTripper
+		host string
+	}
+)
 
 const (
 	harborPageSize            = 100
 	maxDiscoveryPages         = 100
 	maxDiscoveryResponseBytes = 4 << 20
 )
+
+// Ping must not follow redirects to another origin or negotiate a redirect downgrade.
+func (t discoveryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Response != nil || req.URL.Host != t.host {
+		return nil, errors.New("project discovery registry probe redirects are not permitted")
+	}
+	return t.base.RoundTrip(req)
+}
 
 func (s *Service) ListNamespaces(ctx context.Context, id string, params pagination.QueryParams) ([]types.ContainerRegistryNamespace, pagination.Response, error) {
 	ctx, cancel := s.lookupContext(ctx)
@@ -161,6 +177,24 @@ func (s *Service) harborRepositories(ctx context.Context, target *target, projec
 }
 
 func (s *Service) harborNames(ctx context.Context, target *target, path string, remaining *int) ([]string, error) {
+	probeBudget := 1
+	if target.registry.Scheme() == "http" {
+		probeBudget = 2
+	}
+	if *remaining < probeBudget {
+		return nil, errors.New("project discovery request limit reached; select a namespace")
+	}
+	// Native Ping may race HTTPS and the explicitly permitted HTTP fallback.
+	*remaining -= probeBudget
+	base := cmp.Or(s.transport, http.DefaultTransport)
+	challenge, pingErr := transport.Ping(ctx, target.registry, discoveryTransport{base: base, host: target.registry.RegistryStr()})
+	if pingErr != nil {
+		return nil, pingErr
+	}
+	scheme := "https"
+	if challenge.Insecure {
+		scheme = "http"
+	}
 	var names []string
 	seenPages := make(map[string]struct{})
 	seenNames := make(map[string]struct{})
@@ -169,7 +203,7 @@ func (s *Service) harborNames(ctx context.Context, target *target, path string, 
 			return nil, errors.New("project discovery request limit reached; select a namespace")
 		}
 		*remaining--
-		result, err := s.harborPage(ctx, target, path, page)
+		result, err := s.harborPage(ctx, target, path, page, scheme)
 		if err != nil {
 			return nil, err
 		}
@@ -202,13 +236,13 @@ func (s *Service) harborNames(ctx context.Context, target *target, path string, 
 }
 
 // The project API accepts registry username/password, including CLI and robot secrets.
-func (s *Service) harborPage(ctx context.Context, target *target, path string, page int) (harborPage, error) {
+func (s *Service) harborPage(ctx context.Context, target *target, path string, page int, scheme string) (harborPage, error) {
 	auth, err := target.auth.Authorization()
 	if err != nil {
 		return harborPage{}, errors.New("failed to resolve project discovery credentials")
 	}
 	endpoint := url.URL{
-		Scheme: target.registry.Scheme(), Host: target.registry.RegistryStr(), Path: path,
+		Scheme: scheme, Host: target.registry.RegistryStr(), Path: path,
 		RawQuery: url.Values{"page": {strconv.Itoa(page)}, "page_size": {strconv.Itoa(harborPageSize)}}.Encode(),
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), http.NoBody)

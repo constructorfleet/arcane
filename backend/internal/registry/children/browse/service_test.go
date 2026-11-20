@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
@@ -30,8 +31,60 @@ import (
 )
 
 type (
-	testRegistries map[string]types.ContainerRegistryCredential
+	testRegistries        map[string]types.ContainerRegistryCredential
+	testDiscoveryRegistry struct {
+		t            *testing.T
+		mode         string
+		httpCalls    int
+		foreignCalls int
+		apiCalls     int
+	}
 )
+
+func (f *testDiscoveryRegistry) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.URL.Host != "registry.example" {
+		f.foreignCalls++
+	}
+	if req.URL.Scheme == "http" {
+		f.httpCalls++
+	}
+	status, body := http.StatusOK, ""
+	header := make(http.Header)
+	switch req.URL.Path {
+	case "/v2/":
+		assert.Empty(f.t, req.Header.Get("Authorization"), "scheme negotiation must never send credentials")
+		switch f.mode {
+		case "http-opt-in", "http-not-allowed":
+			if req.URL.Scheme == "https" {
+				return nil, errors.New("synthetic HTTPS unavailable")
+			}
+		case "cross-origin-redirect":
+			status = http.StatusFound
+			header.Set("Location", "https://foreign.example/v2/")
+		case "https-downgrade-redirect":
+			status = http.StatusFound
+			header.Set("Location", "http://registry.example/v2/")
+		}
+	case "/api/v2.0/projects":
+		f.apiCalls++
+		if f.mode == "https-denied" {
+			assert.Equal(f.t, "https", req.URL.Scheme)
+		} else {
+			assert.Equal(f.t, "http", req.URL.Scheme)
+		}
+		user, password, ok := req.BasicAuth()
+		assert.True(f.t, ok)
+		assert.Equal(f.t, "synthetic-user", user)
+		assert.Equal(f.t, "synthetic-secret", password)
+		body = `[{"name":"team"}]`
+		if f.mode == "https-denied" {
+			status = http.StatusForbidden
+		}
+	default:
+		status = http.StatusUnauthorized
+	}
+	return &http.Response{StatusCode: status, Header: header, Body: io.NopCloser(strings.NewReader(body)), Request: req}, nil
+}
 
 func newTestRegistry(t *testing.T) string {
 	t.Helper()
@@ -117,6 +170,32 @@ func browseParams(search string) pagination.QueryParams {
 }
 
 func TestService_ListRepositories(t *testing.T) {
+	t.Run("insecure option still prefers verified HTTPS for project discovery", func(t *testing.T) {
+		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/v2/" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			if r.URL.Path == "/v2/_catalog" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			user, password, ok := r.BasicAuth()
+			assert.True(t, ok)
+			assert.Equal(t, "synthetic-user", user)
+			assert.Equal(t, "synthetic-secret", password)
+			_, _ = io.WriteString(w, `[{"name":"team"}]`)
+		}))
+		t.Cleanup(server.Close)
+		svc := newTestService(testRegistries{})
+		svc.transport = server.Client().Transport
+		svc.resolve = func(context.Context, string) (types.ContainerRegistry, *types.ContainerRegistryCredential, error) {
+			return types.ContainerRegistry{URL: server.URL, Insecure: true}, &types.ContainerRegistryCredential{Username: "synthetic-user", Token: "synthetic-secret"}, nil
+		}
+		projects, _, err := svc.ListNamespaces(t.Context(), "tls-first", browseParams(""))
+		require.NoError(t, err)
+		require.Equal(t, []types.ContainerRegistryNamespace{{Name: "team"}}, projects)
+	})
 	host := newTestRegistry(t)
 	img := platformImage(t, v1.Platform{OS: "linux", Architecture: "amd64"}, time.Now())
 	writeImage(t, host+"/team/api:1.0", img)
@@ -208,7 +287,8 @@ func TestService_ListRepositories(t *testing.T) {
 		items, _, budgetErr := budgetService.ListRepositories(t.Context(), budgetID, "", browseParams(""))
 		require.ErrorContains(t, budgetErr, "request limit")
 		require.Nil(t, items)
-		require.Equal(t, maxDiscoveryPages, apiCalls)
+		require.Positive(t, apiCalls)
+		require.LessOrEqual(t, apiCalls*3, maxDiscoveryPages, "each HTTP-only list reserves two probe slots and consumes an API page")
 	})
 }
 
@@ -308,6 +388,44 @@ func TestService_DeleteRepositoryTag(t *testing.T) {
 }
 
 func TestService_BrowseUsesStoredCredentials(t *testing.T) {
+	for _, tt := range []struct {
+		name             string
+		projects         []string
+		httpCalls        int
+		apiCalls         int
+		insecure         bool
+		permissionDenied bool
+	}{
+		{name: "https-denied", insecure: true, apiCalls: 1, permissionDenied: true},
+		{name: "http-opt-in", insecure: true, httpCalls: 2, apiCalls: 1, projects: []string{"team"}},
+		{name: "http-not-allowed"},
+		{name: "cross-origin-redirect"},
+		{name: "https-downgrade-redirect"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := newTestService(testRegistries{})
+			svc.resolve = func(context.Context, string) (types.ContainerRegistry, *types.ContainerRegistryCredential, error) {
+				return types.ContainerRegistry{URL: "registry.example", Insecure: tt.insecure},
+					&types.ContainerRegistryCredential{Username: "synthetic-user", Token: "synthetic-secret"}, nil
+			}
+			fake := &testDiscoveryRegistry{t: t, mode: tt.name}
+			svc.transport = fake
+			// Skip the separate OCI catalog path to exercise the provider transport directly.
+			target, err := svc.target(t.Context(), "transport")
+			require.NoError(t, err)
+			remaining := maxDiscoveryPages
+			projects, err := svc.harborProjects(t.Context(), target, &remaining)
+			require.Equal(t, tt.projects == nil, err != nil)
+			require.Equal(t, tt.projects, projects)
+			require.Equal(t, tt.httpCalls, fake.httpCalls)
+			require.Equal(t, tt.apiCalls, fake.apiCalls)
+			if tt.permissionDenied {
+				require.ErrorIs(t, err, errdefs.ErrPermissionDenied)
+			}
+			require.Zero(t, fake.foreignCalls)
+		})
+	}
+
 	registryHandler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		username, password, ok := r.BasicAuth()
