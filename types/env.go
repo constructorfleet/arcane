@@ -9,10 +9,18 @@ type (
 		Key      string `json:"key"`
 		Value    string `json:"value"`
 		NoInject bool   `json:"noInject,omitzero"`
+		IsSecret bool   `json:"isSecret,omitzero"`
 	}
 
 	EnvSummary struct {
-		Variables []EnvVariable `json:"variables"`
+		Variables       []EnvVariable `json:"variables"`
+		MetadataVersion int           `json:"metadataVersion,omitzero"`
+	}
+
+	MaterializedVariablesResponse struct {
+		Data            []EnvVariable `json:"data"`
+		MetadataVersion int           `json:"metadataVersion,omitzero"`
+		Success         bool          `json:"success"`
 	}
 
 	GlobalVariable struct {

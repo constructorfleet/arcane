@@ -4712,5 +4712,6 @@
   "image_pushed_successfully": "Image {reference} pushed successfully",
   "image_transfer_incomplete": "The image transfer ended without a completion confirmation.",
   "source_image": "Source image",
-  "registry_reference": "Registry reference"
+  "registry_reference": "Registry reference",
+  "shared_stack_variables_hint": "Use {reference} to reference shared variables available to the selected agent. Values in this stack’s .env take precedence."
 }

@@ -241,7 +241,7 @@
 			}));
 	}
 
-	const globalVariableMap = $derived(globalVariablesToMap(data.globalVariables));
+	const globalVariableMap = $derived(globalVariablesToMap(data.globalVariables, destinationId));
 	const loadNotices = $derived(templateLoadNotices(data));
 	const stackEditorContext = $derived({
 		envContent: inputs.envContent.value,
@@ -394,6 +394,8 @@
 			</div>
 		</div>
 	</div>
+
+	<p class="px-6 pb-2 text-xs text-muted-foreground">{m.shared_stack_variables_hint({ reference: '${KEY}' })}</p>
 
 	<div class="flex min-h-0 flex-1 overflow-hidden">
 		<div class="mx-auto h-full w-full max-w-full min-w-0">

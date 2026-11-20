@@ -81,6 +81,9 @@ const (
 	ProjectEnvModeDirect       ProjectEnvMode = "direct"
 	ProjectEnvModeOverride     ProjectEnvMode = "override"
 	GlobalEnvNoInjectDirective                = "arcane:noinject"
+	GlobalEnvSecretDirective                  = "arcane:secret"
+	GlobalEnvMetadataDirective                = "arcane:metadata"
+	GlobalEnvMetadataVersion                  = 2
 	// Docker Compose pre-defined variable names that compose-go's consts package
 	// does not export. See https://docs.docker.com/compose/how-tos/environment-variables/envvars.
 	composeEnvFilesKey          = "COMPOSE_ENV_FILES"
@@ -260,7 +263,7 @@ func loadCachedEnvFile(ctx context.Context, envCache *cache.Cache[string, envFil
 			size:         info.Size,
 			exists:       true,
 			values:       parsed,
-			noInjectKeys: ParseNoInjectDirectives(string(content)),
+			noInjectKeys: ParseEnvDirectives(string(content), GlobalEnvNoInjectDirective),
 		}, true, nil
 	})
 	if err != nil {
@@ -299,7 +302,7 @@ func parseProjectEnvFileExisting(ctx context.Context, path string, contextEnv En
 	return ParseProjectEnvContent(string(content), contextEnv)
 }
 
-func ParseNoInjectDirectives(content string) map[string]bool {
+func ParseEnvDirectives(content, directive string) map[string]bool {
 	keys := map[string]bool{}
 	for line := range strings.Lines(content) {
 		line = strings.TrimSpace(line)
@@ -311,7 +314,7 @@ func ParseNoInjectDirectives(content string) map[string]bool {
 			break
 		}
 		fields := strings.Fields(comment)
-		if len(fields) == 0 || fields[0] != GlobalEnvNoInjectDirective {
+		if len(fields) == 0 || fields[0] != directive {
 			continue
 		}
 		for _, key := range fields[1:] {
@@ -319,6 +322,37 @@ func ParseNoInjectDirectives(content string) map[string]bool {
 		}
 	}
 	return keys
+}
+
+func ReadSharedEnvironment(ctx context.Context, directory string) (types.EnvSummary, error) {
+	if strings.TrimSpace(directory) == "" {
+		return types.EnvSummary{}, common.Classify(common.ErrValidation, errors.New("shared-input directory is required"))
+	}
+	content, err := (acfs.Root{Path: directory}).ReadFile(ctx, "/"+GlobalEnvFileName)
+	if errors.Is(err, os.ErrNotExist) {
+		return types.EnvSummary{MetadataVersion: GlobalEnvMetadataVersion}, nil
+	}
+	if err != nil {
+		return types.EnvSummary{}, common.Classify(common.ErrUnavailable, errors.New("shared variables on this agent could not be read; check the projects directory permissions"))
+	}
+	return ParseSharedEnvironment(string(content))
+}
+
+func ParseSharedEnvironment(content string) (types.EnvSummary, error) {
+	if !ParseEnvDirectives(content, GlobalEnvMetadataDirective)[strconv.Itoa(GlobalEnvMetadataVersion)] {
+		return types.EnvSummary{}, common.Classify(common.ErrUnavailable, errors.New("shared variables on this agent need to sync before stack operations can use them"))
+	}
+	values, parseErr := ParseProjectEnvContent(content, allowedProcessEnv())
+	if parseErr != nil {
+		return types.EnvSummary{}, common.Classify(common.ErrValidation, errors.New("shared variables on this agent could not be parsed"))
+	}
+	noInject := ParseEnvDirectives(content, GlobalEnvNoInjectDirective)
+	secrets := ParseEnvDirectives(content, GlobalEnvSecretDirective)
+	variables := make([]types.EnvVariable, 0, len(values))
+	for _, key := range slices.Sorted(maps.Keys(values)) {
+		variables = append(variables, types.EnvVariable{Key: key, Value: values[key], NoInject: noInject[key], IsSecret: secrets[key]})
+	}
+	return types.EnvSummary{Variables: variables, MetadataVersion: GlobalEnvMetadataVersion}, nil
 }
 
 func ParseProjectEnvFile(ctx context.Context, path string, contextEnv EnvMap) (EnvMap, error) {
@@ -538,7 +572,7 @@ func BuildAdditiveOverrideEnvContent(gitContent, localContent string) (string, e
 		}
 	}
 
-	return formatEnvMap(override), nil
+	return FormatEnvMap(override), nil
 }
 
 func BuildOverrideEnvContent(gitContent, effectiveContent string) (string, error) {
@@ -574,7 +608,7 @@ func BuildOverrideEnvContent(gitContent, effectiveContent string) (string, error
 		return effectiveContent, nil
 	}
 
-	return formatEnvMap(override), nil
+	return FormatEnvMap(override), nil
 }
 
 func CheckProjectEnvAccess(ctx context.Context, projectsDir, dir string) *types.ProjectConfigurationError {
@@ -709,7 +743,7 @@ func readOptionalProjectFile(ctx context.Context, projectPath, fileName string) 
 	return "", false, false, fmt.Errorf("read %s: %w", fileName, readErr)
 }
 
-func formatEnvMap(envMap EnvMap) string {
+func FormatEnvMap(envMap EnvMap) string {
 	if len(envMap) == 0 {
 		return ""
 	}

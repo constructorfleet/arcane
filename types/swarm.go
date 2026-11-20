@@ -371,6 +371,7 @@ type (
 		Configs         []string `json:"configs"`
 		Secrets         []string `json:"secrets"`
 		Warnings        []string `json:"warnings,omitempty"`
+		PreviewWithheld bool     `json:"previewWithheld"`
 	}
 
 	SwarmStackSource struct {

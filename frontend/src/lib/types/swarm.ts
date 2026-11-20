@@ -412,6 +412,7 @@ export interface SwarmStackRenderConfigRequest {
 }
 
 export interface SwarmStackRenderConfigResponse {
+	previewWithheld: boolean;
 	name: string;
 	renderedCompose: string;
 	services: string[];

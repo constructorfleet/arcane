@@ -16,6 +16,10 @@ type (
 		proxyRemoteJSON handlerutil.RemoteJSONProxy
 	}
 
+	MaterializedVariablesOutput struct {
+		Body types.MaterializedVariablesResponse
+	}
+
 	ListGlobalVariablesInput struct{}
 
 	CreateGlobalVariableInput struct {
@@ -127,24 +131,25 @@ func (h *VariableHandler) GetSyncStatus(_ context.Context, _ *GetGlobalVariableS
 	}, nil
 }
 
-func (h *VariableHandler) GetMaterializedVariables(ctx context.Context, input *types.EnvironmentInput) (*handlerutil.Out[[]types.EnvVariable], error) {
+func (h *VariableHandler) GetMaterializedVariables(ctx context.Context, input *types.EnvironmentInput) (*MaterializedVariablesOutput, error) {
 	if input.EnvironmentID != "0" {
-		response, err := h.proxyRemoteJSON.JSON[types.ApiResponse[[]types.EnvVariable]](ctx, input.EnvironmentID, http.MethodGet, "/api/agents/0/templates/variables", nil)
+		response, err := h.proxyRemoteJSON.JSON[types.MaterializedVariablesResponse](ctx, input.EnvironmentID, http.MethodGet, "/api/agents/0/templates/variables", nil)
 		if err != nil {
 			return nil, err
 		}
-		return &handlerutil.Out[[]types.EnvVariable]{Body: *response}, nil
+		return &MaterializedVariablesOutput{Body: *response}, nil
 	}
 
-	vars, err := h.variableService.ReadLocalEnvFile(ctx)
+	summary, err := h.variableService.ReadLocalEnvFile(ctx)
 	if err != nil {
 		return nil, huma.Error500InternalServerError("Failed to retrieve global variables: " + err.Error())
 	}
 
-	return &handlerutil.Out[[]types.EnvVariable]{
-		Body: types.ApiResponse[[]types.EnvVariable]{
-			Success: true,
-			Data:    vars,
+	return &MaterializedVariablesOutput{
+		Body: types.MaterializedVariablesResponse{
+			Success:         true,
+			Data:            summary.Variables,
+			MetadataVersion: summary.MetadataVersion,
 		},
 	}, nil
 }
@@ -158,7 +163,7 @@ func (h *VariableHandler) UpdateMaterializedVariables(ctx context.Context, input
 		return &handlerutil.Out[types.MessageResponse]{Body: *response}, nil
 	}
 
-	if err := h.variableService.WriteLocalEnvFile(ctx, input.Body.Variables); err != nil {
+	if err := h.variableService.WriteLocalEnvFile(ctx, input.Body); err != nil {
 		return nil, handlerutil.APIError(err)
 	}
 

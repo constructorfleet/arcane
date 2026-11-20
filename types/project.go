@@ -246,6 +246,7 @@ type (
 		OverrideContent string
 		EnvContent      string
 		WorkingDir      string
+		SharedVariables []EnvVariable
 	}
 
 	ProjectBuildOptions struct {

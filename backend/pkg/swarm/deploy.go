@@ -26,6 +26,7 @@ type (
 		EnvContent           string
 		ResolveImage         string
 		WorkingDir           string
+		SharedVariables      []types.EnvVariable
 		WithRegistryAuth     bool
 		Prune                bool
 	}
@@ -43,6 +44,7 @@ func DeployStack(ctx context.Context, dockerClient *dockerclient.Client, opts St
 	}
 
 	project, err := projects.LoadComposeProjectFromContent(ctx, types.ComposeContentOptions{
+		SharedVariables: opts.SharedVariables,
 		ProjectName:     stackName,
 		ComposeContent:  opts.ComposeContent,
 		OverrideContent: opts.OverrideContent,

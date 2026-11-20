@@ -191,6 +191,21 @@ from native Swarm secret delivery. Existing variable/project business coverage
 passed PR #75 Go CI; live synthetic reuse and scoped-denial acceptance remain
 #29 / #63. No production values were read or changed for this audit.
 
+cf.39 connects Swarm render/deploy/redeploy to the selected agent's synchronized
+shared inputs (#92). Explicit stack values, including blank values and nested
+expansion, override defaults; interpolation-only inputs remain available to
+explicit references. Secret provenance survives synchronization; legacy inputs
+require a successful resync before Swarm reuse. Imports from agents lacking
+provenance default to secret storage; existing manager definitions are preserved.
+Protected previews withhold
+resolved YAML and resource names, and protected errors/path warnings omit
+values. Saved source retains original Compose and explicit .env. Scope-aware
+completion offers secret keys without values. Isolated fake-Docker business
+coverage and frontend checks are distinguished from post-release acceptance in
+#92; SEC-05–SEC-08 and scoped-denial acceptance remain open. Inputs are the last
+successfully synchronized agent snapshot; explicit Docker-visible substitutions
+remain subject to Docker permissions. Native secrets are a separate mechanism.
+
 Boundary: Docker cannot return the plaintext of an existing Swarm secret.
 Imported secrets must be shown as external/write-only; replacement is supported
 without pretending their old values can be recovered. Standalone containers

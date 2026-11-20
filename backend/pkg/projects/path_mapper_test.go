@@ -1,6 +1,8 @@
 package projects
 
 import (
+	"bytes"
+	"log/slog"
 	"path/filepath"
 	"testing"
 
@@ -203,33 +205,52 @@ func TestPathMapper_TranslateVolumeSourcesDriverOptsDevice(t *testing.T) {
 }
 
 func TestRemapEscapedRelativeSources_MountTableTakesPrecedence(t *testing.T) {
-	pm := NewPathMapperFromMounts([]HostMount{
-		{Destination: "/app/data", Source: "/docker/112/arcane/arcane-data"},
-		{Destination: "/app/data/projects/goclaw/media", Source: "/mnt/media"},
-	})
-	require.True(t, pm.isNonMatching)
+	for _, mode := range []struct {
+		name      string
+		protected bool
+	}{{"ordinary paths", false}, {"protected paths", true}} {
+		t.Run(mode.name, func(t *testing.T) {
+			pm := NewPathMapperFromMounts([]HostMount{
+				{Destination: "/app/data", Source: "/docker/112/arcane/arcane-data"},
+				{Destination: "/app/data/projects/goclaw/media", Source: "/mnt/media"},
+			})
+			require.True(t, pm.isNonMatching)
 
-	containerWorkingDir := "/app/data/projects/goclaw"
-	project := &composetypes.Project{
-		Services: composetypes.Services{
-			"goclaw": {
-				Name: "goclaw",
-				Volumes: []composetypes.ServiceVolumeConfig{
-					{Type: composetypes.VolumeTypeBind, Source: "/app/data/projects/goclaw/media", Target: "/media"},
-					{Type: composetypes.VolumeTypeBind, Source: "/goclaw/data", Target: "/app/data"},
+			containerWorkingDir := "/app/data/projects/goclaw"
+			project := &composetypes.Project{
+				Services: composetypes.Services{
+					"goclaw": {
+						Name: "goclaw",
+						Volumes: []composetypes.ServiceVolumeConfig{
+							{Type: composetypes.VolumeTypeBind, Source: "/app/data/projects/goclaw/media", Target: "/media"},
+							{Type: composetypes.VolumeTypeBind, Source: "/goclaw/data", Target: "/app/data"},
+						},
+					},
 				},
-			},
-		},
-	}
-	rawSources := map[string]string{
-		("volume:" + "goclaw" + "\x00" + filepath.Clean("/media")):    "./media",
-		("volume:" + "goclaw" + "\x00" + filepath.Clean("/app/data")): "../../../../goclaw/data",
-	}
+			}
+			rawSources := map[string]string{
+				("volume:" + "goclaw" + "\x00" + filepath.Clean("/media")):    "./media",
+				("volume:" + "goclaw" + "\x00" + filepath.Clean("/app/data")): "../../../../goclaw/data",
+			}
 
-	require.NoError(t, pm.TranslateVolumeSources(project, true))
-	RemapEscapedRelativeSources(t.Context(), pm, project, containerWorkingDir, rawSources, true)
+			require.NoError(t, pm.TranslateVolumeSources(project, true))
+			var logs bytes.Buffer
+			previous := slog.Default()
+			slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+			defer slog.SetDefault(previous)
+			RemapEscapedRelativeSources(t.Context(), pm, project, SourceRemapOptions{
+				RawSources: rawSources, WorkingDirectory: containerWorkingDir, IncludeFileResources: true, ProtectedInputs: mode.protected,
+			})
+			require.Contains(t, logs.String(), "remapped")
+			if mode.protected {
+				require.NotContains(t, logs.String(), "goclaw")
+			} else {
+				require.Contains(t, logs.String(), "/docker/112/goclaw/data")
+			}
 
-	volumes := project.Services["goclaw"].Volumes
-	assert.Equal(t, "/mnt/media", volumes[0].Source, "nested independent mount must win over the host project directory")
-	assert.Equal(t, "/docker/112/goclaw/data", volumes[1].Source)
+			volumes := project.Services["goclaw"].Volumes
+			assert.Equal(t, "/mnt/media", volumes[0].Source, "nested independent mount must win over the host project directory")
+			assert.Equal(t, "/docker/112/goclaw/data", volumes[1].Source)
+		})
+	}
 }

@@ -533,8 +533,7 @@ func applyServicePorts(spec *swarm.ServiceSpec, ports []composegotypes.ServicePo
 	converted := make([]swarm.PortConfig, 0, len(ports))
 	for _, port := range ports {
 		if strings.TrimSpace(port.HostIP) != "" {
-			slog.WarnContext(context.Background(), "swarm ignores a compose port host IP", //nolint:forbidigo // Compose-to-swarm conversion is a pure transformation without a request context.
-				"hostIp", port.HostIP, "targetPort", port.Target)
+			slog.WarnContext(context.Background(), "swarm ignores a compose port host IP") //nolint:forbidigo // Compose-to-swarm conversion is a pure transformation without a request context.
 		}
 		entry := swarm.PortConfig{
 			Name:       port.Name,

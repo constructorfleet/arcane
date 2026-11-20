@@ -244,14 +244,14 @@ func TestResolveEffectiveVariables_MarksInterpolationOnlyVariables(t *testing.T)
 	require.NoError(t, err)
 	require.Equal(t, []types.EnvVariable{
 		{Key: "TZ", Value: "Europe/Paris", NoInject: true},
-		{Key: "DB_PASSWORD", Value: "hunter2", NoInject: true},
+		{Key: "DB_PASSWORD", Value: "hunter2", NoInject: true, IsSecret: true},
 	}, forA)
 
 	forB, err := service.resolveEffectiveVariables(ctx, "env-b")
 	require.NoError(t, err)
 	require.Equal(t, []types.EnvVariable{
 		{Key: "TZ", Value: "UTC"},
-		{Key: "DB_PASSWORD", Value: "hunter2", NoInject: true},
+		{Key: "DB_PASSWORD", Value: "hunter2", NoInject: true, IsSecret: true},
 	}, forB)
 }
 
@@ -293,29 +293,113 @@ func TestImportVariables_InjectsOnlyUnmarkedEntries(t *testing.T) {
 		injected[variable.Key] = variable.InjectIntoContainers
 	}
 	require.Equal(t, map[string]bool{"PUID": true, "DB_PASSWORD": false}, injected, "unmarked legacy entries were always injected; marked ones stay interpolation-only")
+	for _, test := range []struct {
+		name    string
+		version int
+	}{{"unversioned agent", 0}, {"versioned agent", projects.GlobalEnvMetadataVersion}} {
+		t.Run(test.name, func(t *testing.T) {
+			importCtx := t.Context()
+			wire := types.MaterializedVariablesResponse{
+				Success: true, MetadataVersion: test.version,
+				Data: []types.EnvVariable{
+					{Key: "KNOWN", Value: "remote-known"},
+					{Key: "IMPORTED_PUBLIC", Value: "owned-public"},
+					{Key: "IMPORTED_SECRET", Value: "owned-private", IsSecret: test.version == projects.GlobalEnvMetadataVersion, NoInject: true},
+				},
+			}
+			encoded, importErr := json.Marshal(wire)
+			require.NoError(t, importErr)
+			svc, importDB, _ := setupVariableServiceTest(t, &variableTestRemoteProxy{
+				proxyJSON: func(_ context.Context, envID, method, path string, _ []byte, out any) error {
+					require.Equal(t, "env-import", envID)
+					require.Equal(t, http.MethodGet, method)
+					require.Equal(t, agentVariablesPath, path)
+					return json.Unmarshal(encoded, out)
+				},
+			})
+			createVariableTestEnvironment(t, importDB, "env-import")
+			_, importErr = svc.CreateVariable(importCtx, types.GlobalVariable{Key: "KNOWN", Value: "manager-known", AllEnvironments: true})
+			require.NoError(t, importErr)
+			require.NoError(t, svc.importRemoteLegacyVarsOnce(importCtx, "env-import"))
+			importedVariables, importErr := svc.ListVariables(importCtx)
+			require.NoError(t, importErr)
+			byKey := make(map[string]types.GlobalVariable)
+			for _, value := range importedVariables {
+				byKey[value.Key] = value
+			}
+			require.Equal(t, "manager-known", byKey["KNOWN"].Value)
+			require.False(t, byKey["KNOWN"].IsSecret)
+			require.True(t, byKey["IMPORTED_SECRET"].IsSecret)
+			require.Empty(t, byKey["IMPORTED_SECRET"].Value)
+			require.Equal(t, test.version == 0, byKey["IMPORTED_PUBLIC"].IsSecret)
+			if test.version == 0 {
+				require.Empty(t, byKey["IMPORTED_PUBLIC"].Value)
+			} else {
+				require.Equal(t, "owned-public", byKey["IMPORTED_PUBLIC"].Value)
+			}
+			var stored GlobalVariable
+			require.NoError(t, importDB.Where("key = ?", "IMPORTED_SECRET").First(&stored).Error)
+			require.NotEqual(t, "owned-private", stored.Value)
+			effective, importErr := svc.resolveEffectiveVariables(importCtx, "env-import")
+			require.NoError(t, importErr)
+			values := make(map[string]string)
+			for _, value := range effective {
+				values[value.Key] = value.Value
+			}
+			require.Equal(t, "owned-private", values["IMPORTED_SECRET"])
+			require.Equal(t, "owned-public", values["IMPORTED_PUBLIC"])
+		})
+	}
 }
 
 func TestReadLocalEnvFile_ReportsNoInjectMarks(t *testing.T) {
-	service, _, _ := setupVariableServiceTest(t, &variableTestRemoteProxy{})
+	service, _, projectsDir := setupVariableServiceTest(t, &variableTestRemoteProxy{})
 	ctx := t.Context()
 	vars := []types.EnvVariable{
-		{Key: "DB_PASSWORD", Value: "hunter2", NoInject: true},
+		{Key: "DB_PASSWORD", Value: "literal$TOKEN \"quotes\" and\\backslash\nnext line", NoInject: true, IsSecret: true},
 		{Key: "TZ", Value: "UTC"},
 	}
 
-	require.NoError(t, service.WriteLocalEnvFile(ctx, vars))
+	require.NoError(t, service.WriteLocalEnvFile(ctx, types.EnvSummary{Variables: vars, MetadataVersion: projects.GlobalEnvMetadataVersion}))
 
 	read, err := service.ReadLocalEnvFile(ctx)
 	require.NoError(t, err)
-	require.Equal(t, vars, read, "a re-added agent must report which keys are interpolation-only")
+	require.Equal(t, vars, read.Variables, "a re-added agent must report which keys are interpolation-only")
+	require.Equal(t, projects.GlobalEnvMetadataVersion, read.MetadataVersion)
+	shared, sharedErr := projects.ReadSharedEnvironment(ctx, projectsDir)
+	require.NoError(t, sharedErr)
+	require.Equal(t, projects.GlobalEnvMetadataVersion, shared.MetadataVersion)
+	require.Equal(t, vars, shared.Variables)
+	info, statErr := os.Stat(filepath.Join(projectsDir, projects.GlobalEnvFileName))
+	require.NoError(t, statErr)
+	if runtime.GOOS != "windows" {
+		require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	}
+
+	require.NoError(t, service.WriteLocalEnvFile(ctx, types.EnvSummary{Variables: vars}))
+	legacy, readErr := service.ReadLocalEnvFile(ctx)
+	require.NoError(t, readErr)
+	require.Zero(t, legacy.MetadataVersion)
+	_, legacyErr := projects.ReadSharedEnvironment(ctx, projectsDir)
+	require.ErrorIs(t, legacyErr, common.ErrUnavailable)
+	require.NotContains(t, legacyErr.Error(), vars[0].Value)
+	envPath := filepath.Join(projectsDir, projects.GlobalEnvFileName)
+	require.NoError(t, os.WriteFile(envPath, []byte("# arcane:metadata 2\n# arcane:secret TOKEN\nTOKEN=\"synthetic-unclosed-secret\n"), 0o600))
+	_, malformedErr := projects.ReadSharedEnvironment(ctx, projectsDir)
+	require.ErrorIs(t, malformedErr, common.ErrValidation)
+	require.NotContains(t, malformedErr.Error(), "synthetic-unclosed-secret")
+	require.NoError(t, os.Remove(envPath))
+	require.NoError(t, os.Mkdir(envPath, 0o700))
+	_, directoryErr := projects.ReadSharedEnvironment(ctx, projectsDir)
+	require.ErrorIs(t, directoryErr, common.ErrUnavailable)
 }
 
 func TestWriteLocalEnvFile_RejectsNewlineInjectionKey(t *testing.T) {
 	service, _, projectsDir := setupVariableServiceTest(t, &variableTestRemoteProxy{})
 
-	err := service.WriteLocalEnvFile(t.Context(), []types.EnvVariable{
+	err := service.WriteLocalEnvFile(t.Context(), types.EnvSummary{Variables: []types.EnvVariable{
 		{Key: "BENIGN\nINJECTED", Value: "x"},
-	})
+	}, MetadataVersion: projects.GlobalEnvMetadataVersion})
 	require.ErrorIs(t, err, common.ErrInvalidEnvKey, "expected InvalidEnvKeyError, got %v", err)
 
 	_, statErr := os.Stat(filepath.Join(projectsDir, ".env.global"))
@@ -330,13 +414,13 @@ func TestWriteLocalEnvFile_PreservesExistingFileMode(t *testing.T) {
 	ctx := t.Context()
 	envPath := filepath.Join(projectsDir, ".env.global")
 
-	require.NoError(t, service.WriteLocalEnvFile(ctx, []types.EnvVariable{{Key: "A", Value: "1"}}))
+	require.NoError(t, service.WriteLocalEnvFile(ctx, types.EnvSummary{Variables: []types.EnvVariable{{Key: "A", Value: "1"}}, MetadataVersion: projects.GlobalEnvMetadataVersion}))
 	info, err := os.Stat(envPath)
 	require.NoError(t, err)
 	require.Equal(t, fs.FilePerm, info.Mode().Perm(), "new file must use the configured default mode")
 
 	require.NoError(t, os.Chmod(envPath, 0o600))
-	require.NoError(t, service.WriteLocalEnvFile(ctx, []types.EnvVariable{{Key: "A", Value: "2"}}))
+	require.NoError(t, service.WriteLocalEnvFile(ctx, types.EnvSummary{Variables: []types.EnvVariable{{Key: "A", Value: "2"}}, MetadataVersion: projects.GlobalEnvMetadataVersion}))
 	info, err = os.Stat(envPath)
 	require.NoError(t, err)
 	require.Equal(t, os.FileMode(0o600), info.Mode().Perm(), "rewrite must keep the existing mode")
@@ -501,7 +585,8 @@ func requireMaterializationRequests(t *testing.T, requests []capturedVariableSyn
 	require.Equal(t, token, requests[1].Headers[agent.HeaderAgentToken])
 	var materialized types.EnvSummary
 	require.NoError(t, json.Unmarshal(requests[1].Body, &materialized))
-	require.Equal(t, []types.EnvVariable{{Key: "API_TOKEN", Value: "super-secret", NoInject: true}}, materialized.Variables)
+	require.Equal(t, []types.EnvVariable{{Key: "API_TOKEN", Value: "super-secret", NoInject: true, IsSecret: true}}, materialized.Variables)
+	require.Equal(t, projects.GlobalEnvMetadataVersion, materialized.MetadataVersion)
 }
 
 func (p *variableTestRemoteProxy) ProxyJSONRequest(ctx context.Context, envID, method, path string, body []byte, out any) error {

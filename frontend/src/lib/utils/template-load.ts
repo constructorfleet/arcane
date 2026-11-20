@@ -40,8 +40,18 @@ export type SelectedTemplateLoad = {
 	forbidden: boolean;
 };
 
-export function globalVariablesToMap(globalVariables: GlobalVariable[] | null | undefined): Record<string, string> {
-	return Object.fromEntries((globalVariables ?? []).map((item) => [item.key, item.value]));
+export function globalVariablesToMap(
+	globalVariables: GlobalVariable[] | null | undefined,
+	environmentId?: string
+): Record<string, string> {
+	let variables = globalVariables ?? [];
+	if (environmentId !== undefined) {
+		variables = [
+			...variables.filter((item) => item.allEnvironments),
+			...variables.filter((item) => !item.allEnvironments && item.environmentIds.includes(environmentId))
+		];
+	}
+	return Object.fromEntries(variables.map((item) => [item.key, item.isSecret ? '' : item.value]));
 }
 
 export async function loadGlobalVariablesOrEmpty(queryClient: QueryClient): Promise<GlobalVariable[]> {

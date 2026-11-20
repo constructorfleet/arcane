@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -304,6 +305,7 @@ func (s *VariableService) resolveEffectiveVariables(ctx context.Context, envID s
 			Key:      variable.Key,
 			Value:    value,
 			NoInject: !variable.InjectIntoContainers,
+			IsSecret: variable.IsSecret,
 		}
 		if index, ok := positions[variable.Key]; ok {
 			result[index] = entry
@@ -342,10 +344,10 @@ func (s *VariableService) syncEnvironment(ctx context.Context, envID string) err
 	}
 
 	if envID == environment.LocalEnvironmentID {
-		return s.WriteLocalEnvFile(ctx, vars)
+		return s.WriteLocalEnvFile(ctx, types.EnvSummary{Variables: vars, MetadataVersion: projects.GlobalEnvMetadataVersion})
 	}
 
-	body, err := json.Marshal(types.EnvSummary{Variables: vars})
+	body, err := json.Marshal(types.EnvSummary{Variables: vars, MetadataVersion: projects.GlobalEnvMetadataVersion})
 	if err != nil {
 		return fmt.Errorf("failed to marshal variables for sync: %w", err)
 	}
@@ -480,22 +482,26 @@ func (s *VariableService) localEnvFilePath(ctx context.Context) (string, error) 
 	return filepath.Join(projectsDirectory, projects.GlobalEnvFileName), nil
 }
 
-func (s *VariableService) ReadLocalEnvFile(ctx context.Context) ([]types.EnvVariable, error) {
+func (s *VariableService) ReadLocalEnvFile(ctx context.Context) (types.EnvSummary, error) {
 	envPath, err := s.localEnvFilePath(ctx)
 	if err != nil {
-		return nil, err
+		return types.EnvSummary{}, err
 	}
 
 	content, err := acfs.Root{Path: filepath.Dir(envPath)}.ReadFile(ctx, "/"+projects.GlobalEnvFileName)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			slog.DebugContext(ctx, "Global variables file does not exist yet", "path", envPath)
-			return []types.EnvVariable{}, nil
+			return types.EnvSummary{MetadataVersion: projects.GlobalEnvMetadataVersion}, nil
 		}
-		return nil, fmt.Errorf("failed to open global variables file: %w", err)
+		return types.EnvSummary{}, fmt.Errorf("failed to open global variables file: %w", err)
 	}
 
-	noInject := projects.ParseNoInjectDirectives(string(content))
+	if projects.ParseEnvDirectives(string(content), projects.GlobalEnvMetadataDirective)[strconv.Itoa(projects.GlobalEnvMetadataVersion)] {
+		return projects.ParseSharedEnvironment(string(content))
+	}
+	noInject := projects.ParseEnvDirectives(string(content), projects.GlobalEnvNoInjectDirective)
+	secrets := projects.ParseEnvDirectives(string(content), projects.GlobalEnvSecretDirective)
 	vars := []types.EnvVariable{}
 	scanner := bufio.NewScanner(bytes.NewReader(content))
 	lineNum := 0
@@ -511,8 +517,7 @@ func (s *VariableService) ReadLocalEnvFile(ctx context.Context) ([]types.EnvVari
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
 			slog.WarnContext(ctx, "Skipping invalid line in global variables file",
-				"line", lineNum,
-				"content", line)
+				"line", lineNum)
 			continue
 		}
 
@@ -530,17 +535,22 @@ func (s *VariableService) ReadLocalEnvFile(ctx context.Context) ([]types.EnvVari
 			Key:      key,
 			Value:    value,
 			NoInject: noInject[key],
+			IsSecret: secrets[key],
 		})
 	}
 
 	if readVariablesErr := scanner.Err(); readVariablesErr != nil {
-		return nil, fmt.Errorf("error reading global variables file: %w", readVariablesErr)
+		return types.EnvSummary{}, fmt.Errorf("error reading global variables file: %w", readVariablesErr)
 	}
 
-	return vars, nil
+	return types.EnvSummary{Variables: vars}, nil
 }
 
-func (s *VariableService) WriteLocalEnvFile(ctx context.Context, vars []types.EnvVariable) error {
+func (s *VariableService) WriteLocalEnvFile(ctx context.Context, summary types.EnvSummary) error {
+	if summary.MetadataVersion != 0 && summary.MetadataVersion != projects.GlobalEnvMetadataVersion {
+		return common.Classify(common.ErrBadRequest, errors.New("unsupported shared-variable metadata version"))
+	}
+	vars := summary.Variables
 	envPath, err := s.localEnvFilePath(ctx)
 	if err != nil {
 		return err
@@ -554,33 +564,32 @@ func (s *VariableService) WriteLocalEnvFile(ctx context.Context, vars []types.En
 	var builder strings.Builder
 	builder.WriteString("# Global Environment Variables\n")
 	builder.WriteString("# These variables are available to all projects\n")
+	if summary.MetadataVersion == projects.GlobalEnvMetadataVersion {
+		_, _ = fmt.Fprintf(&builder, "# %s %d\n", projects.GlobalEnvMetadataDirective, summary.MetadataVersion)
+	}
 
 	for _, v := range vars {
 		if v.NoInject {
 			_, _ = fmt.Fprintf(&builder, "# %s %s\n", projects.GlobalEnvNoInjectDirective, strings.TrimSpace(v.Key))
 		}
+		if v.IsSecret {
+			_, _ = fmt.Fprintf(&builder, "# %s %s\n", projects.GlobalEnvSecretDirective, strings.TrimSpace(v.Key))
+		}
 	}
 	builder.WriteString("\n")
 
-	for _, v := range vars {
-		if strings.TrimSpace(v.Key) == "" {
+	values := make(projects.EnvMap, len(vars))
+	for _, variable := range vars {
+		key := strings.TrimSpace(variable.Key)
+		if key == "" {
 			continue
 		}
-
-		key := strings.TrimSpace(v.Key)
 		if validateKeyErr := validateVariableKey(key); validateKeyErr != nil {
 			return validateKeyErr
 		}
-
-		// Preserve intentional whitespace inside the quoted value.
-		value := v.Value
-
-		if strings.ContainsAny(value, " \t\n\r#") {
-			value = `"` + strings.ReplaceAll(value, `"`, `\"`) + `"`
-		}
-
-		_, _ = fmt.Fprintf(&builder, "%s=%s\n", key, value)
+		values[key] = variable.Value
 	}
+	builder.WriteString(projects.FormatEnvMap(values))
 
 	s.envFileMu.Lock()
 	defer s.envFileMu.Unlock()
@@ -595,12 +604,18 @@ func (s *VariableService) WriteLocalEnvFile(ctx context.Context, vars []types.En
 	if entry, statErr := envRoot.Stat(ctx, "/"+projects.GlobalEnvFileName, acfstypes.StatOptions{}); statErr == nil {
 		mode = os.FileMode(entry.UnixMode).Perm()
 	}
+	if slices.ContainsFunc(vars, func(variable types.EnvVariable) bool { return variable.IsSecret }) {
+		mode = 0o600
+	}
 	writeErr := envRoot.Write(ctx, "/"+projects.GlobalEnvFileName, []byte(builder.String()), acfs.WriteOptions{Mode: mode})
 	if errors.Is(writeErr, syscall.EBUSY) {
 		writeErr = envRoot.Write(ctx, "/"+projects.GlobalEnvFileName, []byte(builder.String()), acfs.WriteOptions{
 			Mode:    mode,
 			InPlace: true,
 		})
+	}
+	if errors.Is(writeErr, syscall.EROFS) && summary.MetadataVersion == projects.GlobalEnvMetadataVersion {
+		return common.Classify(common.ErrUnavailable, errors.New("shared variables could not be synchronized because the projects directory is read-only"))
 	}
 	if errors.Is(writeErr, syscall.EROFS) {
 		slog.WarnContext(ctx, "Skipping global variables file because the projects directory is read-only", "path", envPath, "count", len(vars))
@@ -633,14 +648,17 @@ func (s *VariableService) importRemoteLegacyVarsOnce(ctx context.Context, envID 
 		return nil
 	}
 
-	var out struct {
-		Data    []types.EnvVariable `json:"data"`
-		Success bool                `json:"success"`
-	}
+	var out types.MaterializedVariablesResponse
 	if proxyEnvironmentJSONErr := s.environments.ProxyJSONRequest(ctx, envID, http.MethodGet, agentVariablesPath, nil, &out); proxyEnvironmentJSONErr != nil {
 		return proxyEnvironmentJSONErr
 	}
 
+	if out.MetadataVersion != projects.GlobalEnvMetadataVersion {
+		// Older agents cannot prove which values were secret; preserve confidentiality on import.
+		for index := range out.Data {
+			out.Data[index].IsSecret = true
+		}
+	}
 	if importVariablesErr := s.importVariables(ctx, out.Data, envID); importVariablesErr != nil {
 		return importVariablesErr
 	}
@@ -671,9 +689,18 @@ func (s *VariableService) importVariables(ctx context.Context, vars []types.EnvV
 			continue
 		}
 
+		value := entry.Value
+		if entry.IsSecret {
+			encrypted, encryptErr := crypto.Encrypt(value)
+			if encryptErr != nil {
+				return fmt.Errorf("failed to encrypt imported shared variable: %w", encryptErr)
+			}
+			value = encrypted
+		}
 		variable := GlobalVariable{
 			Key:                  key,
-			Value:                entry.Value,
+			Value:                value,
+			IsSecret:             entry.IsSecret,
 			AllEnvironments:      scopeEnvID == "",
 			InjectIntoContainers: !entry.NoInject,
 		}

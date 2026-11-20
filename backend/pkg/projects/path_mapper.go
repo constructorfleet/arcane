@@ -33,6 +33,13 @@ type (
 		isNonMatching   bool
 	}
 
+	SourceRemapOptions struct {
+		RawSources           map[string]string
+		WorkingDirectory     string
+		IncludeFileResources bool
+		ProtectedInputs      bool
+	}
+
 	remapTarget struct {
 		apply   func(hostPath string)
 		kind    string
@@ -270,10 +277,11 @@ func RemapEscapedRelativeSources(
 	ctx context.Context,
 	pathMapper types.VolumeSourcePathMapper,
 	project *composetypes.Project,
-	containerWorkingDir string,
-	rawSources map[string]string,
-	includeFileResources bool,
+	opts SourceRemapOptions,
 ) {
+	containerWorkingDir := opts.WorkingDirectory
+	rawSources := opts.RawSources
+	includeFileResources := opts.IncludeFileResources
 	if project == nil || pathMapper == nil || len(rawSources) == 0 || containerWorkingDir == "" {
 		return
 	}
@@ -303,10 +311,16 @@ func RemapEscapedRelativeSources(
 			continue // identity mount: the Docker host already resolves it the same way
 		}
 		target.apply(hostPath)
+		var attributes []any
+		if !opts.ProtectedInputs {
+			attributes = []any{
+				"kind", target.kind, "name", target.name, "spec", rawSource,
+				"containerPath", target.current, "hostPath", hostPath,
+			}
+		}
 		slog.WarnContext(ctx,
 			"compose relative path resolves outside the mounted projects directory; remapped so the Docker host resolves it the same way `docker compose up` would",
-			"kind", target.kind, "name", target.name, "spec", rawSource,
-			"containerPath", target.current, "hostPath", hostPath,
+			attributes...,
 		)
 	}
 }

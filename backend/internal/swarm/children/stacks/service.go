@@ -238,6 +238,10 @@ func (s *Service) DeployStack(ctx context.Context, environmentID string, req typ
 			return nil, err
 		}
 	}
+	sharedVariables, err := s.sharedStackInputs(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if upsertStackSourceErr := s.upsertStackSource(ctx, environmentID, stackName, req.ComposeContent, overrideContent, envContent, req.Files); upsertStackSourceErr != nil {
 		return nil, fmt.Errorf("failed to persist swarm stack source: %w", upsertStackSourceErr)
 	}
@@ -255,6 +259,7 @@ func (s *Service) DeployStack(ctx context.Context, environmentID string, req typ
 	)
 
 	if deployStackErr := libswarm.DeployStack(ctx, dockerClient, libswarm.StackDeployOptions{
+		SharedVariables:      sharedVariables,
 		Name:                 stackName,
 		ComposeContent:       req.ComposeContent,
 		OverrideContent:      overrideContent,
@@ -266,7 +271,7 @@ func (s *Service) DeployStack(ctx context.Context, environmentID string, req typ
 		WorkingDir:           workingDir,
 		PathMapper:           pm,
 	}); deployStackErr != nil {
-		return nil, classifySwarmStackError(deployStackErr)
+		return nil, classifySwarmStackError(deployStackErr, sharedVariables)
 	}
 
 	return &types.SwarmStackDeployResponse{Name: stackName}, nil
@@ -615,7 +620,7 @@ func (s *Service) removeStackRuntime(ctx context.Context, environmentID, stackNa
 	}
 
 	if removeStackResourcesErr := libswarm.RemoveStackResources(ctx, dockerClient, stackName); removeStackResourcesErr != nil {
-		return classifySwarmStackError(removeStackResourcesErr)
+		return classifySwarmStackError(removeStackResourcesErr, nil)
 	}
 	return nil
 }
@@ -701,7 +706,12 @@ func (s *Service) RenderStackConfig(ctx context.Context, environmentID string, r
 		dockerClient,
 	)
 
+	sharedVariables, err := s.sharedStackInputs(ctx)
+	if err != nil {
+		return nil, err
+	}
 	result, err := libswarm.RenderStackConfig(ctx, libswarm.StackRenderOptions{
+		SharedVariables: sharedVariables,
 		Name:            req.Name,
 		ComposeContent:  req.ComposeContent,
 		OverrideContent: req.OverrideContent,
@@ -710,10 +720,17 @@ func (s *Service) RenderStackConfig(ctx context.Context, environmentID string, r
 		PathMapper:      pm,
 	})
 	if err != nil {
-		return nil, classifySwarmStackError(err)
+		return nil, classifySwarmStackError(err, sharedVariables)
 	}
 
+	var warnings []string
+	if result.PreviewWithheld {
+		warnings = []string{"Resolved preview and resource names are withheld because shared secret inputs are available. " +
+			"Validation used the agent inputs; the original source is unchanged."}
+	}
 	return &types.SwarmStackRenderConfigResponse{
+		PreviewWithheld: result.PreviewWithheld,
+		Warnings:        warnings,
 		Name:            result.Name,
 		RenderedCompose: result.RenderedCompose,
 		Services:        result.Services,
@@ -944,9 +961,22 @@ func (s *Service) resolveSwarmStackSourceEnvironmentDir(ctx context.Context, env
 	return rootDir, environmentDir, nil
 }
 
-func classifySwarmStackError(err error) error {
+func (s *Service) sharedStackInputs(ctx context.Context) ([]types.EnvVariable, error) {
+	directory, err := projects.GetProjectsDirectory(ctx, s.settingsService.GetStringSetting(ctx, "projectsDirectory"))
+	if err != nil {
+		return nil, common.Classify(common.ErrUnavailable, errors.New("shared variables on this agent could not be read; check the projects directory permissions"))
+	}
+	summary, err := projects.ReadSharedEnvironment(ctx, directory)
+	return summary.Variables, err
+}
+
+func classifySwarmStackError(err error, sharedVariables []types.EnvVariable) error {
 	if errors.Is(err, libswarm.ErrInvalidStack) {
-		return common.Classify(common.ErrBadRequest, err)
+		err = common.Classify(common.ErrBadRequest, err)
+	}
+	if slices.ContainsFunc(sharedVariables, func(variable types.EnvVariable) bool { return variable.IsSecret }) {
+		apiErr := common.ToAPIError(common.ClassifyDockerError(err))
+		return common.NewAPIError("Stack operation failed with shared secret inputs; check the original source and selected agent", apiErr.Code, apiErr.HTTPStatus())
 	}
 	return err
 }

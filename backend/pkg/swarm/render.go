@@ -20,6 +20,7 @@ type (
 		OverrideContent string
 		EnvContent      string
 		WorkingDir      string
+		SharedVariables []types.EnvVariable
 	}
 
 	StackRenderResult struct {
@@ -30,6 +31,7 @@ type (
 		Volumes         []string
 		Configs         []string
 		Secrets         []string
+		PreviewWithheld bool
 	}
 )
 
@@ -41,6 +43,7 @@ func RenderStackConfig(ctx context.Context, opts StackRenderOptions) (*StackRend
 	ns := namespace{name: stackName}
 
 	project, err := projects.LoadComposeProjectFromContent(ctx, types.ComposeContentOptions{
+		SharedVariables: opts.SharedVariables,
 		ProjectName:     stackName,
 		ComposeContent:  opts.ComposeContent,
 		OverrideContent: opts.OverrideContent,
@@ -62,6 +65,10 @@ func RenderStackConfig(ctx context.Context, opts StackRenderOptions) (*StackRend
 	secretMetaByKey, err := planSecrets(ctx, project, ns)
 	if err != nil {
 		return nil, invalidStackError(err)
+	}
+
+	if slices.ContainsFunc(opts.SharedVariables, func(variable types.EnvVariable) bool { return variable.IsSecret }) {
+		return &StackRenderResult{Name: stackName, PreviewWithheld: true}, nil
 	}
 
 	rendered, err := project.MarshalYAML()

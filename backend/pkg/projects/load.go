@@ -188,7 +188,13 @@ func DetectComposeFile(ctx context.Context, projectsDir, dir string) (string, er
 }
 
 func LoadComposeProjectFromContent(ctx context.Context, opts types.ComposeContentOptions) (project *composetypes.Project, err error) {
-	defer recoverComposeLoadPanic(ctx, "in-memory compose content", &project, &err)
+	protectedInputs := slices.ContainsFunc(opts.SharedVariables, func(variable types.EnvVariable) bool { return variable.IsSecret })
+	defer func() {
+		if protectedInputs && err != nil {
+			err = errors.New("compose could not be loaded with shared secret inputs; check the original source and agent inputs")
+		}
+	}()
+	defer recoverComposeLoadPanic(ctx, "in-memory compose content", &project, &err, protectedInputs)
 
 	if strings.TrimSpace(opts.ComposeContent) == "" {
 		return nil, errors.New("compose content is required")
@@ -204,12 +210,26 @@ func LoadComposeProjectFromContent(ctx context.Context, opts types.ComposeConten
 	}
 
 	envMap := allowedProcessEnv()
-	if strings.TrimSpace(opts.EnvContent) != "" {
-		parsedEnv, parseErr := ParseProjectEnvContent(opts.EnvContent, envMap)
+	injectionVars := make(EnvMap)
+	sharedEnv := make(EnvMap)
+	for _, variable := range opts.SharedVariables {
+		sharedEnv[variable.Key] = variable.Value
+		delete(envMap, variable.Key)
+		if !variable.NoInject {
+			injectionVars[variable.Key] = variable.Value
+		}
+	}
+	if strings.TrimSpace(opts.EnvContent) != "" || len(sharedEnv) > 0 {
+		parsedEnv, parseErr := ParseProjectEnvContent(FormatEnvMap(sharedEnv)+opts.EnvContent, envMap)
 		if parseErr != nil {
 			return nil, fmt.Errorf("failed to parse env content: %w", parseErr)
 		}
 		maps.Copy(envMap, parsedEnv)
+		for key := range injectionVars {
+			if value, exists := parsedEnv[key]; exists {
+				injectionVars[key] = value
+			}
+		}
 	}
 	envMap["PWD"] = workingDir
 
@@ -239,10 +259,15 @@ func LoadComposeProjectFromContent(ctx context.Context, opts types.ComposeConten
 
 	var rawSources map[string]string
 	if !isNilVolumeSourcePathMapper(opts.PathMapper) {
-		rawSources = harvestRawSources(ctx, configDetails, loaderOptions...)
+		rawSources = harvestRawSources(ctx, configDetails, protectedInputs, loaderOptions...)
 	}
 
-	return finishLoadedProject(ctx, project, workingDir, opts.PathMapper, false, rawSources, nil)
+	project, err = finishLoadedProject(ctx, project, workingDir, opts.PathMapper, false, rawSources, nil, protectedInputs)
+	if err != nil {
+		return nil, err
+	}
+	injectServiceEnvironment(project, injectionVars)
+	return project, nil
 }
 
 func wrapTypeCastMappingLenient(mapping map[tree.Path]interp.Cast) map[tree.Path]interp.Cast {
@@ -328,7 +353,7 @@ func ApplyLenientLoaderOptions(ctx context.Context, opts *loader.Options, compos
 }
 
 func LoadComposeProject(ctx context.Context, opts LoadOptions) (project *composetypes.Project, err error) {
-	defer recoverComposeLoadPanic(ctx, opts.ComposeFile, &project, &err)
+	defer recoverComposeLoadPanic(ctx, opts.ComposeFile, &project, &err, false)
 
 	workdir := filepath.Dir(opts.ComposeFile)
 
@@ -426,10 +451,10 @@ func LoadComposeProject(ctx context.Context, opts LoadOptions) (project *compose
 
 	var rawSources map[string]string
 	if !isNilVolumeSourcePathMapper(opts.PathMapper) {
-		rawSources = harvestRawSources(ctx, cfg, loaderOptions...)
+		rawSources = harvestRawSources(ctx, cfg, false, loaderOptions...)
 	}
 
-	project, err = finishLoadedProject(ctx, project, workdir, opts.PathMapper, true, rawSources, opts.Prepare)
+	project, err = finishLoadedProject(ctx, project, workdir, opts.PathMapper, true, rawSources, opts.Prepare, false)
 	if err != nil {
 		return nil, err
 	}
@@ -444,7 +469,8 @@ func finishLoadedProject(ctx context.Context,
 	pathMapper types.VolumeSourcePathMapper,
 	translateFileResources bool,
 	rawSources map[string]string,
-	prepare PrepareProjectFunc) (*composetypes.Project,
+	prepare PrepareProjectFunc,
+	protectedInputs bool) (*composetypes.Project,
 	error,
 ) {
 	if err := applyServiceLabelMetadata(project); err != nil {
@@ -465,16 +491,21 @@ func finishLoadedProject(ctx context.Context,
 		if err := pathMapper.TranslateVolumeSources(project, translateFileResources); err != nil {
 			return nil, fmt.Errorf("failed to translate paths for docker host: %w", err)
 		}
-		RemapEscapedRelativeSources(ctx, pathMapper, project, workingDir, rawSources, translateFileResources)
+		RemapEscapedRelativeSources(ctx, pathMapper, project, SourceRemapOptions{
+			RawSources: rawSources, WorkingDirectory: workingDir,
+			IncludeFileResources: translateFileResources, ProtectedInputs: protectedInputs,
+		})
 	}
 
 	return project, nil
 }
 
-func harvestRawSources(ctx context.Context, cfg composetypes.ConfigDetails, loaderOptions ...func(*loader.Options)) (rawSources map[string]string) {
+func harvestRawSources(ctx context.Context, cfg composetypes.ConfigDetails, protectedInputs bool, loaderOptions ...func(*loader.Options)) (rawSources map[string]string) {
 	defer func() {
 		if panicErr := concurrency.PanicToError(recover()); panicErr != nil {
-			slog.DebugContext(ctx, "panic while harvesting raw compose paths", "error", panicErr)
+			if !protectedInputs {
+				slog.DebugContext(ctx, "panic while harvesting raw compose paths", "error", panicErr)
+			}
 			rawSources = nil
 		}
 	}()
@@ -488,7 +519,9 @@ func harvestRawSources(ctx context.Context, cfg composetypes.ConfigDetails, load
 
 	project, err := loader.LoadWithContext(ctx, cfg, options...)
 	if err != nil {
-		slog.DebugContext(ctx, "unable to harvest raw compose paths; relative paths outside the projects mount may resolve incorrectly", "error", err)
+		if !protectedInputs {
+			slog.DebugContext(ctx, "unable to harvest raw compose paths; relative paths outside the projects mount may resolve incorrectly", "error", err)
+		}
 		return nil
 	}
 
@@ -532,8 +565,12 @@ func recoverComposeLoadPanic(ctx context.Context,
 	source string,
 	project **composetypes.Project,
 	err *error,
+	protectedInputs bool,
 ) {
 	if panicErr := concurrency.PanicToError(recover()); panicErr != nil {
+		if protectedInputs {
+			panicErr = errors.New("invalid compose with shared secret inputs")
+		}
 		slog.WarnContext(ctx,
 			"panic while loading compose project; compose file may contain invalid syntax",
 			"path", source,
@@ -558,7 +595,13 @@ func applyCustomLabels(projectName, serviceName, workingDirectory string, compos
 func injectServiceConfiguration(project *composetypes.Project, injectionVars EnvMap) {
 	for i, s := range project.Services {
 		s.CustomLabels = applyCustomLabels(project.Name, s.Name, project.WorkingDir, project.ComposeFiles)
+		project.Services[i] = s
+	}
+	injectServiceEnvironment(project, injectionVars)
+}
 
+func injectServiceEnvironment(project *composetypes.Project, injectionVars EnvMap) {
+	for i, s := range project.Services {
 		if s.Environment == nil {
 			s.Environment = make(composetypes.MappingWithEquals)
 		}

@@ -304,7 +304,7 @@ func TestFormatEnvMapInternal_RoundTripsValues(t *testing.T) {
 
 	for _, value := range values {
 		t.Run(value, func(t *testing.T) {
-			content := formatEnvMap(EnvMap{"VALUE": value})
+			content := FormatEnvMap(EnvMap{"VALUE": value})
 			parsed, err := ParseProjectEnvContent(content, nil)
 			require.NoError(t, err)
 			assert.Equal(t, value, parsed["VALUE"])

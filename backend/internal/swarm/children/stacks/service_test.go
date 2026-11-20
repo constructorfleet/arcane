@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json/v2"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/libtnb/sqlite"
+	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -29,6 +31,7 @@ import (
 	"getarcane.dev/arcane/v3/internal/settings"
 	"getarcane.dev/arcane/v3/pkg/httpx"
 	"getarcane.dev/arcane/v3/pkg/pagination"
+	"getarcane.dev/arcane/v3/pkg/projects"
 	"getarcane.dev/types/v3"
 )
 
@@ -36,6 +39,13 @@ type (
 	stackSourceDeployRecorder struct {
 		lastReq types.SwarmStackDeployRequest
 		calls   int
+	}
+	sharedStackDockerRecorder struct {
+		service  *swarm.ServiceSpec
+		config   *swarm.ConfigSpec
+		secret   *swarm.SecretSpec
+		requests []string
+		mu       sync.Mutex
 	}
 )
 
@@ -48,6 +58,7 @@ var fullStackSourceSubmitted = map[string]bool{
 
 func setupSwarmServiceTestDB(t *testing.T) *database.DB {
 	t.Helper()
+	t.Setenv("ARCANE_PROJECTS_DIRECTORY", t.TempDir())
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&settings.SettingVariable{}, &environment.Environment{}))
@@ -513,7 +524,203 @@ func TestService_DownStack_RefusesWhenSavedSourceCannotRender(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	sharedPath := filepath.Join(svc.settingsService.GetStringSetting(ctx, "projectsDirectory"), ".env.global")
+	require.NoError(t, os.WriteFile(sharedPath, []byte("# arcane:metadata 2\n# arcane:secret SECRET\nSECRET=owned-down-secret\n"), 0o600))
 	err = svc.DownStack(ctx, "0", "demo-stack")
 	require.ErrorIs(t, err, common.ErrValidation)
+	require.NotContains(t, err.Error(), "owned-down-secret")
 	require.Empty(t, removed)
+}
+
+func newSharedStackTestService(t *testing.T, db *database.DB, settingsSvc *settings.SettingsService) (*Service, *sharedStackDockerRecorder) {
+	t.Helper()
+	ctx := t.Context()
+	recorded := &sharedStackDockerRecorder{service: new(swarm.ServiceSpec), config: new(swarm.ConfigSpec), secret: new(swarm.SecretSpec)}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		recorded.mu.Lock()
+		defer recorded.mu.Unlock()
+		recorded.requests = append(recorded.requests, r.Method+" "+r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		resource := strings.TrimPrefix(r.URL.Path, "/v1.41")
+		switch {
+		case r.Method == http.MethodGet &&
+			(strings.HasPrefix(resource, "/networks/") || strings.HasPrefix(resource, "/configs/") || strings.HasPrefix(resource, "/secrets/")):
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"message":"owned resource not found"}`))
+		case r.Method == http.MethodGet:
+			_, _ = w.Write([]byte(`[]`))
+		case r.Method == http.MethodPost && resource == "/networks/create":
+			_, _ = w.Write([]byte(`{"Id":"owned-network"}`))
+		case r.Method == http.MethodPost && (resource == "/configs/create" || resource == "/secrets/create"):
+			body, readErr := io.ReadAll(r.Body)
+			if readErr != nil {
+				http.Error(w, "owned body read failed", 500)
+				return
+			}
+			var destination any = recorded.config
+			if resource == "/secrets/create" {
+				destination = recorded.secret
+			}
+			if decodeErr := json.Unmarshal(body, destination); decodeErr != nil {
+				http.Error(w, "owned body decode failed", 500)
+				return
+			}
+			if resource == "/secrets/create" {
+				_, _ = w.Write([]byte(`{"ID":"owned-secret"}`))
+			} else {
+				_, _ = w.Write([]byte(`{"ID":"owned-config"}`))
+			}
+		case r.Method == http.MethodPost && resource == "/services/create":
+			body, readErr := io.ReadAll(r.Body)
+			if readErr != nil {
+				http.Error(w, "owned body read failed", 500)
+				return
+			}
+			if decodeErr := json.Unmarshal(body, recorded.service); decodeErr != nil {
+				http.Error(w, "owned body decode failed", 500)
+				return
+			}
+			_, _ = w.Write([]byte(`{"ID":"owned-service"}`))
+		default:
+			http.Error(w, "unexpected owned Docker request", 500)
+		}
+	}))
+	t.Cleanup(server.Close)
+	cli, err := client.New(client.WithHost(server.URL), client.WithAPIVersion("1.41"), client.WithHTTPClient(server.Client()))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = cli.Close() })
+
+	service := NewService(ServiceParams{
+		DockerService: dockerInternal.NewDockerClientService(ctx, db, settingsSvc, bus.Config{}).WithClient(cli),
+		EnsureManager: func(context.Context) error { return nil }, SettingsService: settingsSvc,
+	})
+	return service, recorded
+}
+
+func TestService_SharedStackInputs(t *testing.T) {
+	for _, tc := range []struct {
+		name, shared, env, read, overridden string
+		secret                              bool
+	}{
+		{name: "defaults and injection", shared: "global", read: "global", overridden: "default"},
+		{name: "stack overrides and expansion", shared: "global", env: "SHARED=stack\nLOCAL=${SHARED}-expanded\nOVERRIDE=stack\n", read: "stack", overridden: "stack"},
+		{name: "explicit blank overrides", shared: "global", env: "SHARED=\nOVERRIDE=\n", read: "", overridden: ""},
+		{name: "protected preview", shared: "owned-secret-value", read: "owned-secret-value", overridden: "default", secret: true},
+		{name: "literal values", shared: "literal $TOKEN ${UNKNOWN} \"quoted\" \\path\nnext", read: "literal $TOKEN ${UNKNOWN} \"quoted\" \\path\nnext", overridden: "default"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+			db := setupSwarmServiceTestDB(t)
+			t.Setenv("ARCANE_SWARM_STACK_SOURCES_DIRECTORY", t.TempDir())
+			settingsSvc, err := newSettingsServiceForSwarmTest(t, ctx, db)
+			require.NoError(t, err)
+			header := "# arcane:metadata 2\n# arcane:noinject SHARED\n"
+			if tc.secret {
+				header += "# arcane:secret SHARED\n"
+			}
+			sharedPath := filepath.Join(settingsSvc.GetStringSetting(ctx, "projectsDirectory"), ".env.global")
+			globalContent := header + projects.FormatEnvMap(projects.EnvMap{
+				"SHARED": tc.shared, "AUTO": "automatic", "INJECT": "global-injection", "OVERRIDE": "default", "EMPTY": "must-not-overwrite-empty",
+			})
+			require.NoError(t, os.WriteFile(sharedPath, []byte(globalContent), 0o600))
+			svc, recorded := newSharedStackTestService(t, db, settingsSvc)
+			compose := `services:
+  app:
+    image: busybox:1.37
+    environment:
+      READ: ${SHARED}
+      INDIRECT: ${LOCAL:-none}
+      INJECT: service-wins
+      EMPTY: ""
+    deploy:
+      replicas: 0
+`
+			if tc.secret {
+				compose += "    configs: [shared-config]\n    secrets: [shared-secret]\nconfigs:\n  shared-config:\n    environment: SHARED\nsecrets:\n  shared-secret:\n    environment: SHARED\n"
+			}
+			rendered, err := svc.RenderStackConfig(ctx, "0", types.SwarmStackRenderConfigRequest{Name: "owned-inputs", ComposeContent: compose, EnvContent: tc.env})
+			require.NoError(t, err)
+			require.Equal(t, tc.secret, rendered.PreviewWithheld)
+			if tc.secret {
+				require.Empty(t, rendered.RenderedCompose)
+				require.Empty(t, rendered.Services)
+				require.Empty(t, rendered.Networks)
+				require.Empty(t, rendered.Volumes)
+				require.Empty(t, rendered.Configs)
+				require.Empty(t, rendered.Secrets)
+				require.NotEmpty(t, rendered.Warnings)
+				encoded, marshalErr := json.Marshal(rendered)
+				require.NoError(t, marshalErr)
+				require.NotContains(t, string(encoded), tc.shared)
+			} else {
+				require.Contains(t, rendered.RenderedCompose, "AUTO: automatic")
+			}
+			response, err := svc.DeployStack(ctx, "0", types.SwarmStackDeployRequest{Name: "owned-inputs", ComposeContent: compose, EnvContent: tc.env, ResolveImage: "never"})
+			require.NoError(t, err)
+			require.Equal(t, "owned-inputs", response.Name)
+			recorded.mu.Lock()
+			captured := slices.Clone(recorded.service.TaskTemplate.ContainerSpec.Env)
+			configData := slices.Clone(recorded.config.Data)
+			secretData := slices.Clone(recorded.secret.Data)
+			configs := slices.Clone(recorded.service.TaskTemplate.ContainerSpec.Configs)
+			secrets := slices.Clone(recorded.service.TaskTemplate.ContainerSpec.Secrets)
+			recorded.mu.Unlock()
+			if tc.secret {
+				require.Equal(t, tc.shared, string(configData))
+				require.Equal(t, tc.shared, string(secretData))
+				require.Len(t, configs, 1)
+				require.Len(t, secrets, 1)
+				require.Equal(t, "owned-config", configs[0].ConfigID)
+				require.Equal(t, "owned-secret", secrets[0].SecretID)
+			}
+			require.Contains(t, captured, "READ="+tc.read)
+			require.Contains(t, captured, "AUTO=automatic")
+			require.Contains(t, captured, "OVERRIDE="+tc.overridden)
+			require.Contains(t, captured, "INJECT=service-wins")
+			require.Contains(t, captured, "EMPTY=")
+			require.False(t, slices.ContainsFunc(captured, func(value string) bool { return strings.HasPrefix(value, "SHARED=") }))
+			if tc.name == "stack overrides and expansion" {
+				require.Contains(t, captured, "INDIRECT=stack-expanded")
+			}
+			source, err := svc.GetStackSource(ctx, "0", "owned-inputs")
+			require.NoError(t, err)
+			require.Equal(t, compose, source.ComposeContent)
+			require.Equal(t, tc.env, source.EnvContent)
+			if tc.secret {
+				sourceJSON, marshalErr := json.Marshal(source)
+				require.NoError(t, marshalErr)
+				require.NotContains(t, string(sourceJSON), tc.shared)
+				invalidCompose := "services:\n  app:\n    image: busybox\n    deploy:\n      replicas: ${SHARED}\n"
+				_, invalidErr := svc.RenderStackConfig(ctx, "0", types.SwarmStackRenderConfigRequest{
+					Name: "owned-invalid", ComposeContent: invalidCompose,
+				})
+				require.Error(t, invalidErr)
+				require.NotContains(t, invalidErr.Error(), tc.shared)
+				require.Equal(t, 400, common.ToAPIError(invalidErr).HTTPStatus())
+				require.Nil(t, common.ToAPIError(invalidErr).Details)
+				invalidResponse, deployErr := svc.DeployStack(ctx, "0", types.SwarmStackDeployRequest{
+					Name: "owned-invalid", ComposeContent: invalidCompose, ResolveImage: "never",
+				})
+				require.Nil(t, invalidResponse)
+				require.Error(t, deployErr)
+				require.NotContains(t, deployErr.Error(), tc.shared)
+				require.Equal(t, 400, common.ToAPIError(deployErr).HTTPStatus())
+				require.Nil(t, common.ToAPIError(deployErr).Details)
+			}
+			recorded.mu.Lock()
+			recorded.requests = nil
+			recorded.mu.Unlock()
+			require.NoError(t, os.Remove(sharedPath))
+			require.NoError(t, os.Mkdir(sharedPath, 0o700))
+			failed, inputErr := svc.DeployStack(ctx, "0", types.SwarmStackDeployRequest{Name: "unreadable-inputs", ComposeContent: compose})
+			require.ErrorIs(t, inputErr, common.ErrUnavailable)
+			require.Nil(t, failed)
+			recorded.mu.Lock()
+			observed := slices.Clone(recorded.requests)
+			recorded.mu.Unlock()
+			require.Empty(t, observed)
+			_, sourceErr := svc.GetStackSource(ctx, "0", "unreadable-inputs")
+			require.Error(t, sourceErr)
+		})
+	}
 }
