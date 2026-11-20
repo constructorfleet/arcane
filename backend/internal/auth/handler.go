@@ -816,6 +816,10 @@ func handleApiKeyAuth(
 	),
 ) {
 	if authenticatedUser, key, err := apiKeyService.ValidateApiKeyWithID(ctx.Context(), ctx.Header(middleware.HeaderApiKey)); err == nil && authenticatedUser != nil {
+		if gateErr := authService.RequirePasswordChanged(authenticatedUser, kit.FromPtr(ctx.Operation()).OperationID); gateErr != nil {
+			_ = huma.WriteErr(api, ctx, http.StatusForbidden, gateErr.Error())
+			return
+		}
 		// Personal keys inherit the owner's role permissions (same resolution
 		// as session auth); scoped keys are limited to their own grants.
 		var ps *authz.PermissionSet
@@ -1068,6 +1072,12 @@ func (m *AuthMiddleware) managerAuth(ctx context.Context, c *echo.Context, next 
 func (m *AuthMiddleware) apiKeyHeaderAuth(ctx context.Context, c *echo.Context, next echo.HandlerFunc, apiKey string) error {
 	authenticatedUser, key, err := m.apiKeyValidator.ValidateApiKeyWithID(ctx, apiKey)
 	if err == nil && authenticatedUser != nil {
+		if gateErr := m.authService.RequirePasswordChanged(authenticatedUser, ""); gateErr != nil {
+			return c.JSON(http.StatusForbidden, common.APIError{
+				Code:    common.APIErrorCodePasswordChangeRequired,
+				Message: gateErr.Error(),
+			})
+		}
 		// Personal keys inherit the owner's role permissions (same
 		// resolution as session auth); scoped keys use their own grants.
 		var ps *authz.PermissionSet

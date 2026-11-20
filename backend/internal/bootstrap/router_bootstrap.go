@@ -92,7 +92,7 @@ func createAuthValidator(deps api.HandlerDeps) middleware.AuthValidator {
 			// permissions; scoped keys are limited to their own grants.
 			if key.UserID != nil {
 				user, userErr := deps.User.Service().GetUserByID(ctx, *key.UserID)
-				if userErr != nil || user.Disabled {
+				if userErr != nil || user.Disabled || deps.Auth.Service().RequirePasswordChanged(user, "") != nil {
 					return nil, nil, false
 				}
 				if key.Kind != apikey.ApiKeyKindPersonal {

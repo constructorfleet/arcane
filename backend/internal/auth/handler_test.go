@@ -26,6 +26,7 @@ import (
 	"getarcane.dev/arcane/v3/internal/database"
 	"getarcane.dev/arcane/v3/internal/environment"
 	"getarcane.dev/arcane/v3/internal/middleware"
+	"getarcane.dev/arcane/v3/internal/role"
 	"getarcane.dev/arcane/v3/internal/session"
 	"getarcane.dev/arcane/v3/internal/settings"
 	"getarcane.dev/arcane/v3/internal/user"
@@ -128,6 +129,52 @@ func TestNewHumaMiddleware_AcceptsEnvironmentAccessTokenViaAPIKey(t *testing.T) 
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Contains(t, rec.Body.String(), "environment:env-self")
+
+	for _, tc := range []struct {
+		name                   string
+		kind                   string
+		operationID            string
+		requiresPasswordChange bool
+		wantStatus             int
+	}{
+		{name: "personal owner ready", kind: apikey.ApiKeyKindPersonal, operationID: "secure", wantStatus: http.StatusOK},
+		{name: "scoped owner ready", kind: apikey.ApiKeyKindScoped, operationID: "secure", wantStatus: http.StatusOK},
+		{name: "personal owner flagged", kind: apikey.ApiKeyKindPersonal, operationID: "secure", requiresPasswordChange: true, wantStatus: http.StatusForbidden},
+		{name: "scoped owner flagged", kind: apikey.ApiKeyKindScoped, operationID: "secure", requiresPasswordChange: true, wantStatus: http.StatusForbidden},
+		{name: "flagged owner may change password", kind: apikey.ApiKeyKindPersonal, operationID: "change-password", requiresPasswordChange: true, wantStatus: http.StatusOK},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := setupAuthServiceTestDB(t)
+			roles := role.NewRoleService(db)
+			users := user.NewUserService(user.UserServiceParams{DB: db, RoleService: roles})
+			owner, err := users.CreateUser(t.Context(), &user.User{ID: "huma-key-owner", Username: "huma-key-owner", RequiresPasswordChange: tc.requiresPasswordChange})
+			require.NoError(t, err)
+			keys := apikey.NewApiKeyService(db, users, roles)
+			key, err := keys.CreatePersonalApiKey(t.Context(), owner.ID, types.ApiKey{Name: "middleware-fixture"})
+			require.NoError(t, err)
+			require.NoError(t, db.Model(&apikey.ApiKey{}).Where("id = ?", key.ID).Update("kind", tc.kind).Error)
+			keyRouter := echo.New()
+			keyAPI := humaecho.NewWithGroup(keyRouter, keyRouter.Group("/api"), huma.DefaultConfig("test", "1.0.0"))
+			keyAPI.UseMiddleware(NewHumaMiddleware(HumaMiddlewareParams{
+				API: keyAPI, AuthService: &AuthService{}, APIKeyService: keys,
+				PermResolver: testPermissionResolver{}, Config: &config.Config{},
+			}))
+			called := false
+			huma.Register(keyAPI, huma.Operation{
+				OperationID: tc.operationID, Method: http.MethodGet, Path: "/secure",
+				Security: []map[string][]string{{"ApiKeyAuth": {}}},
+			}, func(_ context.Context, _ *secureInput) (*secureOutput, error) {
+				called = true
+				return &secureOutput{}, nil
+			})
+			keyRequest := httptest.NewRequest(http.MethodGet, "/api/secure", http.NoBody)
+			keyRequest.Header.Set(middleware.HeaderApiKey, key.Key)
+			keyRecorder := httptest.NewRecorder()
+			keyRouter.ServeHTTP(keyRecorder, keyRequest)
+			require.Equal(t, tc.wantStatus, keyRecorder.Code)
+			require.Equal(t, tc.wantStatus == http.StatusOK, called)
+		})
+	}
 }
 
 func TestNewHumaMiddleware_UsesBearerWhenLoopbackProxySendsEnvironmentAccessToken(t *testing.T) {
@@ -631,28 +678,42 @@ func TestAuthMiddleware_ManagerAuthResolvesPermissionsByKeyKind(t *testing.T) {
 	owner := &user.User{ID: userID, Username: "owner"}
 
 	cases := []struct {
-		name        string
-		kind        string
-		wantAllowed string
-		wantDenied  string
+		name                   string
+		kind                   string
+		wantAllowed            string
+		wantDenied             string
+		requiresPasswordChange bool
+		wantStatus             int
 	}{
-		{name: "personal key inherits owner role permissions", kind: apikey.ApiKeyKindPersonal, wantAllowed: "containers:list", wantDenied: "images:list"},
-		{name: "scoped key limited to its own grants", kind: apikey.ApiKeyKindScoped, wantAllowed: "images:list", wantDenied: "containers:list"},
+		{name: "personal key inherits owner role permissions", kind: apikey.ApiKeyKindPersonal, wantAllowed: "containers:list", wantDenied: "images:list", wantStatus: http.StatusOK},
+		{name: "scoped key limited to its own grants", kind: apikey.ApiKeyKindScoped, wantAllowed: "images:list", wantDenied: "containers:list", wantStatus: http.StatusOK},
+		{
+			name: "personal key cannot bypass forced password change", kind: apikey.ApiKeyKindPersonal,
+			wantAllowed: "containers:list", wantDenied: "images:list", requiresPasswordChange: true, wantStatus: http.StatusForbidden,
+		},
+		{
+			name: "scoped user key cannot bypass forced password change", kind: apikey.ApiKeyKindScoped,
+			wantAllowed: "images:list", wantDenied: "containers:list", requiresPasswordChange: true, wantStatus: http.StatusForbidden,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			owner := *owner
+			owner.RequiresPasswordChange = tc.requiresPasswordChange
 			router := echo.New()
 			router.Use(
-				NewAuthMiddleware(nil, &config.Config{}).
+				NewAuthMiddleware(&AuthService{}, &config.Config{}).
 					WithApiKeyValidator(testApiKeyValidator{
-						user: owner,
+						user: &owner,
 						key:  &apikey.ApiKey{ID: "key-1", Kind: tc.kind, UserID: &userID},
 					}).
 					WithPermissionResolver(testPermissionResolver{}).
 					Add(),
 			)
+			called := false
 			router.GET("/secure", func(c *echo.Context) error {
+				called = true
 				ps, ok := c.Get("userPermissions").(*authz.PermissionSet)
 				require.True(t, ok)
 				require.True(t, ps.Allows(tc.wantAllowed, ""))
@@ -665,7 +726,11 @@ func TestAuthMiddleware_ManagerAuthResolvesPermissionsByKeyKind(t *testing.T) {
 			rec := httptest.NewRecorder()
 
 			router.ServeHTTP(rec, req)
-			require.Equal(t, http.StatusOK, rec.Code)
+			require.Equal(t, tc.wantStatus, rec.Code)
+			require.Equal(t, tc.wantStatus == http.StatusOK, called)
+			if tc.requiresPasswordChange {
+				require.Contains(t, rec.Body.String(), "password change required")
+			}
 		})
 	}
 
