@@ -1,6 +1,6 @@
-# 3.0.1-cf.48
+# 3.0.1-cf.49
 
-- Validate user passwords without trimming meaningful boundary whitespace, matching the raw value submitted and the server password policy (#115).
-- Preserve username/profile normalization, optional blank passwords on Edit and server composition enforcement. Reuse the explicit form-field preservation option from cf.47.
+- Clarify English registry overview, empty-state and type guidance for public/private OCI access with optional credentials (#116).
+- Explain that Enabled controls automatic image credential matching; explicit connection browsing/testing remains available when disabled. Registry behavior and saved settings are unchanged.
 
-Validated using synthetic compiled-form cases, existing native password-policy coverage and frontend checks. No account, password, role or credential is changed by this validation; live credential entry is not part of acceptance.
+Validated against the owning registry paths and frontend checks. Fresh live guidance acceptance follows deployment; no registry record, credential, TLS flag, image pull or push is changed by this copy update. Broader registry/provider/cache acceptance remains #40/#31.
