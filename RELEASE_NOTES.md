@@ -1,6 +1,6 @@
-# 3.0.1-cf.49
+# 3.0.1-cf.50
 
-- Clarify English registry overview, empty-state and type guidance for public/private OCI access with optional credentials (#116).
-- Explain that Enabled controls automatic image credential matching; explicit connection browsing/testing remains available when disabled. Registry behavior and saved settings are unchanged.
+- Keep whitespace-only env and override source files visible when reopening Swarm stack editors, and env files visible in project creation and the stack Source pane (#118).
+- Use raw nonempty source length for file presence. Semantic validation, source bytes, exact-empty/absent behavior and Git-derived environment handling are unchanged.
 
-Validated against the owning registry paths and frontend checks. Fresh live guidance acceptance follows deployment; no registry record, credential, TLS flag, image pull or push is changed by this copy update. Broader registry/provider/cache acceptance remains #40/#31.
+Source review and frontend checks cover the visibility change. Live acceptance will cold-reopen the retained owned zero-task cf.47 fixture, whose exact source bytes already persist, then verify guarded cleanup. No deployed application stack, global template, volume or plugin operation is changed.

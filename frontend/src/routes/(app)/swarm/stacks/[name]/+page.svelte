@@ -385,7 +385,7 @@
 											onClose={closeSourceTab}
 										>
 											<div class="relative min-h-0 flex-1">
-												{#if activeSourceTab === 'compose' || stackSource.envContent?.trim()}
+												{#if activeSourceTab === 'compose' || stackSource.envContent?.length}
 													<CodeBlock.Root variant="ghost" class="absolute inset-0">
 														<CodeBlock.Content lineNumbers class="flex-1">
 															{#each sourceLines.current as line, index (index)}

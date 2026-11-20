@@ -95,10 +95,10 @@
 
 	let composeOpen = $state(true);
 	let envOpen = $state(true);
-	let envActive = $state(untrack(() => (data.envTemplate || '').trim().length > 0));
+	let envActive = $state(untrack(() => (data.envTemplate || '').length > 0));
 	let nameInputRef = $state<HTMLInputElement | null>(null);
 	let overrideContent = $state(untrack(() => data.overrideTemplate || ''));
-	let overrideActive = $state(untrack(() => (data.overrideTemplate || '').trim().length > 0));
+	let overrideActive = $state(untrack(() => (data.overrideTemplate || '').length > 0));
 	const deployOptions = $state({
 		prune: false,
 		withRegistryAuth: false,
@@ -321,7 +321,7 @@
 	const { composeHandlers, handleCreateTemplate } = createComposeTemplateDialogFlow({
 		getInputs: () => inputs,
 		setInputValue: (key, value) => {
-			if (key === 'envContent' && value.trim()) envActive = true;
+			if (key === 'envContent' && value.length > 0) envActive = true;
 			form.setValue(key, value);
 		},
 		closeTemplateDialog: () => (ui.showTemplateDialog = false),

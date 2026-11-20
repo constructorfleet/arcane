@@ -112,7 +112,7 @@
 
 	let composeOpen = $state(true);
 	let envOpen = $state(false);
-	let envRequested = $state(formData.envContent.trim() !== '');
+	let envRequested = $state(formData.envContent.length > 0);
 	let layoutMode = $state<ProjectEditorLayoutMode>(resolveProjectEditorLayout('tree'));
 	let treePaneWidth = $state<number | null>(null);
 	const workspaceDraft = new WorkspaceDraftState({
@@ -290,7 +290,7 @@
 	const { composeHandlers, handleCreateTemplate } = createComposeTemplateDialogFlow({
 		getInputs: () => inputs,
 		setInputValue: (key, value) => {
-			if (key === 'envContent' && value.trim()) envRequested = true;
+			if (key === 'envContent' && value.length > 0) envRequested = true;
 			form.setValue(key, value);
 		},
 		closeTemplateDialog: () => (ui.showTemplateDialog = false),
