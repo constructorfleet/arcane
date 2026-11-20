@@ -71,20 +71,21 @@ nodes have manager role; worker-role, migration and failure/disconnect cases rem
 
 ## Volumes and files
 
-cf.65 implements one logical row for same-name/driver Docker-global volumes in a known observed Swarm, with per-node records retained. It groups before filtering/pagination/counts and resolves the active application attachment before Workspace. Inactive or ambiguous groups do not initiate workspace access; unsaved drafts remain on their original agent. Coverage warnings and explicit physical-node links remain visible. Existing volume service coverage and isolated owning loader/workspace/component checks pass locally; live one-row RBD browsing remains pending. This does not complete all volume mutation or failover acceptance in #13/#33.
+cf.65 implements one logical row for same-name/driver Docker-global volumes in a known observed Swarm, with per-node records retained. It groups before filtering/pagination/counts and resolves the active application attachment before Workspace. Inactive or ambiguous groups do not initiate workspace access; unsaved drafts remain on their original agent. Coverage warnings and explicit physical-node links remain visible. cf.65 live QA verified both reported RBD volumes as one entry with five node observations, automatically routed to active swarm04 through manager01. Both root listings and15 nested migration files loaded; same-named local volumes stayed distinct, three pages/both driver sorts/cold reload passed, and native mappings/mountpoints stayed unchanged on all five nodes. Only two normal label-verified AutoRemove helpers appeared on active04. #13 is closed for this bounded logical grouping/routing; broader mutation, permissions and failover remain #33/#63.
 
 cf.45 targets backend reference guards for global-volume delete/rename (#109), including declared zero-replica service mounts. Read-only production acceptance and broader storage identity/routing remain separate; no production volume mutation is claimed.
 
 - [ ] VOL-01 — Browse plugin-backed volumes, including the homelab RBD plugin, through remote agents as well as the manager's node.
 - [ ] VOL-02 — Mount volumes through Docker by name rather than assuming a host path for plugin mountpoints.
-- [ ] VOL-03 — Select the existing consumer's node for an attached RBD volume; verify attachment semantics before using another node.
+- [x] VOL-03 — Select the existing consumer's node for an attached RBD volume; verify attachment semantics before using another node. cf.65 verified unique active04 routing for both reported volumes; live migration/failover remains open.
 - [ ] VOL-04 — Browse directories and download files with permissions and errors shown accurately.
 - [ ] VOL-05 — Upload files, create directories, and edit/save files through the UI.
 - [ ] VOL-06 — Support authorized rename and delete actions with clear target paths.
 - [ ] VOL-07 — Protect file operations against path traversal, escaping symlinks, stale edits, and abandoned helper containers.
-- [ ] VOL-08 — Distinguish same-named node-local volumes and different Swarms/drivers. Group Docker-global volume observations within a known Swarm without claiming physical storage identity across clusters.
+- [x] VOL-08 — Distinguish same-named node-local volumes and different Swarms/drivers. Group Docker-global volume observations within a known Swarm without claiming physical storage identity across clusters.
 - [x] VOL-09 — Keep volume pagination and sorting usable when plugins repeat records; count each volume once per node and recover without clearing saved preferences.
 - [x] VOL-10 — Preview supported raster images read-only, with explicit type/size limits and download states for unsupported files.
+- [x] VOL-11 — Present one logical Docker-global volume per known Swarm/name/driver, retain physical-node observations and route its Workspace to a fresh unique active attachment. cf.65 #13 verified; physical identity across clusters is not inferred.
 
 Status: the user confirmed RBD volume browsing on 2026-11-18. Full VOL-01
 acceptance across remote and manager-host agents remains open. A cf.31 owned
@@ -165,6 +166,8 @@ Swarm does not support every modern local-Compose feature; unsupported behavior
 must be surfaced rather than silently ignored.
 
 ## Configs, secrets, and reusable inputs
+
+cf.67 retains desired config/secret revisions and all current, rollback and retained-task dependencies during automatic cleanup; failed reference inventory defers removal. The existing fake-Docker SDK business coverage reproduces the prior cleanup loss and verifies retention/error cases. Source checks pass; live owned revision/rollback acceptance remains pending under #147/#144. Explicit stack removal remains separate.
 
 - [ ] SEC-01 — Create Docker configs in the UI and inspect their content and usage.
 - [ ] SEC-02 — Create Docker secrets in the UI and inspect metadata and consumers.

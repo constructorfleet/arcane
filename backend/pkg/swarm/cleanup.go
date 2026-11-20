@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
 
 	cerrdefs "github.com/containerd/errdefs"
+	"github.com/moby/moby/api/types/swarm"
 	dockerclient "github.com/moby/moby/client"
 
 	"kit.getarcane.app"
@@ -39,14 +41,21 @@ func cleanupStackResources(
 	configMetaByKey map[string]resourceMeta,
 	secretMetaByKey map[string]resourceMeta,
 ) error {
-	desiredConfigNames := make(map[string]struct{}, len(configMetaByKey))
+	retainedConfigs, retainedSecrets, inventoryErr := referencedStackResources(ctx, dockerClient)
+	if inventoryErr != nil {
+		slog.WarnContext(ctx, "Automatic stack resource cleanup deferred", "stack", stackName, "error", inventoryErr)
+		return nil
+	}
 	for _, meta := range configMetaByKey {
-		desiredConfigNames[meta.Name] = struct{}{}
+		retainedConfigs[meta.Name] = struct{}{}
+	}
+	for _, meta := range secretMetaByKey {
+		retainedSecrets[meta.Name] = struct{}{}
 	}
 	if err := cleanupStaleManagedResources(
 		ctx,
 		stackName,
-		desiredConfigNames,
+		retainedConfigs,
 		configFileResourceAdapter(dockerClient),
 		true,
 		true,
@@ -54,14 +63,10 @@ func cleanupStackResources(
 		return err
 	}
 
-	desiredSecretNames := make(map[string]struct{}, len(secretMetaByKey))
-	for _, meta := range secretMetaByKey {
-		desiredSecretNames[meta.Name] = struct{}{}
-	}
 	if err := cleanupStaleManagedResources(
 		ctx,
 		stackName,
-		desiredSecretNames,
+		retainedSecrets,
 		secretFileResourceAdapter(dockerClient),
 		true,
 		true,
@@ -70,6 +75,51 @@ func cleanupStackResources(
 	}
 
 	return nil
+}
+
+func referencedStackResources(ctx context.Context, dockerClient *dockerclient.Client) (map[string]struct{}, map[string]struct{}, error) {
+	services, err := dockerClient.ServiceList(ctx, dockerclient.ServiceListOptions{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to list service resource references: %w", err)
+	}
+	tasks, err := dockerClient.TaskList(ctx, dockerclient.TaskListOptions{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to list task resource references: %w", err)
+	}
+	configs := make(map[string]struct{})
+	secrets := make(map[string]struct{})
+	for _, service := range services.Items {
+		retainTaskResourceReferences(service.Spec.TaskTemplate, configs, secrets)
+		retainTaskResourceReferences(kit.FromPtr(service.PreviousSpec).TaskTemplate, configs, secrets)
+	}
+	for _, task := range tasks.Items {
+		retainTaskResourceReferences(task.Spec, configs, secrets)
+	}
+	return configs, secrets, nil
+}
+
+func retainTaskResourceReferences(spec swarm.TaskSpec, configs, secrets map[string]struct{}) {
+	container := kit.FromPtr(spec.ContainerSpec)
+	credentialSpec := kit.FromPtr(kit.FromPtr(container.Privileges).CredentialSpec)
+	if credentialSpec.Config != "" {
+		configs[credentialSpec.Config] = struct{}{}
+	}
+	for _, reference := range container.Configs {
+		if reference.ConfigID != "" {
+			configs[reference.ConfigID] = struct{}{}
+		}
+		if reference.ConfigName != "" {
+			configs[reference.ConfigName] = struct{}{}
+		}
+	}
+	for _, reference := range container.Secrets {
+		if reference.SecretID != "" {
+			secrets[reference.SecretID] = struct{}{}
+		}
+		if reference.SecretName != "" {
+			secrets[reference.SecretName] = struct{}{}
+		}
+	}
 }
 
 func collectStaleManagedResources[T any](items []T, convert func(T) staleManagedResource) []staleManagedResource {
@@ -83,7 +133,7 @@ func collectStaleManagedResources[T any](items []T, convert func(T) staleManaged
 func cleanupStaleManagedResources(
 	ctx context.Context,
 	stackName string,
-	desiredNames map[string]struct{},
+	retainedResources map[string]struct{},
 	adapter fileResourceAdapter,
 	managedOnly bool,
 	tolerateInUse bool,
@@ -116,7 +166,10 @@ func cleanupStaleManagedResources(
 	}
 
 	for _, resource := range resources {
-		if _, ok := desiredNames[resource.Name]; ok {
+		if _, ok := retainedResources[resource.Name]; ok {
+			continue
+		}
+		if _, ok := retainedResources[resource.ID]; ok {
 			continue
 		}
 		if err := removeStaleSwarmResource(ctx, tolerateInUse, func(ctx context.Context) error {
