@@ -1,7 +1,7 @@
-# 3.0.1-cf.42
+# 3.0.1-cf.43
 
-- Keep image polling, auto-update, auto-patch, auto-heal, scheduled prune, stale volume helper cleanup and local volume backup job registration on Docker-capable node agents or legacy managers (#102, CP-02).
-- Prevent settings changes from registering those Docker-only jobs on the control plane. Preserve remote-agent health checks, GitOps coordination, project/template file watching and database/file maintenance.
-- Reject control-plane Docker client acquisition and refresh with a classified conflict before probing any daemon, including bound client copies. Node-agent and legacy client behavior is preserved.
+- Start added user-role assignment rows without a selected role or scope, instead of implicitly choosing the first role (Admin) and Global (#103).
+- Require explicit role and scope selection before submitting user creation or updates. Incomplete rows cannot become global assignments, and the form reports how to complete them.
+- Preserve existing assignments and deliberately selected global-role quick presets.
 
-Existing Docker client, scheduler settings and dependency-wiring tests cover the mode boundary. Full release CI and deployed runtime verification are recorded in the PR/issue. This does not implement socket-free system backup execution: manager backup coordination and repository retention remain registered, and Docker-dependent execution fails at the client boundary. Backup support and broader CP-02 acceptance remain follow-ups.
+Production frontend build, required formatting/lint, existing frontend tests and exact-head CI are recorded in the PR. Post-release UI acceptance will use canceled drafts without creating another account or changing any existing grants. Backend authorization remains authoritative; broader scoped/OIDC acceptance stays open in #63.

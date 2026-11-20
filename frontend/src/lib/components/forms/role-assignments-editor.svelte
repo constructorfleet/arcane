@@ -86,10 +86,7 @@
 
 	function addAssignment() {
 		if (disabled) return;
-		const defaultRoleId = roles[0]?.id ?? '';
-		const freeEnv = envOptions.find((option) => !isEnvTaken(option.id, defaultRoleId, -1));
-		const envValue = freeEnv?.id ?? GLOBAL_ENVIRONMENT_OPTION_ID;
-		assignments = [...assignments, { roleId: defaultRoleId, environmentId: selectValueToEnvId(envValue) }];
+		assignments = [...assignments, { roleId: '', environmentId: '' }];
 	}
 
 	function removeAssignment(index: number) {
@@ -98,7 +95,7 @@
 	}
 
 	function hasGlobalRoleAssignment(roleId: string): boolean {
-		return assignments.some((assignment) => assignment.roleId === roleId && !assignment.environmentId);
+		return assignments.some((assignment) => assignment.roleId === roleId && assignment.environmentId === undefined);
 	}
 
 	function toggleQuickPreset(roleId: string, checked: boolean) {
@@ -107,13 +104,13 @@
 		let next = assignments;
 		if (checked) {
 			if (conflictingRoleId) {
-				next = next.filter((assignment) => !(assignment.roleId === conflictingRoleId && !assignment.environmentId));
+				next = next.filter((assignment) => !(assignment.roleId === conflictingRoleId && assignment.environmentId === undefined));
 			}
-			if (!next.some((assignment) => assignment.roleId === roleId && !assignment.environmentId)) {
+			if (!next.some((assignment) => assignment.roleId === roleId && assignment.environmentId === undefined)) {
 				next = [...next, { roleId, environmentId: undefined }];
 			}
 		} else {
-			next = next.filter((assignment) => !(assignment.roleId === roleId && !assignment.environmentId));
+			next = next.filter((assignment) => !(assignment.roleId === roleId && assignment.environmentId === undefined));
 		}
 		assignments = next;
 	}

@@ -97,11 +97,15 @@
 		roleAssignments: z
 			.array(
 				z.object({
-					roleId: z.string().min(1),
+					roleId: z.string().min(1, m.choose_role_and_scope_for_each_assignment()),
 					environmentId: z.string().optional()
 				})
 			)
 			.refine((assignments) => isExternallyManaged || assignments.length >= 1, m.users_role_assignments_required())
+			.refine(
+				(assignments) => assignments.every((assignment) => assignment.roleId.length > 0 && assignment.environmentId !== ''),
+				m.choose_role_and_scope_for_each_assignment()
+			)
 	});
 
 	const form = createForm<typeof formSchema>(
