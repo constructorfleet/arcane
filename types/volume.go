@@ -21,16 +21,35 @@ type (
 		UsageData  *volume.UsageData `json:"usageData,omitempty" readOnly:"true"`
 		ActivityID *string           `json:"activityId,omitempty" readOnly:"true"`
 		EnvironmentTag
-		ID         string   `json:"id" readOnly:"true"`
-		Name       string   `json:"name" required:"false"`
-		Driver     string   `json:"driver" required:"false"`
-		Mountpoint string   `json:"mountpoint" readOnly:"true"`
-		Scope      string   `json:"scope" readOnly:"true"`
-		CreatedAt  string   `json:"createdAt" readOnly:"true"`
-		Containers []string `json:"containers" readOnly:"true"`
+		LogicalID      string            `json:"logicalId,omitempty" readOnly:"true" doc:"Docker-declared global volume namespace within one Swarm, not a physical storage identifier"`
+		ClusterID      string            `json:"clusterId,omitempty" readOnly:"true"`
+		NodeID         string            `json:"nodeId,omitempty" readOnly:"true"`
+		ManagerNodeIDs []string          `json:"managerNodeIds,omitempty" readOnly:"true"`
+		Nodes          []VolumeNodeUsage `json:"nodes,omitempty" readOnly:"true"`
+		WorkspaceState string            `json:"workspaceState,omitempty" enum:"active,inactive,ambiguous" readOnly:"true"`
+		ID             string            `json:"id" readOnly:"true"`
+		Name           string            `json:"name" required:"false"`
+		Driver         string            `json:"driver" required:"false"`
+		Mountpoint     string            `json:"mountpoint" readOnly:"true"`
+		Scope          string            `json:"scope" readOnly:"true"`
+		CreatedAt      string            `json:"createdAt" readOnly:"true"`
+		Containers     []string          `json:"containers" readOnly:"true"`
 
-		Size  int64 `json:"size" readOnly:"true"`
-		InUse bool  `json:"inUse" readOnly:"true"`
+		ActiveConsumers int   `json:"activeConsumers" readOnly:"true"`
+		RunningHelpers  int   `json:"runningHelpers" readOnly:"true"`
+		Size            int64 `json:"size" readOnly:"true"`
+		InUse           bool  `json:"inUse" readOnly:"true"`
+	}
+
+	VolumeNodeUsage struct {
+		EnvironmentRef
+		NodeID          string   `json:"nodeId"`
+		VolumeName      string   `json:"volumeName"`
+		Mountpoint      string   `json:"mountpoint"`
+		Containers      []string `json:"containers"`
+		ActiveConsumers int      `json:"activeConsumers"`
+		RunningHelpers  int      `json:"runningHelpers"`
+		InUse           bool     `json:"inUse"`
 	}
 
 	VolumeUsageCounts struct {

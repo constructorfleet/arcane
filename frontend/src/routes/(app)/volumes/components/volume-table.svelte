@@ -1,6 +1,21 @@
+<script module lang="ts">
+	import { resolve } from '$app/paths';
+
+	import type { Volume } from '#lib/types/volume.js';
+
+	function volumeDetailHref(item: Volume & { environmentId: string }, tab = 'overview') {
+		const params = new URLSearchParams({ env: item.environmentId, tab });
+		if (item.logicalId && item.clusterId && item.nodes?.length) {
+			params.set('cluster', item.clusterId);
+			params.set('driver', item.driver);
+			params.set('agents', item.nodes.map((node) => node.id).join(','));
+		}
+		return resolve(`/(app)/volumes/[volumeName]?${params}`, { volumeName: item.name });
+	}
+</script>
+
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import type { ColumnVisibilityState } from '@tanstack/table-core';
 	import { onMount } from 'svelte';
@@ -17,7 +32,7 @@
 	import { EmptyState } from '#lib/components/states/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import { TrashIcon, InspectIcon, VolumesIcon, CalendarIcon, EditIcon } from '#lib/icons/index.js';
+	import { TrashIcon, InspectIcon, VolumesIcon, CalendarIcon, EditIcon, FolderOpenIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import type { APIRequestConfig } from '#lib/services/api-service.js';
@@ -27,7 +42,7 @@
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import type { ResolvedSettings } from '#lib/types/ui/settings.js';
 	import type { VolumesPaginatedResponse } from '#lib/types/ui/volume.js';
-	import type { VolumeSizeInfo, Volume } from '#lib/types/volume.js';
+	import type { VolumeSizeInfo } from '#lib/types/volume.js';
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
 	import { handleApiResultWithCallbacks, extractApiErrorMessage } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
@@ -332,11 +347,30 @@
 </script>
 
 {#snippet NameCell({ item }: { item: VolumeRow })}
-	<ResourceName
-		name={item.name}
-		href={resolve(`/(app)/volumes/[volumeName]?env=${encodeURIComponent(item.environmentId)}`, { volumeName: item.id })}
-		class="font-mono text-xs-plus leading-5 font-medium"
-	/>
+	<ResourceName name={item.name} href={volumeDetailHref(item)} class="font-mono text-xs-plus leading-5 font-medium" />
+	{#if item.nodes?.length}
+		<details class="mt-1 text-xs text-muted-foreground">
+			<summary class="cursor-pointer"
+				>{item.nodes.length === 1
+					? m.swarm_global_volume_one_node()
+					: m.swarm_global_volume_nodes({ count: item.nodes.length })}</summary
+			>
+			<ul class="mt-2 space-y-1">
+				{#each item.nodes as node (node.id)}
+					<li>
+						<a
+							class="text-primary-text hover:underline"
+							href={volumeDetailHref({ ...item, logicalId: undefined, name: node.volumeName, environmentId: node.id })}
+							>{node.name}</a
+						>
+						{#if item.workspaceState === 'active' && node.id === item.environmentId}
+							<span> · {m.active_attachment()}</span>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		</details>
+	{/if}
 {/snippet}
 
 {#snippet StatusCell({ item }: { item: VolumeRow })}
@@ -344,7 +378,7 @@
 {/snippet}
 
 {#snippet SizeCell({ item }: { item: VolumeRow })}
-	{@const sizeInfo = sizesMap.get(rowKey(item))}
+	{@const sizeInfo = sizesMap.get(rowKey({ id: item.name, environmentId: item.environmentId, environmentTagged: true }))}
 	{#if sizeInfo && sizeInfo.size >= 0}
 		<span class="text-sm tabular-nums">{bytes.format(sizeInfo.size, { unitSeparator: ' ' })}</span>
 	{:else if sizesLoading && sizesMap.size === 0}
@@ -405,19 +439,25 @@
 				}
 			: undefined}
 		rowActions={RowActions}
-		href={() => resolve(`/(app)/volumes/[volumeName]?env=${encodeURIComponent(item.environmentId)}`, { volumeName: item.id })}
+		href={() => volumeDetailHref(item)}
 	/>
 {/snippet}
 
 {#snippet RowActions({ item }: { item: VolumeRow })}
 	<RowActionsMenu name={item.name}>
-		<DropdownMenu.Item
-			onclick={() =>
-				goto(resolve(`/(app)/volumes/[volumeName]?env=${encodeURIComponent(item.environmentId)}`, { volumeName: item.id }))}
-		>
+		<DropdownMenu.Item onclick={() => goto(volumeDetailHref(item))}>
 			<InspectIcon class="size-4" />
 			{m.common_inspect()}
 		</DropdownMenu.Item>
+		{#if hasPermission('volumes:read', item.environmentId)}
+			<DropdownMenu.Item
+				disabled={!!item.logicalId && item.workspaceState !== 'active'}
+				onclick={() => goto(volumeDetailHref(item, 'workspace'))}
+			>
+				<FolderOpenIcon class="size-4" />
+				{m.workspace()}
+			</DropdownMenu.Item>
+		{/if}
 
 		{#if canRenameVolume || canDeleteVolume}
 			<DropdownMenu.Separator />
@@ -426,7 +466,7 @@
 		{#if canRenameVolume && hasPermission('volumes:rename', item.environmentId)}
 			<DropdownMenu.Item
 				onclick={() => handleRenameVolume(item)}
-				disabled={item.inUse || isBackupVolume(item) || isLoading.renaming}
+				disabled={!!item.logicalId || item.inUse || isBackupVolume(item) || isLoading.renaming}
 			>
 				<EditIcon class="size-4" />
 				{m.rename()}
@@ -437,7 +477,7 @@
 			<DropdownMenu.Item
 				variant="destructive"
 				onclick={() => handleRemoveVolumeConfirm(item.name, item.environmentId)}
-				disabled={item.inUse || isBackupVolume(item)}
+				disabled={!!item.logicalId || item.inUse || isBackupVolume(item)}
 			>
 				<TrashIcon class="size-4" />
 				{m.common_remove()}

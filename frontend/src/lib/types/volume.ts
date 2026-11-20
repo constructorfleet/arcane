@@ -83,6 +83,14 @@ export interface VolumeBackupPolicyCollection {
 }
 
 export interface Volume {
+	logicalId?: string;
+	clusterId?: string;
+	nodeId?: string;
+	managerNodeIds?: string[];
+	nodes?: VolumeNodeUsage[];
+	activeConsumers?: number;
+	runningHelpers?: number;
+	workspaceState?: 'active' | 'inactive' | 'ambiguous';
 	options: Record<string, string>;
 	labels: Record<string, string>;
 	activityId?: string;
@@ -94,6 +102,18 @@ export interface Volume {
 	createdAt: string;
 	containers: string[];
 	size: number;
+	inUse: boolean;
+}
+
+export interface VolumeNodeUsage {
+	id: string;
+	name: string;
+	nodeId: string;
+	volumeName: string;
+	mountpoint: string;
+	containers: string[];
+	activeConsumers: number;
+	runningHelpers: number;
 	inUse: boolean;
 }
 

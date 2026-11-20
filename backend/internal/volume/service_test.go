@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/libtnb/sqlite"
+	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/api/types/system"
@@ -749,6 +750,125 @@ func TestAggregateVolumesMergesEnvironments(t *testing.T) {
 		require.Empty(t, body.Data)
 		require.Len(t, body.FailedEnvironments, 3)
 	})
+
+	t.Run("global namespace is one row with the active agent before filtering and paging", func(t *testing.T) {
+		shared := map[string]any{
+			"a": types.PaginatedWithCounts[types.Volume, VolumeUsageCountsData]{Success: true, Data: []types.Volume{
+				{ID: "shared", Name: "shared", Scope: "global", Driver: "rbd", ClusterID: "cluster", NodeID: "manager"},
+				{ID: "local", Name: "local", Scope: "local", Driver: "local", ClusterID: "cluster", NodeID: "manager"},
+			}},
+			"b": types.PaginatedWithCounts[types.Volume, VolumeUsageCountsData]{Success: true, Data: []types.Volume{
+				{
+					ID: "shared", Name: "shared", Scope: "global", Driver: "rbd", ManagerNodeIDs: []string{"manager"},
+					NodeID: "worker", InUse: true, Mountpoint: "/active", ActiveConsumers: 1, Containers: []string{"application"},
+				},
+				{ID: "local", Name: "local", Scope: "local", Driver: "local", NodeID: "worker"},
+			}},
+		}
+		ctx, queries := volumeScopeContext(t, "/api/agents/a,b/volumes?search=shared&inUse=true&label=app&start=99&limit=1", shared)
+		body, err := svc.AggregateVolumes(ctx, pagination.QueryParams{
+			Params: pagination.Params{Start: 99, Limit: 1}, Search: "shared", Filters: map[string]string{"inUse": "true"},
+			SortParams: pagination.SortParams{Sort: "name", Order: pagination.SortAsc},
+		})
+		require.NoError(t, err)
+		require.Len(t, body.Data, 1)
+		item := body.Data[0]
+		require.Equal(t, "b", item.EnvironmentID)
+		require.Equal(t, "active", item.WorkspaceState)
+		require.Equal(t, "cluster", item.ClusterID)
+		require.NotEmpty(t, item.LogicalID)
+		require.Equal(t, []string{"application"}, item.Containers)
+		require.Len(t, item.Nodes, 2)
+		require.Equal(t, int64(1), body.Pagination.TotalItems)
+		require.Equal(t, 1, body.Pagination.CurrentPage)
+		require.Equal(t, VolumeUsageCountsData{Total: 3, Inuse: 1, Unused: 2}, body.Counts)
+		for _, id := range []string{"a", "b"} {
+			stored, ok := queries.Load(id)
+			require.True(t, ok)
+			query := stored.(url.Values)
+			require.Empty(t, query.Get("search"))
+			require.Empty(t, query.Get("inUse"))
+			require.Empty(t, query.Get("label"))
+		}
+	})
+
+	t.Run("different clusters drivers and local volumes stay distinct", func(t *testing.T) {
+		pages := []httpx.EnvironmentResult[types.PaginatedWithCounts[types.Volume, VolumeUsageCountsData]]{
+			{Environment: types.EnvironmentRef{ID: "a"}, Value: types.PaginatedWithCounts[types.Volume, VolumeUsageCountsData]{Data: []types.Volume{
+				{Name: "same", Driver: "rbd", Scope: "global", ClusterID: "one", NodeID: "a"},
+				{Name: "same", Driver: "local", Scope: "local", ClusterID: "one", NodeID: "a"},
+			}}},
+			{Environment: types.EnvironmentRef{ID: "b"}, Value: types.PaginatedWithCounts[types.Volume, VolumeUsageCountsData]{Data: []types.Volume{
+				{Name: "same", Driver: "rbd", Scope: "global", ClusterID: "two", NodeID: "b"},
+				{Name: "same", Driver: "another", Scope: "global", ClusterID: "one", NodeID: "b"},
+				{Name: "same", Driver: "local", Scope: "local", ClusterID: "one", NodeID: "b"},
+				{Name: "same", Driver: "rbd", Scope: "global", NodeID: "b"},
+			}}},
+		}
+		items, counts, _ := mergeVolumeOverview(pages)
+		require.Len(t, items, 6)
+		require.Equal(t, 6, counts.Total)
+	})
+
+	t.Run("running attachments distinguish application helper and stopped references", func(t *testing.T) {
+		usage := volumeConsumerMap([]container.Summary{
+			{ID: "app", State: container.StateRunning, Mounts: []container.MountPoint{{Type: mount.TypeVolume, Name: "shared"}, {Type: mount.TypeVolume, Name: "shared"}}},
+			{
+				ID: "helper", State: container.StateRunning,
+				Labels: map[string]string{"com.getarcaneapp.internal.resource": "true", "com.getarcaneapp.volume-helper": "true"},
+				Mounts: []container.MountPoint{{Type: mount.TypeVolume, Name: "shared"}},
+			},
+			{ID: "stopped", State: container.StateExited, Mounts: []container.MountPoint{{Type: mount.TypeVolume, Name: "shared"}}},
+			{ID: "paused", State: container.StatePaused, Mounts: []container.MountPoint{{Type: mount.TypeVolume, Name: "shared"}}},
+			{ID: "restarting", State: container.StateRestarting, Mounts: []container.MountPoint{{Type: mount.TypeVolume, Name: "shared"}}},
+		})
+		require.Len(t, usage["shared"].IDs, 5)
+		require.Equal(t, 3, usage["shared"].Applications)
+		require.Equal(t, 1, usage["shared"].Helpers)
+	})
+
+	t.Run("workspace selection uses mounted consumers and preserves ambiguity", func(t *testing.T) {
+		cases := []struct {
+			name, state, agent string
+			a, b               types.Volume
+		}{
+			{
+				name: "no mounted consumer", state: "inactive", agent: "a",
+				a: types.Volume{Mountpoint: "/stale", Containers: []string{"stopped"}}, b: types.Volume{ActiveConsumers: 1},
+			},
+			{
+				name: "existing mounted helper", state: "active", agent: "b",
+				b: types.Volume{Mountpoint: "/mounted", RunningHelpers: 1},
+			},
+			{
+				name: "application preferred over helper", state: "active", agent: "b",
+				a: types.Volume{Mountpoint: "/helper", RunningHelpers: 1}, b: types.Volume{Mountpoint: "/application", ActiveConsumers: 1},
+			},
+			{
+				name: "multiple application attachments", state: "ambiguous", agent: "a",
+				a: types.Volume{Mountpoint: "/one", ActiveConsumers: 1}, b: types.Volume{Mountpoint: "/two", ActiveConsumers: 1},
+			},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				members := []types.Volume{
+					{
+						EnvironmentTag: types.EnvironmentTag{EnvironmentID: "a", EnvironmentName: "a"}, Name: "shared",
+						Mountpoint: tc.a.Mountpoint, Containers: tc.a.Containers, ActiveConsumers: tc.a.ActiveConsumers, RunningHelpers: tc.a.RunningHelpers,
+					},
+					{
+						EnvironmentTag: types.EnvironmentTag{EnvironmentID: "b", EnvironmentName: "b"}, Name: "shared",
+						Mountpoint: tc.b.Mountpoint, Containers: tc.b.Containers, ActiveConsumers: tc.b.ActiveConsumers, RunningHelpers: tc.b.RunningHelpers,
+					},
+				}
+				item := mergeGlobalVolume(members, "owned-logical-key")
+				require.Equal(t, tc.state, item.WorkspaceState)
+				require.Equal(t, tc.agent, item.EnvironmentID)
+				require.Len(t, item.Nodes, 2)
+				require.Equal(t, "owned-logical-key", item.LogicalID)
+			})
+		}
+	})
 }
 
 func TestAggregateVolumeSizesKeepsEnvironmentRows(t *testing.T) {
@@ -772,19 +892,21 @@ func TestAggregateVolumeSizesKeepsEnvironmentRows(t *testing.T) {
 
 func TestAggregateVolumeCountsSumsEnvironments(t *testing.T) {
 	ctx, _ := volumeScopeContext(t, "/api/agents/a,b,c/volumes/counts", map[string]any{
-		"a": types.ApiResponse[VolumeUsageCountsData]{
+		"a": types.PaginatedWithCounts[types.Volume, VolumeUsageCountsData]{
 			Success: true,
-			Data: VolumeUsageCountsData{
-				Inuse:  1,
-				Unused: 2,
-				Total:  3,
+			Data: []types.Volume{
+				{Name: "shared", Driver: "rbd", Scope: "global", ClusterID: "cluster", NodeID: "a", InUse: true},
+				{Name: "a2"},
+				{Name: "a3"},
 			},
 		},
-		"b": types.ApiResponse[VolumeUsageCountsData]{
+		"b": types.PaginatedWithCounts[types.Volume, VolumeUsageCountsData]{
 			Success: true,
-			Data: VolumeUsageCountsData{
-				Inuse: 4,
-				Total: 4,
+			Data: []types.Volume{
+				{Name: "shared", Driver: "rbd", Scope: "global", ClusterID: "cluster", NodeID: "b", InUse: true},
+				{Name: "b2", InUse: true},
+				{Name: "b3", InUse: true},
+				{Name: "b4", InUse: true},
 			},
 		},
 	})
@@ -793,9 +915,9 @@ func TestAggregateVolumeCountsSumsEnvironments(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, VolumeUsageCountsData{
-		Inuse:  5,
+		Inuse:  4,
 		Unused: 2,
-		Total:  7,
+		Total:  6,
 	}, body.Data)
 	require.Len(t, body.Environments, 2)
 	require.Len(t, body.FailedEnvironments, 1)

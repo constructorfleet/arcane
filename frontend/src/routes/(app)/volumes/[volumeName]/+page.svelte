@@ -82,6 +82,7 @@
 	let containersDetailed = $derived<VolumeConsumer[]>(data.containersDetailed ?? []);
 
 	const currentEnvId = $derived(data.envId);
+	const logicalVolume = $derived(data.logicalVolume);
 	const environmentSettings = useEnvironmentSettings(() => currentEnvId);
 	const volumeSettings = $derived(environmentSettings.current?.runtime);
 	// Until the backup volume name is known, the volume cannot be removed.
@@ -110,7 +111,13 @@
 	const queryClient = useQueryClient();
 
 	let workspaceRequested = $state(false);
-	const workspaceEnabled = $derived(!!volume?.name && selectedTab === 'workspace' && workspaceRequested && canReadVolume);
+	const workspaceEnabled = $derived(
+		!!volume?.name &&
+			selectedTab === 'workspace' &&
+			workspaceRequested &&
+			canReadVolume &&
+			(!logicalVolume || logicalVolume.workspaceState === 'active')
+	);
 	let workspaceFileChanges = $state<VolumeWorkspaceFileChange[]>([]);
 	let workspaceFileContents = $state<Record<string, string>>({});
 	let loadedWorkspaceFileContents = $state<Record<string, string>>({});
@@ -846,7 +853,7 @@
 				onclick: handleSaveVolumeWorkspace
 			});
 		}
-		if (canDeleteVolume) {
+		if (canDeleteVolume && !logicalVolume) {
 			items.push({
 				id: 'remove',
 				action: 'remove',
@@ -871,6 +878,12 @@
 	}
 
 	function onTabChange(value: string) {
+		if (value === 'workspace' && logicalVolume && selectedTab !== 'workspace' && !hasWorkspaceChanges) {
+			const target = new URL(window.location.href);
+			target.searchParams.set('tab', 'workspace');
+			window.location.assign(target.href);
+			return;
+		}
 		workspaceRequested = value === 'workspace';
 		urlTab.select(value);
 	}
@@ -1170,7 +1183,7 @@
 	/>
 
 	{@render volumeContainers(volume)}
-	<VolumeAgentRecords {volume} environmentId={currentEnvId} {hasWorkspaceChanges} />
+	<VolumeAgentRecords volume={logicalVolume ?? volume} environmentId={currentEnvId} {hasWorkspaceChanges} />
 
 	{#if volume.labels && Object.keys(volume.labels).length > 0}
 		<DetailSection title={m.common_labels()} icon={TagIcon}>
@@ -1216,6 +1229,11 @@
 						<Badge variant="purple" minWidth="20">{volume.scope}</Badge>
 					{/if}
 				</div>
+				{#if logicalVolume?.workspaceState === 'active'}
+					<p class="text-xs text-muted-foreground">
+						{m.workspace_uses_active_attachment({ agent: logicalVolume.environmentName ?? currentEnvId })}
+					</p>
+				{/if}
 			</div>
 		{/snippet}
 
@@ -1225,10 +1243,36 @@
 
 		{#snippet tabContent(tab)}
 			<div class="space-y-6">
+				{#if data.logicalFailures.length > 0}
+					<Alert.Root variant="warning-subtle" icon={AlertIcon}>
+						<Alert.Description
+							>{m.all_environments_unavailable({
+								environments: data.logicalFailures
+									.map(({ environment, message }) => `${environment.name} (${message})`)
+									.join(', ')
+							})}</Alert.Description
+						>
+					</Alert.Root>
+				{/if}
+				{#if data.logicalExcluded.length > 0}
+					<Alert.Root variant="warning-subtle" icon={AlertIcon}>
+						<Alert.Description>{m.volume_agent_records_excluded({ agents: data.logicalExcluded.join(', ') })}</Alert.Description>
+					</Alert.Root>
+				{/if}
 				{#if tab === 'overview'}
 					{@render volumeOverview(volume)}
 				{:else if tab === 'workspace'}
-					{@render volumeWorkspace(volume)}
+					{#if logicalVolume && logicalVolume.workspaceState !== 'active'}
+						<Alert.Root variant="warning-subtle" icon={AlertIcon}>
+							<Alert.Description>
+								{logicalVolume.workspaceState === 'ambiguous'
+									? m.multiple_active_volume_attachments()
+									: m.no_active_volume_attachment()}
+							</Alert.Description>
+						</Alert.Root>
+					{:else}
+						{@render volumeWorkspace(volume)}
+					{/if}
 				{:else if tab === 'backups'}
 					{#key `${currentEnvId}:${volume.name}`}
 						<BackupList

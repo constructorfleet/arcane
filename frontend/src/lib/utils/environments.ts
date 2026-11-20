@@ -29,7 +29,8 @@ export type EnvironmentPage<P extends Page<object>> = Omit<P, 'data' | 'groups'>
 const KEY_SEPARATOR = '\u001f';
 
 /** Table row key; tagged rows are keyed by environment, since IDs can repeat across environments. */
-export function rowKey(row: { id: string; environmentId?: string; environmentTagged?: boolean }): string {
+export function rowKey(row: { id: string; logicalId?: string; environmentId?: string; environmentTagged?: boolean }): string {
+	if (row.logicalId) return row.logicalId;
 	return row.environmentTagged && row.environmentId !== undefined ? `${row.environmentId}${KEY_SEPARATOR}${row.id}` : row.id;
 }
 

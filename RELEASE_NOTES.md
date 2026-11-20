@@ -1,11 +1,9 @@
-# 3.0.1-cf.64
+# 3.0.1-cf.65
 
-## Fixed
+- Show one logical entry for a Docker-global plugin volume with the same name and driver in the same observed Swarm (#13 / #14). Preserve the individual agent records under that entry. Local volumes, different clusters/drivers and unknown cluster identities remain separate.
+- Select the node with the active application attachment for volume details and Workspace, using fresh container observations. Re-resolve the selected attachment before opening Workspace; retain unsaved edits on their original agent. An inactive or ambiguous attachment shows an explicit state without attempting to mount the volume on another node.
+- Group before filtering, sorting, pagination and usage counts. Show partial agent coverage and retain explicit per-node management links. Logical entries exclude bulk/resource deletion while normal authorized workspace file editing remains available.
 
-- Registry project discovery now uses the same HTTPS-first negotiation as OCI browsing. Allowing insecure connections permits a plain HTTP fallback instead of forcing project API requests onto HTTP.
-- Discovery probes reject redirects and foreign origins. Authenticated project requests remain on the configured host, do not follow redirects, and retain certificate verification. Probe attempts reserve slots in the existing shared request budget.
+Validation: existing volume service coverage extended for grouping, identity boundaries, counts and attachment selection; 16 actual owning page-loader cases, 23 workspace owner cases and 23 compiled component SSR cases with service/framework/child boundaries stubbed; production build, full format/lint and release contract/tool checks.
 
-## Validation and limits
-
-- Existing browse tests cover verified HTTPS with insecure fallback enabled, explicitly permitted HTTP, refused HTTP fallback, HTTPS permission errors, redirect boundaries, and bounded project enumeration. The trusted TLS case reproduces the previous forced-HTTP failure against canonical cf.63.
-- This fixes the cf.63 live transport mismatch reported in #160 (parent #146/#40). Existing-profile namespace/repository/tag UI acceptance remains pending the cf.64 rollout; no registry credentials, permissions, TLS flags, pulls, or pushes were changed by this work.
+Live single-entry RBD listing and active-node workspace browsing remain pending release/runtime acceptance. Grouping follows Docker global-volume scope within the observed Swarm; it does not infer physical storage identity across clusters. No plugin changes, cross-node mounts or destructive volume operations were performed for this implementation.

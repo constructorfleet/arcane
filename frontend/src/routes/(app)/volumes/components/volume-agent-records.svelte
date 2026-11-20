@@ -38,10 +38,29 @@
 	}));
 	const records = $derived(
 		(recordsQuery.data?.data ?? [])
+			.flatMap((record) =>
+				record.nodes?.length
+					? record.nodes.map((node) => ({
+							...record,
+							logicalId: undefined,
+							nodes: undefined,
+							id: node.volumeName,
+							name: node.volumeName,
+							environmentId: node.id,
+							environmentName: node.name,
+							mountpoint: node.mountpoint,
+							containers: node.containers,
+							inUse: node.inUse,
+							activeConsumers: node.activeConsumers,
+							runningHelpers: node.runningHelpers
+						}))
+					: [record]
+			)
 			.filter(
 				(record) =>
 					record.name === volume.name &&
 					record.driver === volume.driver &&
+					(!volume.clusterId || record.clusterId === volume.clusterId) &&
 					agents.some((agent) => agent.id === record.environmentId)
 			)
 			.toSorted((a, b) => Number(!!b.mountpoint) - Number(!!a.mountpoint) || a.environmentName.localeCompare(b.environmentName))

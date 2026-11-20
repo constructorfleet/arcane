@@ -407,19 +407,14 @@ func (s *VolumeService) GetVolumeByName(ctx context.Context, name string) (*type
 	usage, _ := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (mo.Option[[]volume.Volume], error) {
 		return docker.GetVolumeUsageDataStaleWhileRevalidate(ctx, dockerClient), nil
 	})
-	v := types.NewVolume(enrichVolumesWithUsageData([]volume.Volume{volResult.Volume}, usage.OrEmpty())[0])
-
-	containerIDs, err := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) ([]string, error) {
-		return docker.GetContainersUsingVolume(ctx, dockerClient, name)
-	})
+	consumers, err := s.dockerService.ListContainers(ctx, true)
 	if err != nil {
 		slog.WarnContext(ctx, "failed to get containers using volume", "volume", name, "error", err.Error())
-	} else {
-		v.Containers = containerIDs
-		if len(containerIDs) > 0 {
-			v.InUse = true
-		}
 	}
+	info, _ := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.SystemInfoResult, error) {
+		return dockerClient.Info(ctx, client.InfoOptions{})
+	})
+	v := volumeObservation(enrichVolumesWithUsageData([]volume.Volume{volResult.Volume}, usage.OrEmpty())[0], volumeConsumerMap(consumers)[name], info.Info.Swarm)
 
 	return &v, nil
 }
@@ -917,7 +912,7 @@ func (s *VolumeService) ListVolumesPaginated(ctx context.Context, params paginat
 		volumes []volume.Volume
 	}
 	type containerMapResult struct {
-		containerMap map[string][]string
+		containerMap map[string]volumeConsumers
 		err          error
 	}
 
@@ -932,20 +927,12 @@ func (s *VolumeService) ListVolumesPaginated(ctx context.Context, params paginat
 	}()
 
 	go func() {
-		containers, listErr := s.dockerService.ListContainers(ctx, false)
+		containers, listErr := s.dockerService.ListContainers(ctx, true)
 		if listErr != nil {
 			containerChan <- containerMapResult{err: fmt.Errorf("failed to list containers: %w", listErr)}
 			return
 		}
-		containerMap := make(map[string][]string)
-		for _, c := range containers {
-			for _, m := range c.Mounts {
-				if m.Type == mount.TypeVolume && m.Name != "" {
-					containerMap[m.Name] = append(containerMap[m.Name], c.ID)
-				}
-			}
-		}
-		containerChan <- containerMapResult{containerMap: containerMap}
+		containerChan <- containerMapResult{containerMap: volumeConsumerMap(containers)}
 	}()
 
 	// Wait for both results
@@ -958,8 +945,11 @@ func (s *VolumeService) ListVolumesPaginated(ctx context.Context, params paginat
 	volumeContainerMap := containerResult.containerMap
 	if containerResult.err != nil {
 		slog.WarnContext(ctx, "failed to build volume-container map", "error", containerResult.err.Error())
-		volumeContainerMap = make(map[string][]string)
+		volumeContainerMap = make(map[string]volumeConsumers)
 	}
+	info, _ := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.SystemInfoResult, error) {
+		return dockerClient.Info(ctx, client.InfoOptions{})
+	})
 
 	effectiveParams := params
 	usageCacheSnapshot := "not_requested"
@@ -985,15 +975,9 @@ func (s *VolumeService) ListVolumesPaginated(ctx context.Context, params paginat
 
 	items := make([]types.Volume, 0, len(enrichedVolumes))
 	for _, v := range enrichedVolumes {
-		volDto := types.NewVolume(v)
+		volDto := volumeObservation(v, volumeContainerMap[v.Name], info.Info.Swarm)
 		if !includeInternal && s.isInternalVolume(volDto) {
 			continue
-		}
-		if containerIDs, ok := volumeContainerMap[v.Name]; ok {
-			volDto.Containers = containerIDs
-			if len(containerIDs) > 0 {
-				volDto.InUse = true
-			}
 		}
 		items = append(items, volDto)
 	}
@@ -1033,49 +1017,51 @@ func (s *VolumeService) ListVolumesPaginated(ctx context.Context, params paginat
 }
 
 func (s *VolumeService) AggregateVolumes(ctx context.Context, params pagination.QueryParams) (types.PaginatedWithCounts[types.Volume, VolumeUsageCountsData], error) {
-	collection, err := httpx.CollectEnvironments[types.PaginatedWithCounts[types.Volume, VolumeUsageCountsData]](ctx, url.Values{"start": {"0"}, "limit": {"-1"}})
+	collection, err := httpx.CollectEnvironments[types.PaginatedWithCounts[types.Volume, VolumeUsageCountsData]](ctx, url.Values{
+		"start": {"0"}, "limit": {"-1"}, "search": nil, "inUse": nil, "label": nil,
+	})
 	if err != nil {
 		return types.PaginatedWithCounts[types.Volume, VolumeUsageCountsData]{}, err
 	}
 
-	pages := make([]pagination.EnvironmentPage[types.Volume], 0, len(collection.Results))
-	var counts VolumeUsageCountsData
-	for _, result := range collection.Results {
-		page := result.Value
-		pages = append(pages, pagination.EnvironmentPage[types.Volume]{
-			Environment:    result.Environment,
-			Items:          page.Data,
-			TotalAvailable: cmp.Or(page.Pagination.GrandTotalItems, page.Pagination.TotalItems),
-		})
-		counts = VolumeUsageCountsData{
-			Inuse:  counts.Inuse + page.Counts.Inuse,
-			Unused: counts.Unused + page.Counts.Unused,
-			Total:  counts.Total + page.Counts.Total,
-		}
+	items, counts, unseen := mergeVolumeOverview(collection.Results)
+	paginationConfig := pagination.WithEnvironment(s.buildVolumePaginationConfig())
+	result := paginationConfig.SearchOrderAndPaginate(items, params)
+	if params.Limit > 0 && int64(params.Start) >= result.TotalCount {
+		params.Start = int(max(result.TotalCount-1, 0)) / params.Limit * params.Limit
+		result = paginationConfig.SearchOrderAndPaginate(items, params)
 	}
-	data, resp := pagination.MergeEnvironmentPages(s.buildVolumePaginationConfig(), pages, params)
 
 	return types.PaginatedWithCounts[types.Volume, VolumeUsageCountsData]{
 		Success:            true,
-		Data:               data,
+		Data:               result.Items,
 		Counts:             counts,
-		Pagination:         handlerutil.PaginationResponse(resp),
+		Pagination:         handlerutil.PaginationResponse(pagination.BuildResponse(result.TotalCount, result.TotalAvailable+unseen, params)),
 		FailedEnvironments: collection.Failures,
 	}, nil
 }
 
 func (s *VolumeService) AggregateVolumeCounts(ctx context.Context) (types.ApiResponse[VolumeUsageCountsData], error) {
-	return httpx.CollectEnvironmentData(ctx, nil, func(environments []types.EnvironmentData[VolumeUsageCountsData]) VolumeUsageCountsData {
-		var counts VolumeUsageCountsData
-		for _, environment := range environments {
-			counts = VolumeUsageCountsData{
-				Inuse:  counts.Inuse + environment.Data.Inuse,
-				Unused: counts.Unused + environment.Data.Unused,
-				Total:  counts.Total + environment.Data.Total,
-			}
-		}
-		return counts
-	})
+	scope, ok := httpx.EnvironmentScopeFromContext(ctx)
+	if !ok {
+		return types.ApiResponse[VolumeUsageCountsData]{}, errors.New("request has no environment scope")
+	}
+	listScope := *scope
+	listScope.Path = "/volumes"
+	collection, err := httpx.CollectEnvironments[types.PaginatedWithCounts[types.Volume, VolumeUsageCountsData]](
+		httpx.WithEnvironmentScope(ctx, &listScope), url.Values{
+			"start": {"0"}, "limit": {"-1"}, "search": nil, "inUse": nil, "label": nil,
+		},
+	)
+	if err != nil {
+		return types.ApiResponse[VolumeUsageCountsData]{}, err
+	}
+	_, counts, _ := mergeVolumeOverview(collection.Results)
+	environments := make([]types.EnvironmentData[VolumeUsageCountsData], 0, len(collection.Results))
+	for _, result := range collection.Results {
+		environments = append(environments, types.EnvironmentData[VolumeUsageCountsData]{Environment: result.Environment, Data: result.Value.Counts})
+	}
+	return types.ApiResponse[VolumeUsageCountsData]{Success: true, Data: counts, Environments: environments, FailedEnvironments: collection.Failures}, nil
 }
 
 func (s *VolumeService) AggregateVolumeSizes(ctx context.Context) (types.ApiResponse[[]VolumeSizeInfo], error) {
