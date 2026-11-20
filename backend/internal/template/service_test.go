@@ -498,6 +498,23 @@ services:
 	require.NotNil(t, stored.Metadata)
 	require.NotNil(t, stored.Metadata.IconURL)
 	require.Equal(t, "https://cdn.example/local.png", *stored.Metadata.IconURL)
+	compose := "\n# authored source\n" + stored.Content + "\n\n"
+	env := "\n \t \n"
+	require.NoError(t, service.UpdateTemplate(t.Context(), stored.ID, types.Template{
+		Content: compose, EnvContent: new(env),
+	}, map[string]bool{"content": true, "envContent": true}))
+	composeBytes, err := os.ReadFile(filepath.Join(templateDir, "compose.yaml"))
+	require.NoError(t, err)
+	require.Equal(t, compose, string(composeBytes))
+	envBytes, err := os.ReadFile(filepath.Join(templateDir, ".env.example"))
+	require.NoError(t, err)
+	require.Equal(t, env, string(envBytes))
+	require.NoError(t, service.SyncLocalTemplatesFromFilesystem(t.Context()))
+	var refreshed ComposeTemplate
+	require.NoError(t, service.db.WithContext(t.Context()).First(&refreshed, "id = ?", stored.ID).Error)
+	require.Equal(t, compose, refreshed.Content)
+	require.NotNil(t, refreshed.EnvContent)
+	require.Equal(t, env, *refreshed.EnvContent)
 }
 
 func TestGetTemplate_ForceRefreshesRemoteCacheOnMiss(t *testing.T) {

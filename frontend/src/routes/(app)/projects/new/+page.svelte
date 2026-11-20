@@ -107,7 +107,7 @@
 		envContent: data.envTemplate || ''
 	};
 
-	const form = createForm<typeof formSchema>(formSchema, formData);
+	const form = createForm<typeof formSchema>(formSchema, formData, { preserveWhitespace: ['composeContent', 'envContent'] });
 	let inputs = $derived(form.inputs);
 
 	let composeOpen = $state(true);

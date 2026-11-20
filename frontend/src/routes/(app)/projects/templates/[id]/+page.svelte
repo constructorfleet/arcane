@@ -87,7 +87,9 @@
 		};
 	}
 
-	const form = createForm<typeof formSchema>(formSchema, untrack(formValues));
+	const form = createForm<typeof formSchema>(formSchema, untrack(formValues), {
+		preserveWhitespace: ['composeContent', 'envContent']
+	});
 
 	afterNavigate(() => form.reset(formValues()));
 

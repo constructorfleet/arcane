@@ -88,7 +88,9 @@
 	const submitLabel = $derived(isEditMode ? m.common_save() : m.common_create_button({ resource: m.swarm_stack() }));
 	const submitLoadingLabel = $derived(isEditMode ? m.common_saving() : m.common_action_creating());
 
-	const form = createForm<typeof formSchema>(formSchema, getInitialFormData());
+	const form = createForm<typeof formSchema>(formSchema, getInitialFormData(), {
+		preserveWhitespace: ['composeContent', 'envContent']
+	});
 	let inputs = $derived(form.inputs);
 
 	let composeOpen = $state(true);

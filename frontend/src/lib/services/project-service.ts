@@ -94,7 +94,7 @@ class ProjectService extends BaseAPIService {
 			JSON.stringify({
 				name: projectName,
 				composeContent,
-				envContent: envContent?.trim() ? envContent : undefined,
+				envContent: envContent || undefined,
 				tags: tags.map((tag) => tag.name),
 				tagColors: Object.fromEntries(tags.map((tag) => [tag.name, tag.color])),
 				directory: directory || undefined

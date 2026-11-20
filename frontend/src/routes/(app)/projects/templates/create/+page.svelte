@@ -40,7 +40,7 @@
 		envContent: ''
 	};
 
-	const form = createForm<typeof formSchema>(formSchema, initialValues);
+	const form = createForm<typeof formSchema>(formSchema, initialValues, { preserveWhitespace: ['composeContent', 'envContent'] });
 	let inputs = $derived(form.inputs);
 
 	const hasEditorErrors = $derived(

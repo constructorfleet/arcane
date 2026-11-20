@@ -227,7 +227,7 @@ func WriteProjectFiles(ctx context.Context, write ComposeFileWrite, envContent *
 		return err
 	}
 
-	if strings.TrimSpace(kit.FromPtr(envContent)) == "" {
+	if kit.FromPtr(envContent) == "" {
 		return nil
 	}
 

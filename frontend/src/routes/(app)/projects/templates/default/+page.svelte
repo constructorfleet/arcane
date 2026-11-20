@@ -46,10 +46,14 @@
 
 	const formSchema = createTemplateContentSchema();
 
-	const form = createForm<typeof formSchema>(formSchema, {
-		composeContent: untrack(() => originalComposeContent),
-		envContent: untrack(() => originalEnvContent)
-	});
+	const form = createForm<typeof formSchema>(
+		formSchema,
+		{
+			composeContent: untrack(() => originalComposeContent),
+			envContent: untrack(() => originalEnvContent)
+		},
+		{ preserveWhitespace: ['composeContent', 'envContent'] }
+	);
 
 	const hasChanges = $derived(
 		form.inputs.composeContent.value !== originalComposeContent || form.inputs.envContent.value !== originalEnvContent

@@ -267,18 +267,28 @@ func TestWriteProjectFiles(t *testing.T) {
 	})
 
 	t.Run("overwrites env when envContent is provided", func(t *testing.T) {
-		envPath := filepath.Join(projectDir, ".env")
-		newContent := "NEW=true"
-		err := WriteProjectFiles(t.Context(), ComposeFileWrite{
-			ProjectsRoot: projectsRoot,
-			DirPath:      projectDir,
-			Content:      "services: {}",
-		}, &newContent)
-		require.NoError(t, err)
-
-		content, err := os.ReadFile(envPath)
-		require.NoError(t, err)
-		assert.Equal(t, newContent, string(content))
+		for _, newContent := range []string{"NEW=true\n", "\n \t \n"} {
+			envPath := filepath.Join(projectDir, ".env")
+			compose := "\n# authored source\nservices: {}\n\n"
+			err := WriteProjectFiles(t.Context(), ComposeFileWrite{
+				ProjectsRoot: projectsRoot,
+				DirPath:      projectDir,
+				Content:      compose,
+			}, &newContent)
+			require.NoError(t, err)
+			content, err := os.ReadFile(envPath)
+			require.NoError(t, err)
+			assert.Equal(t, newContent, string(content))
+			composeBytes, err := os.ReadFile(filepath.Join(projectDir, "compose.yaml"))
+			require.NoError(t, err)
+			assert.Equal(t, compose, string(composeBytes))
+			require.NoError(t, WriteManagedEnvFile(t.Context(), projectsRoot, projectDir, EffectiveEnvFileName, false, newContent))
+			managed, readErr := os.ReadFile(envPath)
+			require.NoError(t, readErr)
+			assert.Equal(t, newContent, string(managed))
+		}
+		require.NoError(t, WriteManagedEnvFile(t.Context(), projectsRoot, projectDir, EffectiveEnvFileName, false, ""))
+		assert.NoFileExists(t, filepath.Join(projectDir, EffectiveEnvFileName))
 	})
 }
 

@@ -9,7 +9,11 @@ export function preventDefault<T extends Event>(fn: (event: T) => unknown) {
 	};
 }
 
-export function createForm<T extends z.ZodType<Record<string, unknown>>>(schema: T, initialValues: z.infer<T>) {
+export function createForm<T extends z.ZodType<Record<string, unknown>>>(
+	schema: T,
+	initialValues: z.infer<T>,
+	options: { preserveWhitespace?: readonly (keyof z.infer<T>)[] } = {}
+) {
 	const schemaKeys = Object.keys(schema instanceof z.ZodObject ? schema.shape : {});
 	const inputs = $state(
 		Object.fromEntries(
@@ -24,6 +28,7 @@ export function createForm<T extends z.ZodType<Record<string, unknown>>>(schema:
 		const values = Object.fromEntries(
 			Object.entries(inputs).map(([key, input]) => {
 				const value: unknown = input.value;
+				if (options.preserveWhitespace?.includes(key)) return [key, value];
 				if (typeof value === 'string') return [key, value.trim()];
 				if (Array.isArray(value)) return [key, value.map((item: unknown) => (typeof item === 'string' ? item.trim() : item))];
 				return [key, value];

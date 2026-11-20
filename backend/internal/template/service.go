@@ -447,7 +447,7 @@ func writeImportedTemplateFiles(ctx context.Context, folderPath, composePath, co
 		dotEnvPath := filepath.Join(folderPath, ".env")
 		if _, dotEnvErr := (acfs.Host{}).Stat(ctx, dotEnvPath, acfstypes.StatOptions{FollowFinal: true}); dotEnvErr == nil {
 			envPath = dotEnvPath
-		} else if strings.TrimSpace(envContent) == "" {
+		} else if envContent == "" {
 			envPath = ""
 		}
 	}

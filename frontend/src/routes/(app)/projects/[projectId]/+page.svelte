@@ -211,7 +211,7 @@
 
 	const formSchema = z.object({
 		name: z.string().min(1, m.compose_project_name_required()),
-		composeContent: z.string().min(1, m.compose_content_is_required()),
+		composeContent: z.string().refine((value) => value.trim().length > 0, m.compose_content_is_required()),
 		envContent: z.string().optional().default(''),
 		overrideContent: z.string().optional().default('')
 	});
@@ -223,7 +223,9 @@
 		overrideContent: data.editorState.originalOverrideContent || ''
 	}));
 
-	const form = createForm<typeof formSchema>(formSchema, initialFormData);
+	const form = createForm<typeof formSchema>(formSchema, initialFormData, {
+		preserveWhitespace: ['composeContent', 'envContent', 'overrideContent']
+	});
 	let inputs = $derived(form.inputs);
 
 	function withLoadedProjectIncludeContent(details: Project | null | undefined): Project | null {
