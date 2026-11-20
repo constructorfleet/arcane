@@ -4724,5 +4724,6 @@
   "literal_arguments_description": "Each row is one literal argument. Spaces, quotes and empty values are kept. Remove all rows to use the image default.",
   "add_argument": "Add argument",
   "command_argument": "Command argument",
-  "argument": "Argument"
+  "argument": "Argument",
+  "entrypoint_argument": "Entrypoint argument"
 }

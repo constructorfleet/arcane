@@ -64,8 +64,6 @@ export const LINUX_CAPABILITIES = [
 export const containerFormSchema = z.object({
 	name: z.string().min(1, m.container_name_required()),
 	image: z.string().min(1, m.image_is_required()),
-	command: z.string().optional().default(''),
-	entrypoint: z.string().optional().default(''),
 	workingDir: z.string().optional().default(''),
 	user: z.string().optional().default(''),
 	hostname: z.string().optional().default(''),
@@ -90,6 +88,8 @@ export type ContainerFormSchema = typeof containerFormSchema;
 export type ContainerFormValues = z.infer<ContainerFormSchema>;
 
 export type ContainerFormRows = {
+	command: { value: string }[];
+	entrypoint: { value: string }[];
 	env: KeyValueRow[];
 	labels: KeyValueRow[];
 	ports: PortMappingRow[];
@@ -98,15 +98,6 @@ export type ContainerFormRows = {
 	capAdd: string[];
 	capDrop: string[];
 };
-
-function splitShellWords(input: string): string[] {
-	const words: string[] = [];
-	const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
-	for (const match of input.matchAll(re)) {
-		words.push(match[1] ?? match[2] ?? match[3] ?? '');
-	}
-	return words;
-}
 
 function joinShellWords(words: string[] | undefined): string {
 	if (!words?.length) return '';
@@ -117,8 +108,6 @@ export function emptyContainerFormValues(): ContainerFormValues {
 	return {
 		name: '',
 		image: '',
-		command: '',
-		entrypoint: '',
 		workingDir: '',
 		user: '',
 		hostname: '',
@@ -141,7 +130,7 @@ export function emptyContainerFormValues(): ContainerFormValues {
 }
 
 export function emptyContainerFormRows(): ContainerFormRows {
-	return { env: [], labels: [], ports: [], volumes: [], networks: [], capAdd: [], capDrop: [] };
+	return { command: [], entrypoint: [], env: [], labels: [], ports: [], volumes: [], networks: [], capAdd: [], capDrop: [] };
 }
 
 function healthModeFromConfig(hc: ContainerHealthcheckCreate | undefined): ContainerFormValues['healthMode'] {
@@ -163,8 +152,6 @@ export function formValuesFromEditConfig(cfg: ContainerEditConfig): ContainerFor
 		...emptyContainerFormValues(),
 		name: cfg.name,
 		image: cfg.image,
-		command: joinShellWords(cfg.command),
-		entrypoint: joinShellWords(cfg.entrypoint),
 		workingDir: cfg.workingDir ?? '',
 		user: cfg.user ?? '',
 		hostname: cfg.hostname ?? '',
@@ -242,6 +229,8 @@ function volumeRowsFromEditConfig(cfg: ContainerEditConfig): VolumeMountRow[] {
 
 export function rowsFromEditConfig(cfg: ContainerEditConfig): ContainerFormRows {
 	const rows = emptyContainerFormRows();
+	rows.command = (cfg.command ?? []).map((value) => ({ value }));
+	rows.entrypoint = (cfg.entrypoint ?? []).map((value) => ({ value }));
 
 	for (const entry of cfg.environment ?? []) {
 		const eq = entry.indexOf('=');
@@ -368,8 +357,8 @@ export function toCreateRequest(values: ContainerFormValues, rows: ContainerForm
 	return {
 		name: values.name.trim(),
 		image: values.image.trim(),
-		cmd: values.command.trim() ? splitShellWords(values.command.trim()) : undefined,
-		entrypoint: values.entrypoint.trim() ? splitShellWords(values.entrypoint.trim()) : undefined,
+		cmd: rows.command.length > 0 ? rows.command.map((argument) => argument.value) : undefined,
+		entrypoint: rows.entrypoint.length > 0 ? rows.entrypoint.map((argument) => argument.value) : undefined,
 		workingDir: values.workingDir.trim() || undefined,
 		user: values.user.trim() || undefined,
 		hostname: values.hostname.trim() || undefined,
@@ -389,13 +378,15 @@ export function toEditRequest(
 	original: ContainerEditConfig
 ): ContainerEdit {
 	const initial = formValuesFromEditConfig(original);
+	const commandValues = rows.command.map((argument) => argument.value);
 	let command: string[] | undefined;
-	if (values.command.trim() !== initial.command.trim()) {
-		command = splitShellWords(values.command.trim());
+	if (JSON.stringify(commandValues) !== JSON.stringify(original.command ?? [])) {
+		command = commandValues;
 	}
+	const entrypointValues = rows.entrypoint.map((argument) => argument.value);
 	let entrypoint: string[] | undefined;
-	if (values.entrypoint.trim() !== initial.entrypoint.trim()) {
-		entrypoint = splitShellWords(values.entrypoint.trim());
+	if (JSON.stringify(entrypointValues) !== JSON.stringify(original.entrypoint ?? [])) {
+		entrypoint = entrypointValues;
 	}
 
 	const healthFields = ['healthMode', 'healthInterval', 'healthTimeout', 'healthStartPeriod', 'healthRetries'] as const;

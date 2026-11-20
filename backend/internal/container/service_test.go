@@ -533,6 +533,16 @@ func TestApplyEditPreservesUnmanagedSettings(t *testing.T) {
 	require.Len(t, hc.Ulimits, 1)
 	require.Equal(t, []string{"/data:/data"}, hc.Binds)
 	require.Contains(t, cfg.ExposedPorts, network.MustParsePort("80/tcp"))
+
+	command := []string{"", "  literal \"double\" and 'single'  ", "line\nβ", "same", "same", ""}
+	entrypoint := []string{"/bin/echo", ""}
+	next, err := applyEditToContainerConfig(cfg, hc.PortBindings, types.ContainerEdit{
+		Command:    new(command),
+		Entrypoint: new(entrypoint),
+	})
+	require.NoError(t, err)
+	require.Equal(t, command, next.Cmd)
+	require.Equal(t, entrypoint, next.Entrypoint)
 }
 
 func TestMergeEditMountsPreservesMountOptions(t *testing.T) {

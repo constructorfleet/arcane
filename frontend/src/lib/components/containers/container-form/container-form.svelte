@@ -6,6 +6,7 @@
 	import KeyValueEditor from '#lib/components/form/key-value-editor.svelte';
 	import NetworkAttachmentEditor from '#lib/components/form/network-attachment-editor.svelte';
 	import PortMappingEditor from '#lib/components/form/port-mapping-editor.svelte';
+	import RowListEditor from '#lib/components/form/row-list-editor.svelte';
 	import SearchableSelect from '#lib/components/form/searchable-select.svelte';
 	import SelectWithLabel from '#lib/components/form/select-with-label.svelte';
 	import VolumeMountEditor from '#lib/components/form/volume-mount-editor.svelte';
@@ -15,6 +16,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
+	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { CloseIcon, ContainersIcon, NetworksIcon, SettingsIcon, VariableIcon, VolumesIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
@@ -230,20 +232,39 @@
 								<p class="text-xs text-muted-foreground">{m.image_pull_if_missing_note()}</p>
 							{/if}
 						</div>
-						<FormInput
-							label={m.common_command()}
-							type="text"
-							placeholder={m.container_command_placeholder()}
-							disabled={submitting}
-							bind:input={inputs.command}
-						/>
-						<FormInput
-							label={m.common_entrypoint()}
-							type="text"
-							placeholder="/docker-entrypoint.sh"
-							disabled={submitting}
-							bind:input={inputs.entrypoint}
-						/>
+						<p class="text-xs text-muted-foreground lg:col-span-2">{m.literal_arguments_description()}</p>
+						<fieldset class="space-y-2">
+							<legend class="text-sm font-medium">{m.common_command()}</legend>
+							<RowListEditor
+								bind:rows={rows.command}
+								createRow={() => ({ value: '' })}
+								disabled={submitting}
+								addLabel={m.add_argument()}
+							>
+								{#snippet children(argument)}
+									<Textarea aria-label={m.argument()} bind:value={argument.value} rows={2} mono disabled={submitting} />
+								{/snippet}
+							</RowListEditor>
+						</fieldset>
+						<fieldset class="space-y-2">
+							<legend class="text-sm font-medium">{m.common_entrypoint()}</legend>
+							<RowListEditor
+								bind:rows={rows.entrypoint}
+								createRow={() => ({ value: '' })}
+								disabled={submitting}
+								addLabel={m.add_argument()}
+							>
+								{#snippet children(argument)}
+									<Textarea
+										aria-label={m.entrypoint_argument()}
+										bind:value={argument.value}
+										rows={2}
+										mono
+										disabled={submitting}
+									/>
+								{/snippet}
+							</RowListEditor>
+						</fieldset>
 						<FormInput
 							label={m.common_working_directory()}
 							type="text"
