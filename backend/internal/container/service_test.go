@@ -485,8 +485,18 @@ func setupProjectTestDB(t *testing.T) *database.DB {
 
 func TestApplyEditPreservesUnmanagedSettings(t *testing.T) {
 	cfg := container.Config{
-		Image:        "nginx:1.25",
-		Env:          []string{"OLD=1"},
+		Image:      "nginx:1.25",
+		Env:        []string{"OLD=1"},
+		Cmd:        []string{"-c", "", "  literal \"quote with spaces\"  "},
+		Entrypoint: []string{"/bin/echo", ""},
+		Healthcheck: &container.HealthConfig{
+			Test:          []string{"CMD", "/bin/echo", "literal $VALUE", ""},
+			Interval:      time.Minute,
+			Timeout:       7 * time.Second,
+			StartPeriod:   10 * time.Second,
+			StartInterval: 3 * time.Second,
+			Retries:       4,
+		},
 		StopSignal:   "SIGQUIT",
 		ExposedPorts: network.PortSet{network.MustParsePort("80/tcp"): {}, network.MustParsePort("9000/tcp"): {}},
 	}
@@ -507,6 +517,16 @@ func TestApplyEditPreservesUnmanagedSettings(t *testing.T) {
 	require.NoError(t, applyEditToHostConfig(&hc, req))
 
 	require.Equal(t, []string{"NEW=1"}, cfg.Env)
+	require.Equal(t, []string{"-c", "", "  literal \"quote with spaces\"  "}, cfg.Cmd)
+	require.Equal(t, []string{"/bin/echo", ""}, cfg.Entrypoint)
+	require.Equal(t, &container.HealthConfig{
+		Test:          []string{"CMD", "/bin/echo", "literal $VALUE", ""},
+		Interval:      time.Minute,
+		Timeout:       7 * time.Second,
+		StartPeriod:   10 * time.Second,
+		StartInterval: 3 * time.Second,
+		Retries:       4,
+	}, cfg.Healthcheck)
 	require.Equal(t, "SIGQUIT", cfg.StopSignal)
 	require.Equal(t, map[string]string{"net.core.somaxconn": "1024"}, hc.Sysctls)
 	require.Equal(t, "json-file", hc.LogConfig.Type)

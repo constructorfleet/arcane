@@ -29,9 +29,9 @@
 
 	const queryClient = useQueryClient();
 	// The form is intentionally seeded once from the load-time snapshot.
-	// svelte-ignore state_referenced_locally
-	const form = createForm<typeof containerFormSchema>(containerFormSchema, formValuesFromEditConfig(data.editConfig));
-	let rows = $state(untrack(() => rowsFromEditConfig(data.editConfig)));
+	const initialConfig = untrack(() => structuredClone(data.editConfig));
+	const form = createForm<typeof containerFormSchema>(containerFormSchema, formValuesFromEditConfig(initialConfig));
+	let rows = $state(untrack(() => rowsFromEditConfig(initialConfig)));
 
 	const editContainerMutation = createMutation(() => ({
 		mutationFn: (request: ContainerEdit) => containerService.editContainer(data.containerId, request, data.envId),
@@ -51,7 +51,7 @@
 	function handleSubmit() {
 		const values = form.validate();
 		if (!values) return;
-		const request = toEditRequest(values, rows);
+		const request = toEditRequest(values, rows, initialConfig);
 		openConfirmDialog({
 			title: m.edit_confirm_title(),
 			message: m.edit_confirm_message({ name: data.editConfig.name }),

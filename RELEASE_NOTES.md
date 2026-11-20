@@ -1,6 +1,6 @@
-# 3.0.1-cf.52
+# 3.0.1-cf.53
 
-- Edit Docker service Command and Args as individual literal arguments rather than splitting a flat string on spaces (#123). Preserve spaces, quotes, newlines and intentionally empty entries.
-- Removing every row restores the image default for that field; untouched arrays and other native service fields retain their existing preservation behavior.
+- Preserve untouched standalone-container command, entrypoint and healthcheck settings during edits by omitting them from the recreate request (#125). Keep empty arguments, native exec healthchecks and unexposed healthcheck options intact.
+- Changing healthcheck timing retains an unchanged exec Test vector and existing StartInterval. Explicit mode/test edits and resets keep their current behavior.
 
-Validation exercises the actual service-editor form and submitted native spec with boundary cases and metadata-only edits. Live acceptance will use only an owned zero-task service; no production command or workload is changed. Broader Compose/GUI fidelity remains #28.
+Validation exercises the actual owning form against native-array, healthcheck, timing and reset cases; live acceptance will use an owned disposable container. No production container is edited or recreated. Intentional standalone argument authoring still uses the existing text syntax; broader #28 remains open.

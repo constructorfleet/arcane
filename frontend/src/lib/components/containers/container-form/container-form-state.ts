@@ -381,9 +381,38 @@ export function toCreateRequest(values: ContainerFormValues, rows: ContainerForm
 	};
 }
 
-// The edit request always carries every form-owned section (empty included);
-// the backend preserves anything the form does not own.
-export function toEditRequest(values: ContainerFormValues, rows: ContainerFormRows): ContainerEdit {
+// Execution settings are omitted when unchanged so the backend preserves them.
+// Other form-owned sections always include empty values to allow clearing.
+export function toEditRequest(
+	values: ContainerFormValues,
+	rows: ContainerFormRows,
+	original: ContainerEditConfig
+): ContainerEdit {
+	const initial = formValuesFromEditConfig(original);
+	let command: string[] | undefined;
+	if (values.command.trim() !== initial.command.trim()) {
+		command = splitShellWords(values.command.trim());
+	}
+	let entrypoint: string[] | undefined;
+	if (values.entrypoint.trim() !== initial.entrypoint.trim()) {
+		entrypoint = splitShellWords(values.entrypoint.trim());
+	}
+
+	const healthFields = ['healthMode', 'healthInterval', 'healthTimeout', 'healthStartPeriod', 'healthRetries'] as const;
+	const healthTestChanged = values.healthTest.trim() !== initial.healthTest.trim();
+	let healthcheck: ContainerHealthcheckCreate | undefined;
+	let clearHealthcheck = false;
+	if (healthTestChanged || healthFields.some((field) => values[field] !== initial[field])) {
+		healthcheck = buildHealthcheck(values);
+		clearHealthcheck = values.healthMode === 'inherit';
+		if (healthcheck && values.healthMode === 'custom' && original.healthcheck) {
+			healthcheck = { ...structuredClone(original.healthcheck), ...healthcheck };
+			if (!healthTestChanged && initial.healthMode === 'custom') {
+				healthcheck.test = original.healthcheck.test?.slice();
+			}
+		}
+	}
+
 	const hostConfig: ContainerHostConfigEdit = {
 		binds: buildBinds(rows),
 		mounts: buildMounts(rows),
@@ -406,12 +435,12 @@ export function toEditRequest(values: ContainerFormValues, rows: ContainerFormRo
 		workingDir: values.workingDir.trim(),
 		user: values.user.trim(),
 		hostname: values.hostname.trim(),
-		command: splitShellWords(values.command.trim()),
-		entrypoint: splitShellWords(values.entrypoint.trim()),
+		command,
+		entrypoint,
 		environment: buildEnv(rows),
 		labels: buildLabels(rows),
-		healthcheck: values.healthMode === 'inherit' ? undefined : buildHealthcheck(values),
-		clearHealthcheck: values.healthMode === 'inherit',
+		healthcheck,
+		clearHealthcheck,
 		hostConfig,
 		networkingConfig: { endpointsConfig: buildEndpoints(rows) }
 	};
