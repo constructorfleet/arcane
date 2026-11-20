@@ -154,6 +154,9 @@ control-plane/global-agent architecture before being marked complete.
 - [ ] CMP-07 — Preserve source Compose, associated files, deployment history, and enough provenance to explain live drift.
 - [x] CMP-08 — Launch standalone containers from the UI through an explicitly selected node agent. cf.23 owned swarm03 launch and native command/resource/security settings matched; cf.26 also accepted 0.1 CPU creation and 0.25 CPU editing with exact native NanoCPUs (#69 closed).
 - [x] CMP-09 — Preserve full current native service Spec, resource IDs, network and source bytes/permissions on an unchanged-source UI Save. cf.68 owned zero-task acceptance passed (#144); general Compose and running-consumer round trips remain open.
+- [ ] CMP-10 — Navigate from a project's files/services to its container without a route-data error. cf.69 reproduced undefined.data during the client transition; cold reload succeeded (#150). Captured mounted-page cache keys pass the isolated transition; live acceptance remains pending.
+
+cf.69 project lifecycle acceptance: ordinary UI Create→Up→Check→Destroy produced exact owned image-check counts 0→1→0 and removed the project, source, container and private bridge (#167 closed/verified). Read-only exact-project SQLite counts required no manual cleanup. All19 core Specs and40 task IDs matched the accepted69 baseline after cleanup; no fixture remains. This does not sweep existing orphan records or establish concurrent-check cleanup.
 
 Status: cf.23 owned Swarm stack create/Edit/Save passed through explicitly selected
 swarm03. Original anchor/merge and synthetic `.env` input survived Source refresh;

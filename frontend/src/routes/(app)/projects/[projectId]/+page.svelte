@@ -1324,6 +1324,9 @@
 	onMount(() => {
 		let active = true;
 		const cache = queryClient.getQueryCache();
+		// Route data can disappear before this mounted page unsubscribes.
+		const workspaceQueryKey = queryKeys.projects.workspace(envId, projectId);
+		const detailQueryKey = queryKeys.projects.detail(envId, projectId);
 		const loadAfterUpdate = async () => {
 			await tick();
 			if (!active) return;
@@ -1332,9 +1335,9 @@
 		};
 		const unsubscribe = cache.subscribe((event) => {
 			if (event.type !== 'updated' || (event.action.type !== 'success' && event.action.type !== 'error')) return;
-			const workspace = cache.findAll({ queryKey: queryKeys.projects.workspace(envId, projectId) });
+			const workspace = cache.findAll({ queryKey: workspaceQueryKey });
 			const detail = cache.find({
-				queryKey: queryKeys.projects.detail(envId, projectId),
+				queryKey: detailQueryKey,
 				exact: true
 			});
 			if (workspace.includes(event.query) || event.query === detail) void loadAfterUpdate();

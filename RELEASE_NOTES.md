@@ -1,9 +1,9 @@
-# 3.0.1-cf.69
+# 3.0.1-cf.70
 
-- Remove saved image-update checks for the exact deleted project in the existing project-metadata transaction (#167). Other project, global image, container and reference checks remain intact.
-- The shared deletion helper also covers existing filesystem reconciliation and failed-create rollback callers. No new lifecycle service, schema migration or legacy-orphan purge is introduced.
-- Reconcile the checklist with verified cf.67 revision retention and cf.68 unchanged-source Save acceptance (#147/#144); full project-route QA remains #150.
+- Keep a mounted project's cache observer scoped to the query keys captured when it mounts (#150 / CMP-10). A cache update during navigation no longer reads disappearing route data before the observer unsubscribes.
+- Preserve existing project/environment editor resets, cache filtering and delayed-work cancellation. No layout, router, dependency or API changes are required.
+- Record cf.69's verified project-check cleanup: ordinary Check→Destroy removed the owned check record, project, source, container and bridge (#167).
 
-Validation: extended existing project-destruction coverage reproduces two orphaned check rows on canonical cf.68. The correction removes those rows, preserves four unrelated scopes, rolls project/check deletion back on transaction failure, and retains checks/files/project state after failed Compose down. Focused owning checks pass; full format/lint, owning-package checks and release validation are recorded in the PR.
+Validation: actual pinned SvelteKit Root/Props/RenderNode and project layout, with the exact mounted project cache callback and an isolated cache emitter, reproduce the live undefined.data error before the fix. Captured keys avoid the error under both transition orders and preserve project/environment remounts and query scopes. Full format/lint, production frontend build and required CI are recorded in the PR.
 
-No live project was created to reproduce this finding, and no production database cleanup was performed. Release/runtime and live owned-project lifecycle acceptance remain pending. Existing orphaned records are not purged; the rollback check covers database metadata.
+The live cf.69 client transition failed; a cold reload of the same URL succeeded. The owned fixture was fully cleaned and the final core/runtime gate passed. This release's live navigation acceptance remains pending. The reproduction uses a page subset and synthetic cache events, not the complete router or an auto-update installation. The separate debug webhook redaction finding remains #169.
