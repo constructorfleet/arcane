@@ -446,6 +446,9 @@ export function toEditRequest(
 		healthcheck,
 		clearHealthcheck,
 		hostConfig,
-		networkingConfig: { endpointsConfig: buildEndpoints(rows) }
+		networkingConfig:
+			JSON.stringify(rows.networks) === JSON.stringify(rowsFromEditConfig(original).networks)
+				? undefined
+				: { endpointsConfig: buildEndpoints(rows) }
 	};
 }

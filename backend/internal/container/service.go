@@ -193,9 +193,11 @@ func buildCleanNetworkingConfig(containerInspect container.InspectResponse, apiV
 		}
 
 		endpointsConfig[networkName] = &network.EndpointSettings{ //exhaustruct:enforce
-			IPAMConfig:          nil,
-			Links:               endpoint.Links,
-			Aliases:             endpoint.Aliases,
+			IPAMConfig: endpoint.IPAMConfig,
+			Links:      endpoint.Links,
+			Aliases: slices.DeleteFunc(endpoint.Aliases, func(alias string) bool {
+				return alias == "" || len(containerInspect.ID) >= 12 && alias == containerInspect.ID[:12]
+			}),
 			DriverOpts:          endpoint.DriverOpts,
 			GwPriority:          endpoint.GwPriority,
 			NetworkID:           endpoint.NetworkID,

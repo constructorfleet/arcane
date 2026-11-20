@@ -1,6 +1,6 @@
-# 3.0.1-cf.55
+# 3.0.1-cf.56
 
-- Preserve untouched standalone memory and memory-plus-swap limits by omitting them from unrelated edits (#129). Display fractional MiB values without rounding away native bytes.
-- Support Docker's -1 unlimited-swap sentinel in create/edit forms, with guidance and validation for the supported negative value. Explicit zero still resets the swap setting.
+- Preserve native network attachments when a standalone-container edit leaves the network rows untouched (#130). Omit the frontend network replacement and retain explicit IPv4/IPv6/link-local IPAM through the shared backend recreation path used by edit, redeploy and rollback.
+- Keep the existing Docker API compatibility sanitization and clone native endpoint settings rather than aliasing inspected data. Filter the previous container’s generated short-ID alias so the daemon can regenerate it.
 
-Validation covers the actual owning form, untouched native values and intentional resource edits. Live acceptance uses only an owned isolated container; no production workload is edited. Broader #28 remains open.
+Validation covers actual owning form payloads and the existing backend network-edit test. This bounded fix preserves untouched networking; intentional network-row edits retain the existing replacement contract. Full IPv6/link-local authoring and reset controls remain follow-up work under #28. No production network is changed for QA.

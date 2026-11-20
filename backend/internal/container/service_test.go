@@ -315,13 +315,17 @@ func TestBuildContainerFilterAccessors_FiltersByStatus(t *testing.T) {
 
 func TestBuildCleanNetworkingConfigPreservesEndpointSettings(t *testing.T) {
 	containerInspect := container.InspectResponse{
+		ID: "0123456789abcdef",
 		NetworkSettings: &container.NetworkSettings{
 			Networks: map[string]*network.EndpointSettings{
 				"bridge": {
-					Aliases:    []string{"svc"},
+					Aliases:    []string{"svc", "", "0123456789ab"},
 					IPAddress:  netip.MustParseAddr("172.17.0.2"),
+					MacAddress: network.HardwareAddr{0x02, 0x42, 0xac, 0x11, 0x00, 0x02},
 					IPAMConfig: &network.EndpointIPAMConfig{IPv4Address: netip.MustParseAddr("172.17.0.5")},
 				},
+				"dynamic": {IPAddress: netip.MustParseAddr("10.6.0.8")},
+				"empty":   nil,
 			},
 		},
 	}
@@ -331,7 +335,15 @@ func TestBuildCleanNetworkingConfigPreservesEndpointSettings(t *testing.T) {
 	require.Contains(t, out.EndpointsConfig, "bridge")
 	require.Equal(t, []string{"svc"}, out.EndpointsConfig["bridge"].Aliases)
 	require.Equal(t, netip.MustParseAddr("172.17.0.2"), out.EndpointsConfig["bridge"].IPAddress)
-	require.Nil(t, out.EndpointsConfig["bridge"].IPAMConfig)
+	require.Equal(t, containerInspect.NetworkSettings.Networks["bridge"].IPAMConfig, out.EndpointsConfig["bridge"].IPAMConfig)
+	require.NotSame(t, containerInspect.NetworkSettings.Networks["bridge"].IPAMConfig, out.EndpointsConfig["bridge"].IPAMConfig)
+	require.Equal(t, []string{"svc", "", "0123456789ab"}, containerInspect.NetworkSettings.Networks["bridge"].Aliases)
+	require.Equal(t, containerInspect.NetworkSettings.Networks["bridge"].MacAddress, out.EndpointsConfig["bridge"].MacAddress)
+	require.Nil(t, out.EndpointsConfig["dynamic"].IPAMConfig)
+	require.Nil(t, out.EndpointsConfig["empty"])
+	oldAPI := buildCleanNetworkingConfig(containerInspect, "1.43")
+	require.Nil(t, oldAPI.EndpointsConfig["bridge"].MacAddress)
+	require.NotNil(t, containerInspect.NetworkSettings.Networks["bridge"].MacAddress)
 }
 
 func TestCompareContainerPortsForSortDesc_KeepsContainersWithoutPortsLast(t *testing.T) {
@@ -698,7 +710,14 @@ func TestBuildEditNetworkingConfig(t *testing.T) {
 		HostConfig: &container.HostConfig{NetworkMode: "my-net"},
 		NetworkSettings: &container.NetworkSettings{
 			Networks: map[string]*network.EndpointSettings{
-				"my-net": {Aliases: []string{"svc"}, DNSNames: []string{"svc"}},
+				"my-net": {
+					Aliases: []string{"svc"}, DNSNames: []string{"svc"},
+					IPAMConfig: &network.EndpointIPAMConfig{
+						IPv4Address:  netip.MustParseAddr("10.5.0.8"),
+						IPv6Address:  netip.MustParseAddr("fd00:5::8"),
+						LinkLocalIPs: []netip.Addr{netip.MustParseAddr("fe80::8")},
+					},
+				},
 			},
 		},
 	}
@@ -708,6 +727,9 @@ func TestBuildEditNetworkingConfig(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	require.Contains(t, out.EndpointsConfig, "my-net")
+	require.Equal(t, containerInspect.NetworkSettings.Networks["my-net"].IPAMConfig, out.EndpointsConfig["my-net"].IPAMConfig)
+	require.NotSame(t, containerInspect.NetworkSettings.Networks["my-net"].IPAMConfig, out.EndpointsConfig["my-net"].IPAMConfig)
+	require.NotSame(t, &containerInspect.NetworkSettings.Networks["my-net"].IPAMConfig.LinkLocalIPs[0], &out.EndpointsConfig["my-net"].IPAMConfig.LinkLocalIPs[0])
 
 	req := &types.ContainerNetworkingConfigCreate{
 		EndpointsConfig: map[string]types.ContainerEndpointSettingsCreate{
