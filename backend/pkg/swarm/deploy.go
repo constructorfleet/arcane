@@ -9,8 +9,11 @@ import (
 	"strings"
 
 	composegotypes "github.com/compose-spec/compose-go/v2/types"
+	"github.com/distribution/reference"
 	"github.com/moby/moby/api/types/swarm"
 	dockerclient "github.com/moby/moby/client"
+
+	"kit.getarcane.app"
 
 	"getarcane.dev/arcane/v3/pkg/projects"
 	"getarcane.dev/types/v3"
@@ -232,7 +235,7 @@ func updateSwarmService(
 	}
 	queryRegistry := encodedRegistryAuth != "" || shouldQueryRegistryOnUpdate(resolveMode, existing, spec)
 	if !queryRegistry {
-		preserveExistingResolvedImage(&spec, existing)
+		preserveExistingImageResolution(&spec, existing)
 	}
 	// Do not force task rescheduling on no-op updates.
 	spec.TaskTemplate.ForceUpdate = existing.Spec.TaskTemplate.ForceUpdate
@@ -280,9 +283,8 @@ func shouldQueryRegistryOnUpdate(resolveMode string, existing swarm.Service, des
 	case resolveImageAlways:
 		return true
 	case resolveImageChanged:
-		desiredImage := stripImageDigest(resolveServiceImage(desired))
-		existingImage := stripImageDigest(resolveServiceImage(existing.Spec))
-		return desiredImage != "" && desiredImage != existingImage
+		desiredImage := strings.TrimSpace(resolveServiceImage(desired))
+		return desiredImage != "" && !serviceImagesMatch(desiredImage, resolveServiceImage(existing.Spec))
 	default:
 		return false
 	}
@@ -295,18 +297,42 @@ func resolveServiceImage(spec swarm.ServiceSpec) string {
 	return spec.TaskTemplate.ContainerSpec.Image
 }
 
-func preserveExistingResolvedImage(spec *swarm.ServiceSpec, existing swarm.Service) {
+func preserveExistingImageResolution(spec *swarm.ServiceSpec, existing swarm.Service) {
 	if spec.TaskTemplate.ContainerSpec == nil || existing.Spec.TaskTemplate.ContainerSpec == nil {
 		return
 	}
-	if stripImageDigest(resolveServiceImage(*spec)) == stripImageDigest(resolveServiceImage(existing.Spec)) {
+	if serviceImagesMatch(resolveServiceImage(*spec), resolveServiceImage(existing.Spec)) {
 		spec.TaskTemplate.ContainerSpec.Image = existing.Spec.TaskTemplate.ContainerSpec.Image
+		if existing.Spec.TaskTemplate.Placement == nil || len(existing.Spec.TaskTemplate.Placement.Platforms) == 0 {
+			return
+		}
+		placement := kit.FromPtr(spec.TaskTemplate.Placement)
+		spec.TaskTemplate.Placement = &swarm.Placement{
+			Constraints: placement.Constraints,
+			Preferences: placement.Preferences,
+			MaxReplicas: placement.MaxReplicas,
+			Platforms:   slices.Clone(existing.Spec.TaskTemplate.Placement.Platforms),
+		}
 	}
 }
 
-func stripImageDigest(image string) string {
-	image, _, _ = strings.Cut(strings.TrimSpace(image), "@")
-	return image
+func serviceImagesMatch(desired, existing string) bool {
+	desired = strings.TrimSpace(desired)
+	existing = strings.TrimSpace(existing)
+	// A tag-only source can retain its resolved digest; an explicit pin must match.
+	if !strings.Contains(desired, "@") {
+		existing, _, _ = strings.Cut(existing, "@")
+	}
+	desiredRef, desiredErr := reference.ParseNormalizedNamed(desired)
+	existingRef, existingErr := reference.ParseNormalizedNamed(existing)
+	if desiredErr != nil || existingErr != nil {
+		return desired == existing
+	}
+	if desiredPin, pinned := desiredRef.(reference.Canonical); pinned {
+		existingPin, existingPinned := existingRef.(reference.Canonical)
+		return existingPinned && reference.FamiliarName(desiredRef) == reference.FamiliarName(existingRef) && desiredPin.Digest() == existingPin.Digest()
+	}
+	return reference.FamiliarString(reference.TagNameOnly(desiredRef)) == reference.FamiliarString(reference.TagNameOnly(existingRef))
 }
 
 func resolveRegistryAuthForSpec(
