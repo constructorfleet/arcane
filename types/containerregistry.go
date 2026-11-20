@@ -5,6 +5,10 @@ import (
 )
 
 type (
+	ContainerRegistryNamespace struct {
+		Name string `json:"name"`
+	}
+
 	ContainerRegistryRepository struct {
 		Name string `json:"name"`
 	}

@@ -16,12 +16,13 @@ type (
 	}
 
 	ListRegistryRepositoriesInput struct {
-		ID     string `path:"id" doc:"Registry ID"`
-		Search string `query:"search" doc:"Search query"`
-		Sort   string `query:"sort" doc:"Column to sort by"`
-		Order  string `query:"order" default:"asc" doc:"Sort direction"`
-		Start  int    `query:"start" default:"0" doc:"Start index"`
-		Limit  int    `query:"limit" default:"20" doc:"Items per page"`
+		ID        string `path:"id" doc:"Registry ID"`
+		Namespace string `query:"namespace" doc:"Namespace/project to browse"`
+		Search    string `query:"search" doc:"Search query"`
+		Sort      string `query:"sort" doc:"Column to sort by"`
+		Order     string `query:"order" default:"asc" doc:"Sort direction"`
+		Start     int    `query:"start" default:"0" doc:"Start index"`
+		Limit     int    `query:"limit" default:"20" doc:"Items per page"`
 	}
 
 	ListRegistryTagsInput struct {
@@ -45,10 +46,26 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
+func (h *Handler) ListNamespaces(ctx context.Context, input *ListRegistryRepositoriesInput) (*handlerutil.Page[types.ContainerRegistryNamespace], error) {
+	params := handlerutil.PaginationParams(input.Start, input.Limit, input.Sort, input.Order, input.Search)
+	items, paging, err := h.service.ListNamespaces(ctx, input.ID, params)
+	if err != nil {
+		apiErr := common.ToAPIError(err)
+		return nil, huma.NewError(apiErr.HTTPStatus(), "Failed to discover namespaces: "+err.Error())
+	}
+	return &handlerutil.Page[types.ContainerRegistryNamespace]{
+		Body: types.Paginated[types.ContainerRegistryNamespace]{
+			Success:    true,
+			Data:       items,
+			Pagination: handlerutil.PaginationResponse(paging),
+		},
+	}, nil
+}
+
 func (h *Handler) ListRepositories(ctx context.Context, input *ListRegistryRepositoriesInput) (*handlerutil.Page[types.ContainerRegistryRepository], error) {
 	params := handlerutil.PaginationParams(input.Start, input.Limit, input.Sort, input.Order, input.Search)
 
-	repositories, paginationResp, err := h.service.ListRepositories(ctx, input.ID, params)
+	repositories, paginationResp, err := h.service.ListRepositories(ctx, input.ID, input.Namespace, params)
 	if err != nil {
 		apiErr := common.ToAPIError(err)
 		return nil, huma.NewError(apiErr.HTTPStatus(), "Failed to list repositories: "+err.Error())

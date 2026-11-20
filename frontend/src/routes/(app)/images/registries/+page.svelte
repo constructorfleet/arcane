@@ -174,6 +174,7 @@
 					<Dialog.Title>{m.registries_info_title()}</Dialog.Title>
 					<Dialog.Description>{m.registries_info_description()}</Dialog.Description>
 				</Dialog.Header>
+				<p class="pt-4 text-sm text-muted-foreground">{m.namespace_discovery_help()}</p>
 				<div class="grid grid-cols-1 gap-6 py-4 md:grid-cols-2">
 					<div class="space-y-3">
 						<h4 class="text-sm font-medium">{m.registries_popular_public_title()}</h4>

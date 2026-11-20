@@ -38,11 +38,13 @@ type (
 		lookupContext func(ctx context.Context) (context.Context, context.CancelFunc)
 		transport     http.RoundTripper
 		names         *cache.Cache[string, []string]
+		providers     *cache.Cache[string, string]
 	}
 
 	target struct {
 		registry name.Registry
 		// prefix is the repository namespace configured in the registry URL, if any.
+		auth        authn.Authenticator
 		prefix      string
 		cacheKey    string
 		nameOptions []name.Option
@@ -65,6 +67,7 @@ func NewService(
 		resolve:       resolve,
 		lookupContext: lookupContext,
 		transport:     roundTripper,
+		providers:     &cache.Cache[string, string]{Capacity: 256, TTL: browseListCacheTTL},
 		names: &cache.Cache[string, []string]{
 			Capacity: 256,
 			TTL:      browseListCacheTTL,
@@ -87,7 +90,7 @@ func (s *Service) cachedNames(key string, list func() ([]string, error)) ([]stri
 	return names, nil
 }
 
-func (s *Service) ListRepositories(ctx context.Context, id string, params pagination.QueryParams) (listed []types.ContainerRegistryRepository, paging pagination.Response, listErr error) {
+func (s *Service) ListRepositories(ctx context.Context, id, namespace string, params pagination.QueryParams) (listed []types.ContainerRegistryRepository, paging pagination.Response, listErr error) {
 	ctx, span := otel.Tracer(logging.InstrumentationName).Start(ctx, "registry.list_repositories", trace.WithAttributes(attribute.String("arcane.registry.id", id)))
 	defer func() {
 		span.SetAttributes(attribute.Int("arcane.result.count", len(listed)))
@@ -102,15 +105,14 @@ func (s *Service) ListRepositories(ctx context.Context, id string, params pagina
 		return nil, pagination.Response{}, err
 	}
 
-	names, err := s.cachedNames(target.cacheKey, func() ([]string, error) {
-		return remote.Catalog(lookupCtx, target.registry, target.options...)
-	})
+	names, err := s.repositoryNames(lookupCtx, target, namespace)
+	if errors.Is(err, common.ErrValidation) {
+		return nil, pagination.Response{}, err
+	}
 	if err != nil {
 		return nil, pagination.Response{}, classifyBrowseError(err, "failed to list repositories")
 	}
-	page, response := paginateNames(slices.DeleteFunc(names, func(repositoryName string) bool {
-		return target.prefix != "" && !strings.HasPrefix(repositoryName, target.prefix+"/")
-	}), params)
+	page, response := paginateNames(names, params)
 	items := make([]types.ContainerRegistryRepository, 0, len(page))
 	for _, repositoryName := range page {
 		items = append(items, types.ContainerRegistryRepository{Name: repositoryName})
@@ -220,7 +222,8 @@ func (s *Service) target(ctx context.Context, id string) (*target, error) {
 	return &target{
 		registry:    registryName,
 		prefix:      prefix,
-		cacheKey:    fmt.Sprintf("%s\x00%s\x00%s\x00%t", id, reg.URL, reg.Username, reg.Insecure),
+		cacheKey:    fmt.Sprintf("%s\x00%s\x00%s\x00%t\x00%s", id, reg.URL, reg.Username, reg.Insecure, kit.SHA256Hex([]byte(kit.FromPtr(credential).Token))),
+		auth:        authn.FromConfig(authn.AuthConfig{Username: kit.FromPtr(credential).Username, Password: kit.FromPtr(credential).Token}),
 		nameOptions: kit.Ternary(reg.Insecure, []name.Option{name.StrictValidation, name.Insecure}, []name.Option{name.StrictValidation}),
 		options: append([]remote.Option{
 			remote.WithContext(ctx),

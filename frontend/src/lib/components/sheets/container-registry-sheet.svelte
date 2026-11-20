@@ -150,10 +150,10 @@
 		/>
 
 		<FormInput
-			label={m.registries_url()}
+			label={m.registry_host_or_namespace()}
 			type="text"
 			placeholder={m.registries_url_placeholder()}
-			description={m.registries_url_description()}
+			description={m.host_namespace_discovery_help()}
 			bind:input={form.inputs.url}
 		/>
 
@@ -203,7 +203,7 @@
 			type="textarea"
 			rows={3}
 			placeholder={m.registries_repository_names_placeholder()}
-			description={m.registries_repository_names_description()}
+			description={m.optional_repository_shortcuts()}
 			bind:input={form.inputs.repositoryNames}
 		/>
 		<SwitchWithLabel

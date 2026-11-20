@@ -1,5 +1,9 @@
 export type RegistryType = 'generic' | 'ecr';
 
+export interface ContainerRegistryNamespace {
+	name: string;
+}
+
 export interface ContainerRegistryRepository {
 	name: string;
 }

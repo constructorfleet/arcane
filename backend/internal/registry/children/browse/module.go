@@ -10,11 +10,21 @@ import (
 
 func RegisterRoutes(api huma.API, h *Handler) {
 	middleware.RegisterWithPermission(api, huma.Operation{
+		OperationID: "listContainerRegistryNamespaces",
+		Method:      "GET",
+		Path:        "/registries/{id}/namespaces",
+		Summary:     "Discover registry namespaces or projects",
+		Description: "Use the OCI catalog or an available Harbor project API with the saved registry credential",
+		Tags:        []string{"Container Registries"},
+		Security:    handlerutil.DefaultOperationSecurity(),
+	}, authz.PermRegistriesBrowse, h.ListNamespaces)
+
+	middleware.RegisterWithPermission(api, huma.Operation{
 		OperationID: "listContainerRegistryRepositories",
 		Method:      "GET",
 		Path:        "/registries/{id}/repositories",
 		Summary:     "List registry repositories",
-		Description: "List the repositories stored in a container registry through its catalog API",
+		Description: "List the repositories stored in a container registry through its catalog or provider discovery API",
 		Tags:        []string{"Container Registries"},
 		Security:    handlerutil.DefaultOperationSecurity(),
 	}, authz.PermRegistriesBrowse, h.ListRepositories)

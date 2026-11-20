@@ -3,6 +3,7 @@ import type {
 	ContainerRegistryPullUsageResponse,
 	ContainerRegistry,
 	ContainerRegistryRepository,
+	ContainerRegistryNamespace,
 	ContainerRegistryRepositoryTag
 } from '#lib/types/containerregistry.js';
 import type {
@@ -47,8 +48,18 @@ class ContainerRegistryService extends BaseAPIService {
 		return this.handleResponse(this.api.post(`/registries/${id}`, undefined, { params: { action: 'test' } }));
 	}
 
-	async getRepositories(id: string, options?: SearchPaginationSortRequest): Promise<Paginated<ContainerRegistryRepositoryRow>> {
+	async getNamespaces(id: string, options?: SearchPaginationSortRequest): Promise<Paginated<ContainerRegistryNamespace>> {
 		const params = transformPaginationParams(options);
+		const response = await this.api.get(`/registries/${id}/namespaces`, { params });
+		return response.data;
+	}
+
+	async getRepositories(
+		id: string,
+		options?: SearchPaginationSortRequest,
+		namespace = ''
+	): Promise<Paginated<ContainerRegistryRepositoryRow>> {
+		const params = { ...transformPaginationParams(options), ...(namespace ? { namespace } : {}) };
 		const res = await this.api.get(`/registries/${id}/repositories`, { params });
 		const page: Paginated<ContainerRegistryRepository> = res.data;
 		return { ...page, data: page.data.map((repository) => ({ ...repository, id: repository.name })) };

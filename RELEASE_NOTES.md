@@ -1,6 +1,9 @@
-# 3.0.1-cf.62
+# 3.0.1-cf.63
 
-- Compare normalized Docker image references when a Swarm stack source is saved. Equivalent Docker Hub full and familiar names no longer request image resolution or discard an existing resolved digest during source-only edits. Preserve its resolved platform metadata while applying the desired placement constraints and preferences.
-- Honor explicitly changed digest pins, including private registries, while treating equivalent repository/digest references alike regardless of decorative tags, instead of treating every digest for the same repository/tag as unchanged.
+- Discover registry namespaces/projects, then repositories and tags without entering every repository manually (#146 / #40). Standard Docker/OCI catalog browsing remains supported; when it is unavailable, an available Harbor project/repository API uses the existing saved credential.
+- Browse a specific project even when global project listing is denied, while retaining a configured URL namespace boundary. Known repositories remain an optional fallback for registries without discovery support. Add/Help guidance distinguishes host-only discovery, optional project scope and repository shortcuts.
+- Paginate namespaces and repositories; bound provider requests/responses and reject incomplete or repeated pages. Upstream authentication failures retain their category, credentials are not forwarded across redirects, and existing TLS/authentication settings remain unchanged.
 
-Validation: reproduced the cf.61 source-only save changing unrelated platform metadata on an owned zero-replica fixture. Isolated checks exercise the actual owning comparison/preservation functions across equivalent names, default tags, resolved tags, explicit pins and real repository/tag/registry changes. Existing Go, formatting, lint and release checks run before merge; live post-release revision and no-op acceptance remain required. No running production workload or real secret value was used for the reproduction.
+Validation: fake-HTTP registry business tests (including CLI-style and robot credentials, project-list denial, pagination, shared request budgets, malformed/oversized/incomplete responses and redirects); eight actual client-component DOM cases and nine owning-loader cases; ten frontend tests, production build, full format/lint and release tooling checks. Child UI/API boundaries are stubbed in isolated frontend checks.
+
+Live private-Harbor browsing with the user's existing connection is pending release/runtime acceptance. Project discovery remains subject to the registry account's permissions; no access is granted or credentials changed. No live registry writes, pulls or pushes were performed for this implementation.

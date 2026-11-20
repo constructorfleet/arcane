@@ -22,6 +22,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { containerRegistryService } from '#lib/services/container-registry-service.js';
+	import type { PaginationResponse } from '#lib/types/base.js';
 	import type { ContainerRegistryRepositoryTagRow } from '#lib/types/ui/containerregistry.js';
 	import { cn } from '#lib/utils.js';
 	import { extractApiErrorMessage } from '#lib/utils/api.js';
@@ -39,6 +40,7 @@
 	const registryLabel = $derived(registry.url || 'docker.io');
 	// Repository names already carry any namespace from the registry URL.
 	const repository = $derived(data.repository);
+	const namespace = $derived(data.namespace);
 	const tags = $derived(data.tags);
 	const canDeleteTags = $derived(hasShownPermission('registries:delete-tags'));
 	const canPullImages = $derived(hasShownPermission('images:pull'));
@@ -55,13 +57,22 @@
 	const configuredNames = $derived(
 		(registry.repositoryNames ?? []).map((name) => (registry.namespace ? `${registry.namespace}/${name}` : name))
 	);
-	const repositories = $derived(data.catalog?.data.map((item) => item.name) ?? configuredNames);
+	const repositories = $derived([
+		...new Set(
+			data.catalog?.data.map((item) => item.name) ??
+				configuredNames.filter((name) => !namespace || name.startsWith(namespace + '/'))
+		)
+	]);
 
-	function navigate(patch: { repository?: string; search?: string; page?: number }) {
+	function navigate(patch: { repository?: string; namespace?: string; view?: string; search?: string; page?: number }) {
 		const target = patch.repository ?? repository;
+		const targetNamespace = patch.namespace ?? namespace;
+		const view = patch.view ?? (data.allRepositories ? 'repositories' : '');
 		const search = patch.search ?? data.search;
 		const params = new URLSearchParams({
 			...(target ? { repository: target } : {}),
+			...(targetNamespace ? { namespace: targetNamespace } : {}),
+			...(view === 'repositories' ? { view } : {}),
 			...(search ? { search } : {}),
 			...((patch.page ?? 1) > 1 ? { page: String(patch.page) } : {})
 		});
@@ -82,6 +93,12 @@
 		} else if (value) {
 			navigate({ repository: value, search: '', page: 1 });
 		}
+	}
+
+	function openNamespace(event: SubmitEvent) {
+		event.preventDefault();
+		const name = String(new FormData(event.currentTarget as HTMLFormElement).get('namespace') ?? '').trim();
+		if (name) navigate({ namespace: name, repository: '', view: 'repositories', search: '', page: 1 });
 	}
 
 	function tagReference(tag: string) {
@@ -113,6 +130,7 @@
 		refreshing = true;
 		try {
 			const registries = queryKeys.containerRegistries;
+			await queryClient.invalidateQueries({ queryKey: registries.namespacesPrefix(registry.id), refetchType: 'none' });
 			await queryClient.invalidateQueries({ queryKey: registries.repositoriesPrefix(registry.id), refetchType: 'none' });
 			if (repository) {
 				await queryClient.invalidateQueries({ queryKey: registries.tagsPrefix(registry.id, repository), refetchType: 'none' });
@@ -190,8 +208,99 @@
 	]);
 </script>
 
+{#snippet browsePagination(paging: PaginationResponse)}
+	{#if paging.totalPages > 1}
+		<div class="flex items-center justify-between text-sm text-muted-foreground">
+			<span>{m.common_page_of({ page: paging.currentPage, total: paging.totalPages })}</span>
+			<div class="flex gap-2">
+				<ArcaneButton
+					action="base"
+					customLabel={m.common_previous()}
+					disabled={paging.currentPage <= 1}
+					onclick={() => navigate({ page: paging.currentPage - 1 })}
+				/>
+				<ArcaneButton
+					action="base"
+					customLabel={m.common_next()}
+					disabled={paging.currentPage >= paging.totalPages}
+					onclick={() => navigate({ page: paging.currentPage + 1 })}
+				/>
+			</div>
+		</div>
+	{/if}
+{/snippet}
+
+{#snippet namespaceNavigation()}
+	<div class="flex flex-wrap items-center gap-2">
+		<ArcaneButton
+			action="base"
+			customLabel={m.namespaces_projects()}
+			onclick={() => navigate({ namespace: '', repository: '', view: '', search: '', page: 1 })}
+		/>
+		{#if namespace}<span class="font-mono text-sm">/ {namespace}</span>{/if}
+		<ArcaneButton
+			action="base"
+			customLabel={m.all_repositories()}
+			onclick={() => navigate({ namespace: '', repository: '', view: 'repositories', search: '', page: 1 })}
+		/>
+	</div>
+{/snippet}
+
+{#snippet namespaceFallback()}
+	<form class="flex flex-wrap items-center gap-2" onsubmit={openNamespace}>
+		<InputGroup.Root class="min-w-0 flex-1 md:w-80 md:flex-none">
+			<InputGroup.Input name="namespace" aria-label={m.namespace_or_project()} placeholder={m.team_or_project()} />
+		</InputGroup.Root>
+		<ArcaneButton action="inspect" type="submit" customLabel={m.open_namespace_project()} />
+	</form>
+	<p class="text-sm text-muted-foreground">{m.project_browsing_without_listing_help()}</p>
+{/snippet}
+
+{#snippet namespaceGrid()}
+	<div class="space-y-4">
+		{@render namespaceNavigation()}
+		<h2 class="text-lg font-semibold">{m.namespaces_projects()}</h2>
+		<p class="text-sm text-muted-foreground">{m.choose_namespace_project_help()}</p>
+		<InputGroup.Root class="md:w-80">
+			<InputGroup.Addon><SearchIcon aria-hidden="true" /></InputGroup.Addon>
+			<InputGroup.Input
+				aria-label={m.common_search()}
+				value={data.search}
+				placeholder={m.common_search()}
+				oninput={(event) => search(event.currentTarget.value)}
+			/>
+		</InputGroup.Root>
+		<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+			{#each data.namespaces?.data ?? [] as item (item.name)}
+				<button
+					type="button"
+					class="flex items-center gap-3 rounded-xl border border-border/70 bg-card/10 p-4 text-left hover:bg-muted/40"
+					onclick={() => navigate({ namespace: item.name, repository: '', view: 'repositories', search: '', page: 1 })}
+				>
+					<RegistryIcon class="size-5 shrink-0 text-primary" /><span class="min-w-0 flex-1 truncate font-medium">{item.name}</span
+					><ArrowRightIcon class="size-4 shrink-0" />
+				</button>
+			{/each}
+		</div>
+		{#if data.namespaces?.data.length === 0}<EmptyState
+				icon={SearchIcon}
+				title={m.common_no_results_found()}
+				description={m.common_no_results_hint()}
+			/>{/if}
+		{#if data.namespaces}{@render browsePagination(data.namespaces.pagination)}{/if}
+		{@render namespaceFallback()}
+	</div>
+{/snippet}
+
 {#snippet repositoryGrid()}
 	<div class="space-y-4">
+		{@render namespaceNavigation()}
+		{#if data.namespaceError}
+			<Alert.Root variant="warning-subtle" size="sm" icon={AlertIcon}
+				><Alert.Description>{data.namespaceError}</Alert.Description></Alert.Root
+			>
+		{/if}
+		{@render namespaceFallback()}
 		<form class="flex flex-wrap items-center gap-2" onsubmit={submitRepositoryQuery}>
 			<InputGroup.Root class="min-w-0 flex-1 md:w-80 md:flex-none">
 				<InputGroup.Addon>
@@ -251,6 +360,7 @@
 					</button>
 				{/each}
 			</div>
+			{#if data.catalog}{@render browsePagination(data.catalog.pagination)}{/if}
 			{#if data.catalog && data.catalog.pagination.totalItems > repositories.length}
 				<p class="text-xs text-muted-foreground">
 					{m.common_showing_of_total({ shown: repositories.length, total: data.catalog.pagination.totalItems })}
@@ -275,7 +385,7 @@
 				<Breadcrumb.List>
 					<Breadcrumb.Item>
 						<Breadcrumb.Link onclick={() => navigate({ repository: '', search: '', page: 1 })} class="cursor-pointer">
-							{m.registries_repositories()}
+							{namespace || m.registries_repositories()}
 						</Breadcrumb.Link>
 					</Breadcrumb.Item>
 					<Breadcrumb.Separator />
@@ -427,6 +537,8 @@
 <ResourceDetailLayout backUrl="/images/registries" backLabel={m.registries_title()} title={registryLabel} {actions}>
 	{#if repository}
 		{@render tagList()}
+	{:else if data.namespaces && (data.namespaces.pagination.grandTotalItems ?? data.namespaces.pagination.totalItems) > 0}
+		{@render namespaceGrid()}
 	{:else}
 		{@render repositoryGrid()}
 	{/if}

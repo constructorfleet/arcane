@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -127,19 +128,88 @@ func TestService_ListRepositories(t *testing.T) {
 	ctx := t.Context()
 
 	id := registries.add(host, "", "")
-	repositories, page, err := svc.ListRepositories(ctx, id, browseParams(""))
+	repositories, page, err := svc.ListRepositories(ctx, id, "", browseParams(""))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"other/tool", "team/api", "team/web"}, repositoryNames(repositories))
 	assert.EqualValues(t, 3, page.TotalItems)
 
-	repositories, _, err = svc.ListRepositories(ctx, id, browseParams("web"))
+	repositories, _, err = svc.ListRepositories(ctx, id, "", browseParams("web"))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"team/web"}, repositoryNames(repositories))
 
 	namespacedID := registries.add("http://"+host+"/team/", "", "")
-	repositories, _, err = svc.ListRepositories(ctx, namespacedID, browseParams(""))
+	repositories, _, err = svc.ListRepositories(ctx, namespacedID, "", browseParams(""))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"team/api", "team/web"}, repositoryNames(repositories))
+	namespaces, _, err := svc.ListNamespaces(ctx, id, browseParams(""))
+	require.NoError(t, err)
+	require.Equal(t, []types.ContainerRegistryNamespace{{Name: "other"}, {Name: "team"}}, namespaces)
+	repositories, _, err = svc.ListRepositories(ctx, id, "team", browseParams(""))
+	require.NoError(t, err)
+	require.Equal(t, []string{"team/api", "team/web"}, repositoryNames(repositories))
+
+	t.Run("cached project provider keeps upstream auth categories", func(t *testing.T) {
+		status := http.StatusOK
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/v2/":
+				w.WriteHeader(http.StatusOK)
+			case "/v2/_catalog":
+				w.WriteHeader(http.StatusUnauthorized)
+			case "/api/v2.0/projects":
+				_, _ = io.WriteString(w, `[{"name":"team"}]`)
+			default:
+				w.WriteHeader(status)
+			}
+		}))
+		t.Cleanup(server.Close)
+		authProfiles := testRegistries{}
+		authID := authProfiles.add(server.URL, "user", "synthetic-only")
+		authService := newTestService(authProfiles)
+		_, _, discoveryErr := authService.ListNamespaces(t.Context(), authID, browseParams(""))
+		require.NoError(t, discoveryErr)
+		for _, code := range []int{http.StatusUnauthorized, http.StatusForbidden} {
+			status = code
+			_, _, discoveryErr = authService.ListRepositories(t.Context(), authID, "team", browseParams(""))
+			require.ErrorIs(t, discoveryErr, common.ErrBadRequest)
+			require.NotErrorIs(t, discoveryErr, common.ErrUnavailable)
+		}
+	})
+	t.Run("all-project repository enumeration shares a request budget", func(t *testing.T) {
+		apiCalls := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/v2/" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			if r.URL.Path == "/v2/_catalog" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			apiCalls++
+			if r.URL.Path == "/api/v2.0/projects" {
+				w.Header().Set("X-Total-Count", "100")
+				_, _ = io.WriteString(w, "[")
+				for i := 0; i < harborPageSize; i++ {
+					if i > 0 {
+						_, _ = io.WriteString(w, ",")
+					}
+					_, _ = fmt.Fprintf(w, `{"name":"project-%d"}`, i)
+				}
+				_, _ = io.WriteString(w, "]")
+				return
+			}
+			_, _ = io.WriteString(w, "[]")
+		}))
+		t.Cleanup(server.Close)
+		budgetProfiles := testRegistries{}
+		budgetID := budgetProfiles.add(server.URL, "", "")
+		budgetService := newTestService(budgetProfiles)
+		items, _, budgetErr := budgetService.ListRepositories(t.Context(), budgetID, "", browseParams(""))
+		require.ErrorContains(t, budgetErr, "request limit")
+		require.Nil(t, items)
+		require.Equal(t, maxDiscoveryPages, apiCalls)
+	})
 }
 
 func TestService_ListRepositoryTagsSingleImage(t *testing.T) {
@@ -261,13 +331,95 @@ func TestService_BrowseUsesStoredCredentials(t *testing.T) {
 	ctx := t.Context()
 
 	id := registries.add(host, "robot", "secret")
-	repositories, _, err := svc.ListRepositories(ctx, id, browseParams(""))
+	repositories, _, err := svc.ListRepositories(ctx, id, "", browseParams(""))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"private/app"}, repositoryNames(repositories))
 
 	anonymousID := registries.add(host, "", "")
-	_, _, err = svc.ListRepositories(ctx, anonymousID, browseParams(""))
-	assert.ErrorIs(t, err, common.ErrBadRequest)
+	_, _, err = svc.ListRepositories(ctx, anonymousID, "", browseParams(""))
+	require.ErrorIs(t, err, common.ErrBadRequest)
+	for _, username := range []string{"oidc-user", "robot$constructorfleet+reader"} {
+		t.Run(username, func(t *testing.T) {
+			projectCalls, repositoryCalls := 0, 0
+			expectedToken := "synthetic-cli-or-robot-secret"
+			denyProjects := false
+			harborServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/v2/" {
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+				if r.URL.Path == "/v2/_catalog" {
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				user, token, ok := r.BasicAuth()
+				if !ok || user != username || token != expectedToken {
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				assert.Equal(t, "100", r.URL.Query().Get("page_size"))
+				w.Header().Set("Content-Type", "application/json")
+				w.Header().Set("X-Total-Count", "2")
+				switch r.URL.Path {
+				case "/api/v2.0/projects":
+					projectCalls++
+					if denyProjects {
+						w.WriteHeader(http.StatusForbidden)
+						return
+					}
+					if r.URL.Query().Get("page") == "1" {
+						_, _ = io.WriteString(w, `[{"name":"constructorfleet"}]`)
+					} else {
+						_, _ = io.WriteString(w, `[{"name":"ajanis"}]`)
+					}
+				case "/api/v2.0/projects/constructorfleet/repositories":
+					repositoryCalls++
+					if r.URL.Query().Get("page") == "1" {
+						_, _ = io.WriteString(w, `[{"name":"constructorfleet/compass"}]`)
+					} else {
+						_, _ = io.WriteString(w, `[{"name":"constructorfleet/platform/api"}]`)
+					}
+				default:
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			t.Cleanup(harborServer.Close)
+			harborProfiles := testRegistries{}
+			harborID := harborProfiles.add(harborServer.URL, username, expectedToken)
+			harborService := newTestService(harborProfiles)
+			projects, harborPaging, harborErr := harborService.ListNamespaces(t.Context(), harborID, browseParams(""))
+			require.NoError(t, harborErr)
+			require.Equal(t, []types.ContainerRegistryNamespace{{Name: "ajanis"}, {Name: "constructorfleet"}}, projects)
+			require.EqualValues(t, 2, harborPaging.TotalItems)
+			repos, harborPaging, harborErr := harborService.ListRepositories(t.Context(), harborID, "constructorfleet", browseParams(""))
+			require.NoError(t, harborErr)
+			require.Equal(t, []string{"constructorfleet/compass", "constructorfleet/platform/api"}, repositoryNames(repos))
+			require.EqualValues(t, 2, harborPaging.TotalItems)
+			require.Equal(t, 2, projectCalls)
+			require.Equal(t, 2, repositoryCalls)
+			_, _, harborErr = harborService.ListRepositories(t.Context(), harborID, "constructorfleet", browseParams("compass"))
+			require.NoError(t, harborErr)
+			require.Equal(t, 2, repositoryCalls)
+			denyProjects = true
+			scopedID := harborProfiles.add(harborServer.URL+"/constructorfleet", username, expectedToken)
+			projects, _, harborErr = harborService.ListNamespaces(t.Context(), scopedID, browseParams(""))
+			require.NoError(t, harborErr)
+			require.Equal(t, []types.ContainerRegistryNamespace{{Name: "constructorfleet"}}, projects)
+			_, _, harborErr = harborService.ListRepositories(t.Context(), scopedID, "ajanis", browseParams(""))
+			require.Error(t, harborErr)
+			// Explicit project browsing does not need permission to list every project.
+			explicitID := harborProfiles.add(harborServer.URL, username, expectedToken)
+			repos, _, harborErr = harborService.ListRepositories(t.Context(), explicitID, "constructorfleet", browseParams(""))
+			require.NoError(t, harborErr)
+			require.Len(t, repos, 2)
+			expectedToken = "replacement-synthetic-secret"
+			credential := harborProfiles[harborID]
+			credential.Token = expectedToken
+			harborProfiles[harborID] = credential
+			_, _, harborErr = harborService.ListNamespaces(t.Context(), harborID, browseParams(""))
+			require.Error(t, harborErr, "a changed credential must not reuse the previous project's cache")
+		})
+	}
 }
 
 func TestService_BrowseErrors(t *testing.T) {
@@ -287,7 +439,7 @@ func TestService_BrowseErrors(t *testing.T) {
 		{
 			name: "unknown registry",
 			call: func(ctx context.Context) error {
-				_, _, err := svc.ListRepositories(ctx, "missing", browseParams(""))
+				_, _, err := svc.ListRepositories(ctx, "missing", "", browseParams(""))
 				return err
 			},
 			wantErr: common.ErrNotFound,
@@ -331,6 +483,63 @@ func TestService_BrowseErrors(t *testing.T) {
 			assert.ErrorIs(t, tt.call(t.Context()), tt.wantErr)
 		})
 	}
+	t.Run("project discovery failures and redirects remain failures", func(t *testing.T) {
+		redirected := 0
+		other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { redirected++; w.WriteHeader(http.StatusOK) }))
+		t.Cleanup(other.Close)
+		for _, mode := range []string{"denied", "missing", "html", "object", "redirect", "repeat", "partial", "oversize", "too-many-rows"} {
+			t.Run(mode, func(t *testing.T) {
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/v2/" {
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+					if r.URL.Path == "/v2/_catalog" {
+						w.WriteHeader(http.StatusUnauthorized)
+						return
+					}
+					switch mode {
+					case "denied":
+						w.WriteHeader(http.StatusForbidden)
+					case "missing":
+						w.WriteHeader(http.StatusNotFound)
+					case "html":
+						_, _ = io.WriteString(w, "<html>login page</html>")
+					case "object":
+						_, _ = io.WriteString(w, `{}`)
+					case "redirect":
+						http.Redirect(w, r, other.URL, http.StatusFound)
+					case "repeat":
+						w.Header().Set("X-Total-Count", "200")
+						_, _ = io.WriteString(w, `[{"name":"repeated"}]`)
+					case "partial":
+						w.Header().Set("X-Total-Count", "200")
+						_, _ = io.WriteString(w, `[]`)
+					case "oversize":
+						_, _ = io.WriteString(w, strings.Repeat(" ", maxDiscoveryResponseBytes+1))
+					case "too-many-rows":
+						_, _ = io.WriteString(w, "[")
+						for i := 0; i <= harborPageSize; i++ {
+							if i > 0 {
+								_, _ = io.WriteString(w, ",")
+							}
+							_, _ = fmt.Fprintf(w, `{"name":"project-%d"}`, i)
+						}
+						_, _ = io.WriteString(w, "]")
+					}
+				}))
+				t.Cleanup(server.Close)
+				failedProfiles := testRegistries{}
+				failedID := failedProfiles.add(server.URL, "synthetic-user", "synthetic-secret")
+				failedService := newTestService(failedProfiles)
+				items, _, err := failedService.ListNamespaces(t.Context(), failedID, browseParams(""))
+				require.Error(t, err)
+				require.Nil(t, items)
+				require.NotContains(t, err.Error(), "synthetic-secret")
+			})
+		}
+		require.Zero(t, redirected, "discovery must not forward credentials by following redirects")
+	})
 }
 
 func repositoryNames(repositories []types.ContainerRegistryRepository) []string {

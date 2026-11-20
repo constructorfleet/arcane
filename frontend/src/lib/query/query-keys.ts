@@ -127,9 +127,12 @@ export const queryKeys = {
 		list: (options: SearchPaginationSortRequest) => ['container-registries', stableSerialize(options)] as const,
 		pullUsage: () => ['container-registries', 'pull-usage'] as const,
 		detail: (registryId: string) => ['container-registries', 'detail', registryId] as const,
+		namespacesPrefix: (registryId: string) => ['container-registries', 'namespaces', registryId] as const,
+		namespaces: (registryId: string, options: SearchPaginationSortRequest) =>
+			['container-registries', 'namespaces', registryId, stableSerialize(options)] as const,
 		repositoriesPrefix: (registryId: string) => ['container-registries', 'repositories', registryId] as const,
-		repositories: (registryId: string, options: SearchPaginationSortRequest) =>
-			['container-registries', 'repositories', registryId, stableSerialize(options)] as const,
+		repositories: (registryId: string, options: SearchPaginationSortRequest, namespace = '') =>
+			['container-registries', 'repositories', registryId, namespace, stableSerialize(options)] as const,
 		tagsPrefix: (registryId: string, repository: string) => ['container-registries', 'tags', registryId, repository] as const,
 		tags: (registryId: string, repository: string, options: SearchPaginationSortRequest) =>
 			['container-registries', 'tags', registryId, repository, stableSerialize(options)] as const
