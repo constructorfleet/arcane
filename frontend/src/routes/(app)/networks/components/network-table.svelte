@@ -56,8 +56,10 @@
 		selectedIds = $bindable(),
 		requestOptions = $bindable(),
 		onRetry,
-		refreshError
+		refreshError,
+		showEnvironment = true
 	}: {
+		showEnvironment?: boolean;
 		networks: NetworkPage;
 		selectedIds: string[];
 		requestOptions: SearchPaginationSortRequest;
@@ -174,7 +176,7 @@
 	}
 
 	const columns = $derived([
-		...environmentColumns<NetworkRow>().map((column) => ({ ...column, title: m.query_agent() })),
+		...(showEnvironment ? environmentColumns<NetworkRow>().map((column) => ({ ...column, title: m.query_agent() })) : []),
 		{
 			id: 'nodes',
 			accessorFn: (item) => item.nodes?.map((node) => node.name).join(', ') ?? item.environmentName,
@@ -351,7 +353,7 @@
 {/snippet}
 
 <ArcaneTable
-	persistKey="arcane-networks-table"
+	persistKey={showEnvironment ? 'arcane-networks-table' : 'arcane-network-agent-scoped-table'}
 	items={networks}
 	bind:requestOptions
 	bind:selectedIds

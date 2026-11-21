@@ -15,7 +15,7 @@
 	import {
 		UsersIcon,
 		EnvironmentsIcon,
-		InspectIcon,
+		JobsIcon,
 		TrashIcon,
 		AgentConnectionIcon,
 		AddIcon,
@@ -203,12 +203,8 @@
 		});
 	}
 
-	function inspectNodeTasks(node: NodeRow) {
-		goto(
-			resolve(
-				`/(app)/swarm/tasks?nodeId=${encodeURIComponent(node.id)}&search=${encodeURIComponent(node.hostname)}&env=${encodeURIComponent(node.environmentId)}`
-			)
-		);
+	function viewNodeTasks(node: NodeRow) {
+		goto(resolve(`/(app)/swarm/tasks?nodeId=${encodeURIComponent(node.id)}&env=${encodeURIComponent(node.environmentId)}`));
 	}
 
 	async function mutateNode(action: () => Promise<void>, successMessage: string, failureMessage: string) {
@@ -455,9 +451,9 @@
 {#snippet RowActions({ item }: { item: NodeRow })}
 	<RowActionsMenu name={item.hostname} triggerClass="relative size-8 p-0" iconClass="">
 		{#if hasPermission('swarm-nodes:read', item.environmentId)}
-			<DropdownMenu.Item onclick={() => inspectNodeTasks(item)}>
-				<InspectIcon class="size-4" />
-				{m.common_inspect()}
+			<DropdownMenu.Item onclick={() => viewNodeTasks(item)}>
+				<JobsIcon class="size-4" />
+				{m.view_tasks()}
 			</DropdownMenu.Item>
 		{/if}
 		{#if canUpdateNode(item)}

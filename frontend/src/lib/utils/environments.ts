@@ -71,8 +71,18 @@ export function actionEnvironments(...permissions: string[]): EnvironmentRef[] {
 	return permitted.length > 0 ? permitted : environmentStore.shown;
 }
 
-export function readableEnvironments(permission: string): EnvironmentRef[] {
-	return environmentStore.shown.filter((env) => hasPermission(permission, env.id));
+export function readableEnvironments(permission: string, linkedAgent?: string): EnvironmentRef[] {
+	return environmentStore.shown.filter((env) => (!linkedAgent || env.id === linkedAgent) && hasPermission(permission, env.id));
+}
+
+export function resolveLinkedListAgent(url: URL, permission: string): string | undefined {
+	const agent = url.searchParams.get('env');
+	if (agent === null) return undefined;
+	if (!agent || !environmentStore.shown.some((env) => env.id === agent)) {
+		error(404, m.common_not_found_title({ resource: m.resource_environment_cap() }));
+	}
+	if (!hasPermission(permission, agent)) error(403, m.common_access_denied());
+	return agent;
 }
 
 /** Whether a permission is held in any shown environment; row actions check the row's own environment. */

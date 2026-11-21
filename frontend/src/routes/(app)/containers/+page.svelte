@@ -11,7 +11,13 @@
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import type { ContainerStatusCounts } from '#lib/types/container.js';
 	import { pinViewAction } from '#lib/utils/dashboard-layout.js';
-	import { ENVIRONMENT_FILTER, environmentFilterIds, hasShownPermission, readableEnvironments } from '#lib/utils/environments.js';
+	import {
+		ENVIRONMENT_FILTER,
+		environmentFilterIds,
+		environmentName,
+		hasShownPermission,
+		readableEnvironments
+	} from '#lib/utils/environments.js';
 	import { ResourceListPageState } from '#lib/utils/resource-list-page.svelte.js';
 	import { confirmAndApplyAllUpdates } from '#lib/utils/update-actions.js';
 
@@ -21,7 +27,11 @@
 	let { data } = $props();
 	const queryClient = useQueryClient();
 
-	const pageState = new ResourceListPageState(untrack(() => data.containerRequestOptions));
+	const pageState = new ResourceListPageState(
+		untrack(() => data.containerRequestOptions),
+		() => data.linkedAgent,
+		() => data.containerRequestOptions
+	);
 	let groupByProject = $state(false);
 	let hasSeenEnvironmentSync = $state(false);
 	let isApplyingUpdates = $state(false);
@@ -38,7 +48,7 @@
 		const scope = pageState.scope;
 		const options = { ...pageState.requestOptions, groupByProject };
 		return {
-			...containerListQuery(scope, readableEnvironments('containers:list'), options),
+			...containerListQuery(scope, readableEnvironments('containers:list', data.linkedAgent), options),
 			placeholderData: (previous, query) => {
 				if (query?.queryKey[1] !== scope || !previous) return undefined;
 				const picked = environmentFilterIds(options.filters?.[ENVIRONMENT_FILTER]);
@@ -72,7 +82,12 @@
 	const containerStatusCounts = $derived(resourcesReady ? (containers.counts ?? countsFallback) : countsFallback);
 
 	const canCreateContainers = $derived(hasShownPermission('containers:create'));
-	const canApplyUpdates = $derived(hasShownPermission('image-updates:apply'));
+	const linkedUpdateTargets = $derived(
+		data.linkedAgent ? readableEnvironments('image-updates:apply', data.linkedAgent) : undefined
+	);
+	const canApplyUpdates = $derived(
+		linkedUpdateTargets ? linkedUpdateTargets.length > 0 : hasShownPermission('image-updates:apply')
+	);
 
 	const actionButtons: ActionButton[] = $derived(
 		[
@@ -93,6 +108,7 @@
 						label: m.containers_check_updates(),
 						onclick: () =>
 							confirmAndApplyAllUpdates({
+								environments: linkedUpdateTargets,
 								setLoading: (loading) => (isApplyingUpdates = loading),
 								onRefresh: () => queryClient.invalidateQueries({ queryKey: queryKeys.containers.listPrefix(pageState.scope) })
 							}),
@@ -100,7 +116,16 @@
 						disabled: !resourcesReady || isApplyingUpdates
 					}
 				: null,
-			pinViewAction('containers', pageState.requestOptions, readableEnvironments('containers:list')),
+			data.linkedAgent
+				? {
+						id: 'all-agents',
+						action: 'base',
+						placement: 'secondary',
+						label: m.all_environments(),
+						href: resolve('/(app)/containers')
+					}
+				: null,
+			pinViewAction('containers', pageState.requestOptions, readableEnvironments('containers:list', data.linkedAgent)),
 			{
 				id: 'refresh',
 				action: 'refresh',
@@ -140,19 +165,27 @@
 	<ContainerEnvironmentSync onActivate={handleEnvironmentChange} />
 {/key}
 
-<ResourcePageLayout title={m.containers()} subtitle={m.containers_subtitle()} {actionButtons} {statCards}>
+<ResourcePageLayout
+	title={m.containers()}
+	subtitle={data.linkedAgent ? m.agent_resource_list_scope({ name: environmentName(data.linkedAgent) }) : m.containers_subtitle()}
+	{actionButtons}
+	{statCards}
+>
 	{#snippet mainContent()}
 		{#if resourcesReady}
-			<ContainerTable
-				scope={pageState.scope}
-				{containers}
-				bind:selectedIds={pageState.selectedIds}
-				bind:requestOptions={pageState.requestOptions}
-				bind:groupByProject
-				loading={containersQuery.isPlaceholderData}
-				onRetry={() => containersQuery.refetch()}
-				refreshError={containersQuery.error}
-			/>
+			{#key data.linkedAgent}
+				<ContainerTable
+					showEnvironment={!data.linkedAgent}
+					scope={pageState.scope}
+					{containers}
+					bind:selectedIds={pageState.selectedIds}
+					bind:requestOptions={pageState.requestOptions}
+					bind:groupByProject
+					loading={containersQuery.isPlaceholderData}
+					onRetry={() => containersQuery.refetch()}
+					refreshError={containersQuery.error}
+				/>
+			{/key}
 		{/if}
 	{/snippet}
 </ResourcePageLayout>

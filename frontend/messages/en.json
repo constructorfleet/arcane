@@ -4761,5 +4761,7 @@
   "active_attachment": "Active attachment",
   "multiple_active_volume_attachments": "This global volume is mounted on more than one observed agent. Choose a node record to inspect that attachment; Arcane will not move an existing workspace between agents.",
   "no_active_volume_attachment": "No mounted attachment with an active consumer was found on the observed agents. Arcane will not mount this global volume on an inactive node.",
-  "swarm_global_volume_one_node": "Swarm global volume · 1 node"
+  "swarm_global_volume_one_node": "Swarm global volume · 1 node",
+  "agent_resource_list_scope": "Resources on {name}",
+  "view_tasks": "View Tasks"
 }

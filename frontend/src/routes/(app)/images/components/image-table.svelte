@@ -63,8 +63,10 @@
 		selectedIds = $bindable(),
 		requestOptions = $bindable(),
 		onRetry,
-		refreshError
+		refreshError,
+		showEnvironment = true
 	}: {
+		showEnvironment?: boolean;
 		images: EnvironmentPage<ImageListResponse>;
 		selectedIds: string[];
 		requestOptions: SearchPaginationSortRequest;
@@ -219,7 +221,7 @@
 	}
 
 	const allColumns = $derived([
-		...environmentColumns<ImageRow>(),
+		...(showEnvironment ? environmentColumns<ImageRow>() : []),
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
 		{ accessorKey: 'repo', title: m.resource_repository_cap(), sortable: true, cell: RepoCell },
 		{
@@ -645,7 +647,7 @@
 {/snippet}
 
 <ArcaneTable
-	persistKey="arcane-image-table"
+	persistKey={showEnvironment ? 'arcane-image-table' : 'arcane-image-agent-scoped-table'}
 	items={images}
 	bind:requestOptions
 	bind:selectedIds

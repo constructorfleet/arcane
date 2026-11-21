@@ -13,7 +13,7 @@
 	import { AlertIcon, AgentConnectionIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { SwarmNodeAgentDeployment, SwarmNode } from '#lib/types/swarm.js';
-	import { hasAnyPermission } from '#lib/utils/auth.js';
+	import { hasPermission } from '#lib/utils/auth.js';
 
 	import { getSwarmNodeAgentLabel, getSwarmNodeAgentVariant } from '../agent-status';
 
@@ -73,10 +73,10 @@
 		}
 	});
 
-	async function navigateToResource(navigate: () => Promise<void>, permissions: string[]) {
+	async function navigateToResource(resource: 'containers' | 'images' | 'volumes' | 'networks') {
 		const environmentId = agentStatus.environmentId;
-		if (!environmentId || !hasAnyPermission(permissions, environmentId)) return;
-		await navigate();
+		if (!environmentId || !hasPermission(`${resource}:list`, environmentId)) return;
+		await goto(resolve(`/(app)/${resource}?env=${encodeURIComponent(environmentId)}`));
 		open = false;
 	}
 </script>
@@ -137,36 +137,31 @@
 					<div class="text-sm text-muted-foreground">{m.swarm_node_agent_resources_description()}</div>
 				</div>
 				<div class="flex flex-wrap gap-2">
-					{#if hasAnyPermission(['containers:list', 'containers:read'], agentStatus.environmentId)}
+					{#if hasPermission('containers:list', agentStatus.environmentId)}
 						<ArcaneButton
 							action="base"
 							tone="outline"
 							customLabel={m.containers()}
-							onclick={() => navigateToResource(() => goto(resolve('/(app)/containers')), ['containers:list', 'containers:read'])}
+							onclick={() => navigateToResource('containers')}
 						/>
 					{/if}
-					{#if hasAnyPermission(['images:list', 'images:read'], agentStatus.environmentId)}
-						<ArcaneButton
-							action="base"
-							tone="outline"
-							customLabel={m.images()}
-							onclick={() => navigateToResource(() => goto(resolve('/(app)/images')), ['images:list', 'images:read'])}
-						/>
+					{#if hasPermission('images:list', agentStatus.environmentId)}
+						<ArcaneButton action="base" tone="outline" customLabel={m.images()} onclick={() => navigateToResource('images')} />
 					{/if}
-					{#if hasAnyPermission(['volumes:list', 'volumes:read'], agentStatus.environmentId)}
+					{#if hasPermission('volumes:list', agentStatus.environmentId)}
 						<ArcaneButton
 							action="base"
 							tone="outline"
 							customLabel={m.resource_volumes_cap()}
-							onclick={() => navigateToResource(() => goto(resolve('/(app)/volumes')), ['volumes:list', 'volumes:read'])}
+							onclick={() => navigateToResource('volumes')}
 						/>
 					{/if}
-					{#if hasAnyPermission(['networks:list', 'networks:read'], agentStatus.environmentId)}
+					{#if hasPermission('networks:list', agentStatus.environmentId)}
 						<ArcaneButton
 							action="base"
 							tone="outline"
 							customLabel={m.resource_networks_cap()}
-							onclick={() => navigateToResource(() => goto(resolve('/(app)/networks')), ['networks:list', 'networks:read'])}
+							onclick={() => navigateToResource('networks')}
 						/>
 					{/if}
 				</div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -32,6 +33,7 @@
 		acrossEnvironmentsNote,
 		actionEnvironments,
 		destinationEnvironmentId,
+		environmentName,
 		hasShownPermission,
 		listScopes,
 		readableEnvironments,
@@ -48,7 +50,11 @@
 	let { data } = $props();
 	const queryClient = useQueryClient();
 
-	const pageState = new ResourceListPageState(untrack(() => data.imageRequestOptions));
+	const pageState = new ResourceListPageState(
+		untrack(() => data.imageRequestOptions),
+		() => data.linkedAgent,
+		() => data.imageRequestOptions
+	);
 	let isPullDialogOpen = $state(false);
 	let isRegistrySearchDialogOpen = $state(false);
 	let isUploadDialogOpen = $state(false);
@@ -67,7 +73,7 @@
 	const imagesQuery = createQuery(() => {
 		const scope = pageState.scope;
 		return {
-			...imageListQuery(scope, readableEnvironments('images:list'), pageState.requestOptions),
+			...imageListQuery(scope, readableEnvironments('images:list', data.linkedAgent), pageState.requestOptions),
 			placeholderData: (previous, query) => (query?.queryKey[1] === scope ? previous : undefined),
 			select: (value) => ({ envId: scope, value })
 		};
@@ -76,7 +82,7 @@
 	const usageCountsQuery = createQuery(() => {
 		const scope = pageState.scope;
 		return {
-			...imageUsageCountsQuery(scope, readableEnvironments('images:list')),
+			...imageUsageCountsQuery(scope, readableEnvironments('images:list', data.linkedAgent)),
 			select: (value) => ({ envId: scope, value })
 		};
 	});
@@ -95,10 +101,17 @@
 		);
 	}
 
+	const pruneTargets = $derived(
+		data.linkedAgent ? readableEnvironments('images:prune', data.linkedAgent) : actionEnvironments('images:prune')
+	);
+	const checkTargets = $derived(
+		data.linkedAgent ? readableEnvironments('image-updates:check', data.linkedAgent) : actionEnvironments('image-updates:check')
+	);
+
 	const pruneImagesMutation = createMutation(() => ({
 		mutationKey: ['images', 'prune', pageState.scope],
 		mutationFn: (_requestedScope: string) =>
-			settleAcrossEnvironments(actionEnvironments('images:prune'), (id) =>
+			settleAcrossEnvironments(pruneTargets, (id) =>
 				imageService.pruneImages(
 					{
 						mode: imagePruneMode,
@@ -119,8 +132,7 @@
 
 	const checkUpdatesMutation = createMutation(() => ({
 		mutationKey: ['images', 'check-updates', pageState.scope],
-		mutationFn: () =>
-			settleAcrossEnvironments(actionEnvironments('image-updates:check'), (id) => imageService.checkAllImages(id)),
+		mutationFn: () => settleAcrossEnvironments(checkTargets, (id) => imageService.checkAllImages(id)),
 		onSuccess: async (results) => {
 			toast.success(m.images_update_check_completed(), activityToastOptions(extractActivityId(results[0]?.value)));
 			await invalidateEnvironmentImages(results);
@@ -200,7 +212,7 @@
 	}
 
 	async function openPruneDialog() {
-		const environments = actionEnvironments('images:prune');
+		const environments = pruneTargets;
 		const settingsReadable = environments.filter((env) => hasPermission('environment-settings:read', env.id));
 		const result = await tryCatch(
 			Promise.all([
@@ -247,7 +259,9 @@
 
 	const canPullImage = $derived(hasShownPermission('images:pull'));
 	const canUploadImage = $derived(hasShownPermission('images:upload'));
-	const canPruneImage = $derived(hasShownPermission('images:prune'));
+	const canPruneImage = $derived(
+		data.linkedAgent ? readableEnvironments('images:prune', data.linkedAgent).length > 0 : hasShownPermission('images:prune')
+	);
 
 	const actionButtons: ActionButton[] = $derived.by(() => {
 		const buttons: ActionButton[] = [];
@@ -289,7 +303,16 @@
 				disabled: !resourcesReady || isChecking
 			});
 		}
-		buttons.push(pinViewAction('images', pageState.requestOptions, readableEnvironments('images:list')));
+		if (data.linkedAgent) {
+			buttons.push({
+				id: 'all-agents',
+				action: 'base',
+				placement: 'secondary',
+				label: m.all_environments(),
+				href: resolve('/(app)/images')
+			});
+		}
+		buttons.push(pinViewAction('images', pageState.requestOptions, readableEnvironments('images:list', data.linkedAgent)));
 		buttons.push({
 			id: 'refresh',
 			action: 'refresh',
@@ -332,11 +355,17 @@
 	]);
 </script>
 
-<ResourcePageLayout title={m.images()} subtitle={m.images_subtitle()} {actionButtons} {statCards}>
+<ResourcePageLayout
+	title={m.images()}
+	subtitle={data.linkedAgent ? m.agent_resource_list_scope({ name: environmentName(data.linkedAgent) }) : m.images_subtitle()}
+	{actionButtons}
+	{statCards}
+>
 	{#snippet mainContent()}
 		{#if resourcesReady}
-			{#key pageState.scope}
+			{#key JSON.stringify([pageState.scope, data.linkedAgent])}
 				<ImageTable
+					showEnvironment={!data.linkedAgent}
 					images={withFailedEnvironments(images, countFailures)}
 					bind:selectedIds={pageState.selectedIds}
 					bind:requestOptions={pageState.requestOptions}
@@ -442,7 +471,7 @@
 					<Dialog.Title>{m.images_prune_confirm_title()}</Dialog.Title>
 					<Dialog.Description>
 						{m.images_prune_confirm_description({ mode: imagePruneMode })}
-						{acrossEnvironmentsNote(actionEnvironments('images:prune'))}
+						{acrossEnvironmentsNote(pruneTargets)}
 					</Dialog.Description>
 				</Dialog.Header>
 				<SettingsSection variant="plain" class="py-4">

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -16,7 +17,7 @@
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
 	import { extractApiErrorMessage } from '#lib/utils/api.js';
 	import { pinViewAction } from '#lib/utils/dashboard-layout.js';
-	import { hasShownPermission, readableEnvironments } from '#lib/utils/environments.js';
+	import { environmentName, hasShownPermission, readableEnvironments } from '#lib/utils/environments.js';
 	import { ResourceListPageState } from '#lib/utils/resource-list-page.svelte.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
@@ -25,13 +26,17 @@
 	let { data } = $props();
 	const queryClient = useQueryClient();
 
-	const pageState = new ResourceListPageState(untrack(() => data.networkRequestOptions));
+	const pageState = new ResourceListPageState(
+		untrack(() => data.networkRequestOptions),
+		() => data.linkedAgent,
+		() => data.networkRequestOptions
+	);
 	const countsFallback: NetworkUsageCounts = { inuse: 0, unused: 0, total: 0 };
 
 	const networksQuery = createQuery(() => {
 		const scope = pageState.scope;
 		return {
-			...networkListQuery(scope, readableEnvironments('networks:list'), pageState.requestOptions),
+			...networkListQuery(scope, readableEnvironments('networks:list', data.linkedAgent), pageState.requestOptions),
 			placeholderData: (previous, query) => (query?.queryKey[1] === scope ? previous : undefined),
 			select: (value) => ({ envId: scope, value })
 		};
@@ -85,7 +90,16 @@
 				disabled: !resourcesReady || createNetworkMutation.isPending
 			});
 		}
-		buttons.push(pinViewAction('networks', pageState.requestOptions, readableEnvironments('networks:list')));
+		if (data.linkedAgent) {
+			buttons.push({
+				id: 'all-agents',
+				action: 'base',
+				placement: 'secondary',
+				label: m.all_environments(),
+				href: resolve('/(app)/networks')
+			});
+		}
+		buttons.push(pinViewAction('networks', pageState.requestOptions, readableEnvironments('networks:list', data.linkedAgent)));
 		buttons.push({
 			id: 'refresh',
 			action: 'refresh',
@@ -115,14 +129,20 @@
 	]);
 </script>
 
-<ResourcePageLayout title={m.resource_networks_cap()} subtitle={m.networks_subtitle()} {actionButtons} {statCards}>
+<ResourcePageLayout
+	title={m.resource_networks_cap()}
+	subtitle={data.linkedAgent ? m.agent_resource_list_scope({ name: environmentName(data.linkedAgent) }) : m.networks_subtitle()}
+	{actionButtons}
+	{statCards}
+>
 	{#snippet mainContent()}
 		<Alert.Root variant="warning-subtle" size="sm" icon={AlertIcon}>
 			<Alert.Description>{m.network_list_usage_scope()}</Alert.Description>
 		</Alert.Root>
 		{#if resourcesReady}
-			{#key pageState.scope}
+			{#key JSON.stringify([pageState.scope, data.linkedAgent])}
 				<NetworkTable
+					showEnvironment={!data.linkedAgent}
 					{networks}
 					bind:selectedIds={pageState.selectedIds}
 					bind:requestOptions={pageState.requestOptions}

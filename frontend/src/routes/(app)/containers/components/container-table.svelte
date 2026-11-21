@@ -92,8 +92,10 @@
 		withoutFilters = false,
 		loading = false,
 		onRetry,
-		refreshError
+		refreshError,
+		showEnvironment = true
 	}: {
+		showEnvironment?: boolean;
 		/** Shown-environments scope the rows were loaded for. */
 		scope: string;
 		containers: ContainerPage;
@@ -365,7 +367,7 @@
 	}
 
 	const columns = $derived([
-		...environmentColumns<ContainerRow>(),
+		...(showEnvironment ? environmentColumns<ContainerRow>() : []),
 		{ accessorKey: 'id', title: m.common_id(), cell: IdCell, hidden: true },
 		{
 			accessorKey: 'names',
@@ -1188,7 +1190,7 @@
 
 <ArcaneTable
 	bind:this={tablePreferences}
-	persistKey="arcane-container-table"
+	persistKey={showEnvironment ? 'arcane-container-table' : 'arcane-container-agent-scoped-table'}
 	items={containers}
 	bind:requestOptions={() => tableRequestOptions, (next) => (requestOptions = withSupportedSort(next))}
 	bind:selectedIds

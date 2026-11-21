@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -17,7 +18,7 @@
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
 	import { extractApiErrorMessage } from '#lib/utils/api.js';
 	import { pinViewAction } from '#lib/utils/dashboard-layout.js';
-	import { hasShownPermission, readableEnvironments } from '#lib/utils/environments.js';
+	import { environmentName, hasShownPermission, readableEnvironments } from '#lib/utils/environments.js';
 	import { ResourceListPageState } from '#lib/utils/resource-list-page.svelte.js';
 
 	import VolumeTable from './components/volume-table.svelte';
@@ -25,13 +26,17 @@
 	let { data } = $props();
 	const queryClient = useQueryClient();
 
-	const pageState = new ResourceListPageState(untrack(() => data.volumeRequestOptions));
+	const pageState = new ResourceListPageState(
+		untrack(() => data.volumeRequestOptions),
+		() => data.linkedAgent,
+		() => data.volumeRequestOptions
+	);
 	const countsFallback: VolumeUsageCounts = { inuse: 0, unused: 0, total: 0 };
 
 	const volumesQuery = createQuery(() => {
 		const scope = pageState.scope;
 		return {
-			...volumeListQuery(scope, readableEnvironments('volumes:list'), pageState.requestOptions),
+			...volumeListQuery(scope, readableEnvironments('volumes:list', data.linkedAgent), pageState.requestOptions),
 			placeholderData: (previous, query) => (query?.queryKey[1] === scope ? previous : undefined),
 			select: (value) => ({ envId: scope, value })
 		};
@@ -88,7 +93,16 @@
 				disabled: !resourcesReady || createVolumeMutation.isPending
 			});
 		}
-		buttons.push(pinViewAction('volumes', pageState.requestOptions, readableEnvironments('volumes:list')));
+		if (data.linkedAgent) {
+			buttons.push({
+				id: 'all-agents',
+				action: 'base',
+				placement: 'secondary',
+				label: m.all_environments(),
+				href: resolve('/(app)/volumes')
+			});
+		}
+		buttons.push(pinViewAction('volumes', pageState.requestOptions, readableEnvironments('volumes:list', data.linkedAgent)));
 		buttons.push({
 			id: 'refresh',
 			action: 'refresh',
@@ -118,11 +132,17 @@
 	]);
 </script>
 
-<ResourcePageLayout title={m.resource_volumes_cap()} subtitle={m.volumes_subtitle()} {actionButtons} {statCards}>
+<ResourcePageLayout
+	title={m.resource_volumes_cap()}
+	subtitle={data.linkedAgent ? m.agent_resource_list_scope({ name: environmentName(data.linkedAgent) }) : m.volumes_subtitle()}
+	{actionButtons}
+	{statCards}
+>
 	{#snippet mainContent()}
 		{#if resourcesReady}
-			{#key pageState.scope}
+			{#key JSON.stringify([pageState.scope, data.linkedAgent])}
 				<VolumeTable
+					showEnvironment={!data.linkedAgent}
 					{volumes}
 					bind:selectedIds={pageState.selectedIds}
 					bind:requestOptions={pageState.requestOptions}

@@ -1,5 +1,5 @@
-# 3.0.1-cf.71
+# 3.0.1-cf.72
 
-- Show the selected Swarm service's tasks in a searchable table with pagination, sorting, node and state filters, and accurate totals (#171). The table includes current and desired state, node, container access, update time, and errors.
-- Show clearly separated vertical cards on mobile. Task container links still resolve through the agent on the node running the task.
-- Validate pagination and combined filtering with a 120-task data set. Deployed UI verification follows publication.
+- Scope container, image, volume and network links from a Swarm node’s agent to that agent. Bookmarks and reloads preserve the scope. Unknown, disabled and unauthorized agents get an explicit error (#173).
+- Label the node task shortcut View Tasks. Use the exact Swarm node ID and drop the hostname text search.
+- Track the broader Nodes and Cluster redesigns in #174 and #175.

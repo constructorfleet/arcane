@@ -5,6 +5,7 @@ import { m } from '#lib/paraglide/messages.js';
 import BaseAPIService from '#lib/services/api-service.js';
 import { imageService } from '#lib/services/image-service.js';
 import { userService } from '#lib/services/user-service.js';
+import type { EnvironmentRef } from '#lib/stores/environment.store.svelte.js';
 import type { AutoUpdateResourceType, UpdaterResult } from '#lib/types/updater.js';
 import { activityToastOptions } from '#lib/utils/activity-toast.js';
 import { acrossEnvironmentsNote, actionEnvironments, settleAcrossEnvironments } from '#lib/utils/environments.js';
@@ -64,6 +65,7 @@ export function summarizeUpdateResult(result: UpdaterResult) {
 }
 
 type ConfirmAndApplyAllUpdatesOptions = {
+	environments?: EnvironmentRef[];
 	setLoading?: (loading: boolean) => void;
 	onRefresh?: () => unknown;
 };
@@ -82,8 +84,12 @@ async function disarmWhenBackendResponds() {
 	BaseAPIService.setUpgradeInProgress(false);
 }
 
-export function confirmAndApplyAllUpdates({ setLoading, onRefresh }: ConfirmAndApplyAllUpdatesOptions) {
-	const environments = actionEnvironments('image-updates:apply');
+export function confirmAndApplyAllUpdates({
+	environments = actionEnvironments('image-updates:apply'),
+	setLoading,
+	onRefresh
+}: ConfirmAndApplyAllUpdatesOptions) {
+	if (environments.length === 0) return;
 	openConfirmDialog({
 		title: m.update_all(),
 		message: `${m.updates_update_all_confirm_message()} ${acrossEnvironmentsNote(environments)}`.trim(),

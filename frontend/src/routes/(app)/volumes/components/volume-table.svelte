@@ -74,8 +74,10 @@
 		selectedIds = $bindable(),
 		requestOptions = $bindable(),
 		onRetry,
-		refreshError
+		refreshError,
+		showEnvironment = true
 	}: {
+		showEnvironment?: boolean;
 		volumes: EnvironmentPage<VolumesPaginatedResponse>;
 		selectedIds: string[];
 		requestOptions: SearchPaginationSortRequest;
@@ -306,7 +308,7 @@
 	}
 
 	const columns = $derived([
-		...environmentColumns<VolumeRow>(),
+		...(showEnvironment ? environmentColumns<VolumeRow>() : []),
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
 		{ accessorKey: 'name', title: m.common_name(), sortable: true, cell: NameCell },
 		{ accessorKey: 'inUse', title: m.common_status(), sortable: true, cell: StatusCell },
@@ -488,7 +490,7 @@
 
 <ArcaneTable
 	bind:this={tablePreferences}
-	persistKey="arcane-volumes-table"
+	persistKey={showEnvironment ? 'arcane-volumes-table' : 'arcane-volume-agent-scoped-table'}
 	items={withFailedEnvironments(volumes, backupVolumeNamesQuery.data?.failures)}
 	bind:requestOptions
 	bind:selectedIds
