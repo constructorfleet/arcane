@@ -351,6 +351,26 @@ func (s *SystemService) PingDocker(ctx context.Context) error {
 	return err
 }
 
+func (s *SystemService) ListDockerPlugins(ctx context.Context) ([]types.DockerPluginSummary, error) {
+	result, err := s.dockerService.Call(ctx, func(ctx context.Context, cli *client.Client) (client.PluginListResult, error) {
+		return cli.PluginList(ctx, client.PluginListOptions{})
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list Docker plugins: %w", err)
+	}
+	plugins := make([]types.DockerPluginSummary, 0, len(result.Items))
+	for _, plugin := range result.Items {
+		capabilities := make([]string, 0, len(plugin.Config.Interface.Types))
+		for _, capability := range plugin.Config.Interface.Types {
+			capabilities = append(capabilities, capability.Capability)
+		}
+		plugins = append(plugins, types.DockerPluginSummary{
+			ID: plugin.ID, Name: plugin.Name, Reference: plugin.PluginReference, Enabled: plugin.Enabled, Capabilities: capabilities,
+		})
+	}
+	return plugins, nil
+}
+
 func (s *SystemService) GetDockerInfo(ctx context.Context) (types.DockerInfo, error) {
 	serverVersion, err := s.dockerService.Call(ctx, func(ctx context.Context, cli *client.Client) (client.ServerVersionResult, error) {
 		return cli.ServerVersion(ctx, client.ServerVersionOptions{})

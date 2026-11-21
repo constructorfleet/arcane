@@ -197,6 +197,7 @@ var (
 
 		{Method: http.MethodHead, PathPattern: "/api/agents/{id}/system/health", CommandName: "system.health"},
 		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/system/docker/info", CommandName: "system.docker_info"},
+		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/system/docker/plugins", CommandName: "system.docker_plugins"},
 		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/system/df", CommandName: "system.df"},
 		{Method: http.MethodPost, PathPattern: "/api/agents/{id}/system/prune", CommandName: "system.prune"},
 		{Method: http.MethodPost, PathPattern: "/api/agents/{id}/system/containers", CommandName: "system.containers.action"},

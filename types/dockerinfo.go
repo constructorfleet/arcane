@@ -15,4 +15,11 @@ type (
 		system.Info
 		Success bool `json:"success"`
 	}
+	DockerPluginSummary struct {
+		ID           string   `json:"id"`
+		Name         string   `json:"name"`
+		Reference    string   `json:"reference,omitempty"`
+		Capabilities []string `json:"capabilities"`
+		Enabled      bool     `json:"enabled"`
+	}
 )

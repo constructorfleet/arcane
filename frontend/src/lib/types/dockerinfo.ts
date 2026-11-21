@@ -1,3 +1,11 @@
+export interface DockerPluginSummary {
+	id: string;
+	name: string;
+	reference?: string;
+	enabled: boolean;
+	capabilities: string[];
+}
+
 export interface DockerInfo {
 	success: boolean;
 	apiVersion: string;

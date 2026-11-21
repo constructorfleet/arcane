@@ -6,7 +6,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { useUrlTab } from '#lib/hooks/use-url-tab.svelte.js';
-	import { AgentConnectionIcon, ContainersIcon, CpuIcon, UsersIcon } from '#lib/icons/index.js';
+	import { AgentConnectionIcon, ContainersIcon, CpuIcon, LayersIcon, UsersIcon } from '#lib/icons/index.js';
 	import TabbedPageLayout from '#lib/layouts/tabbed-page-layout.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
@@ -16,6 +16,8 @@
 	import { bytes, capitalizeFirstLetter, formatDateTime } from '#lib/utils/formatting.js';
 
 	import { getSwarmNodeAgentLabel, getSwarmNodeAgentVariant } from '../agent-status';
+	import NodeDockerDetails from '../components/node-docker-details.svelte';
+	import NodeDockerNetworks from '../components/node-docker-networks.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -26,6 +28,7 @@
 			? agent.environmentId
 			: undefined
 	);
+	const canListNetworks = $derived(!!agentId && readableEnvironments('networks:list', agentId).length > 0);
 	const canReadDocker = $derived(
 		!!agentId &&
 			agent.state === 'connected' &&
@@ -36,6 +39,7 @@
 		{ value: 'overview', label: m.common_overview(), icon: UsersIcon },
 		{ value: 'host', label: m.swarm_node_hardware_host(), icon: CpuIcon },
 		{ value: 'docker', label: 'Docker', icon: ContainersIcon },
+		{ value: 'resources', label: m.swarm_node_local_resources_tab(), icon: LayersIcon },
 		{ value: 'agent', label: m.agent(), icon: AgentConnectionIcon }
 	]);
 	const urlTab = useUrlTab({ validTabs: () => tabItems.map((tab) => tab.value), defaultTab: () => 'overview' });
@@ -118,7 +122,6 @@
 						</div>
 					</section>
 				{/if}
-				{@render resources()}
 			</div>
 		</Tabs.Content>
 		<Tabs.Content value="host">
@@ -141,24 +144,30 @@
 		</Tabs.Content>
 		<Tabs.Content value="docker">
 			<div class={contentClass}>
-				<div class={fieldClass}>
-					<KeyValueCard label={m.swarm_engine_version()}>{node.engineVersion || m.common_unknown()}</KeyValueCard>
-					{#if docker}
-						<KeyValueCard label={m.swarm_node_storage_driver()}>{docker.Driver || m.common_unknown()}</KeyValueCard>
-						<KeyValueCard label={m.swarm_node_logging_driver()}>{docker.LoggingDriver || m.common_unknown()}</KeyValueCard>
-					{/if}
-				</div>
-				{#if docker}
-					<h2 class="text-sm font-semibold">{m.swarm_node_engine_plugins()}</h2>
-					<div class={fieldClass}>
-						<KeyValueCard label={m.resource_volumes_cap()}>{docker.Plugins?.Volume?.join(', ') || m.common_na()}</KeyValueCard>
-						<KeyValueCard label={m.resource_networks_cap()}>{docker.Plugins?.Network?.join(', ') || m.common_na()}</KeyValueCard>
-						<KeyValueCard label={m.common_logs()}>{docker.Plugins?.Log?.join(', ') || m.common_na()}</KeyValueCard>
-					</div>
+				<KeyValueCard label={m.swarm_engine_version()}>{node.engineVersion || m.common_unknown()}</KeyValueCard>
+				{#if docker && agentId}
+					<NodeDockerDetails {docker} {agentId} />
 				{:else}
 					{@render engineUnavailable()}
 				{/if}
-				{@render resources()}
+			</div>
+		</Tabs.Content>
+		<Tabs.Content value="resources">
+			<div class={contentClass}>
+				{#if resourceLinks.length}
+					<div class="flex flex-wrap gap-2">
+						{#each resourceLinks as { href, label } (href)}
+							<a {href} class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted">{label}</a>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">{m.swarm_node_local_resources_unavailable()}</p>
+				{/if}
+				{#if selectedTab === 'resources' && canListNetworks && agentId}
+					{#key `${node.id}:${agentId}`}
+						<NodeDockerNetworks nodeId={node.id} {agentId} />
+					{/key}
+				{/if}
 			</div>
 		</Tabs.Content>
 		<Tabs.Content value="agent">
@@ -177,7 +186,6 @@
 						<KeyValueCard label={m.swarm_node_last_heartbeat()}>{formatDateTime(agent.lastHeartbeat)}</KeyValueCard>
 					{/if}
 				</div>
-				{@render resources()}
 			</div>
 		</Tabs.Content>
 	{/snippet}
@@ -187,17 +195,4 @@
 	<p class="text-sm text-muted-foreground">
 		{canReadDocker && dockerQuery.isPending ? m.common_loading() : m.swarm_node_engine_unavailable()}
 	</p>
-{/snippet}
-
-{#snippet resources()}
-	{#if resourceLinks.length}
-		<section class="space-y-2">
-			<h2 class="text-sm font-semibold">{m.swarm_node_agent_resources_title()}</h2>
-			<div class="flex flex-wrap gap-2">
-				{#each resourceLinks as { href, label } (href)}
-					<a {href} class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted">{label}</a>
-				{/each}
-			</div>
-		</section>
-	{/if}
 {/snippet}

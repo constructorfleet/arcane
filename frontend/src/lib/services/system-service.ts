@@ -1,4 +1,4 @@
-import type { DockerInfo } from '#lib/types/dockerinfo.js';
+import type { DockerInfo, DockerPluginSummary } from '#lib/types/dockerinfo.js';
 import type { PruneAllRequest, SystemDiskUsage } from '#lib/types/system.js';
 
 import BaseAPIService, { type APIRequestConfig } from './api-service';
@@ -28,6 +28,10 @@ class SystemService extends BaseAPIService {
 
 	async getDockerInfoForEnvironment(environmentId: string): Promise<DockerInfo> {
 		return this.handleResponse(this.api.get(`/agents/${environmentId}/system/docker/info`));
+	}
+
+	async listDockerPlugins(environmentId: string): Promise<DockerPluginSummary[]> {
+		return this.handleResponse(this.api.get(`/agents/${environmentId}/system/docker/plugins`));
 	}
 
 	async getDiskUsage(environmentId: string, config?: APIRequestConfig): Promise<SystemDiskUsage> {

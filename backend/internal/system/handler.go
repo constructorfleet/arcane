@@ -66,6 +66,16 @@ func (h *SystemHandler) GetDockerInfo(ctx context.Context, input *types.Environm
 	return &GetDockerInfoOutput{Body: info}, nil
 }
 
+func (h *SystemHandler) ListDockerPlugins(ctx context.Context, _ *types.EnvironmentInput) (*handlerutil.Out[[]types.DockerPluginSummary], error) {
+	plugins, err := h.systemService.ListDockerPlugins(ctx)
+	if err != nil {
+		return nil, huma.Error502BadGateway("Could not list Docker plugins")
+	}
+	return &handlerutil.Out[[]types.DockerPluginSummary]{
+		Body: types.ApiResponse[[]types.DockerPluginSummary]{Success: true, Data: plugins},
+	}, nil
+}
+
 func (h *SystemHandler) RunContainersAction(ctx context.Context, input *ContainersActionInput) (*handlerutil.Out[types.ContainerActionResult], error) {
 	action := map[string]containersAction{
 		"startall": {

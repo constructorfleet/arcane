@@ -1,5 +1,5 @@
-# 3.0.1-cf.75
+# 3.0.1-cf.76
 
-- Check the container's current state on its agent before counting a recent exit or OOM event under Home's Needs Attention. Recovered or removed containers clear their warning. (#182)
-- Refresh active attention inputs while Home is open. Failed containers that are still exited, dead, or restarting remain eligible, and the Events page retains the history.
-- Group repeated failed Swarm tasks by service slot. Clear the warning when a healthy replacement is observed for that slot.
+- Consolidate the Containers, Images, Volumes, and Networks shortcuts under Local Resources in Node Details. Each opens on the verified node agent. (#174)
+- Add paginated Docker network inventory with driver, scope, subnet, gateway, and IP range, and link each readable network to its details. (#174)
+- Show installed Docker-managed plugins with enabled state, source reference, and capability, alongside effective daemon settings reported by Docker. Reading daemon.json requires host access. (#174)

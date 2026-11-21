@@ -2,6 +2,7 @@ package system
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -40,6 +41,36 @@ type (
 		submitted []types.SchedulerRequest
 	}
 )
+
+func TestListDockerPluginsReturnsInventoryWithoutSettings(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/v1.57/plugins" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[
+			{"Id":"rbd-id","Name":"rbd:latest","PluginReference":"example.test/storage/rbd:v1","Enabled":true,
+			 "Config":{"Interface":{"Types":["docker.volumedriver/1.0"]},"Env":[{"Name":"KEY","Value":"fixture-secret"}]},
+			 "Settings":{"Env":["KEY=fixture-secret"]}},
+			{"Id":"disabled-id","Name":"cache:latest","Enabled":false,"Config":{"Interface":{"Types":[]}}}
+		]`))
+	}))
+	t.Cleanup(server.Close)
+	dockerClient, err := client.New(client.WithHost(server.URL), client.WithAPIVersion("1.57"))
+	require.NoError(t, err)
+	service := &SystemService{dockerService: newSettingsDockerService(t, dockerClient)}
+
+	plugins, err := service.ListDockerPlugins(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, []types.DockerPluginSummary{
+		{ID: "rbd-id", Name: "rbd:latest", Reference: "example.test/storage/rbd:v1", Enabled: true, Capabilities: []string{"volumedriver"}},
+		{ID: "disabled-id", Name: "cache:latest", Capabilities: []string{}},
+	}, plugins)
+	payload, err := json.Marshal(plugins)
+	require.NoError(t, err)
+	require.NotContains(t, string(payload), "fixture-secret")
+}
 
 func TestResolveSystemUpgraderRuntimeOptions_TCPDockerHost(t *testing.T) {
 	currentContainer := &container.InspectResponse{

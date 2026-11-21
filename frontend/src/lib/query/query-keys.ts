@@ -183,7 +183,8 @@ export const queryKeys = {
 		upgradeHealth: (environmentId: string) => ['system', environmentId, 'upgrade-health'] as const,
 		versionInfo: (environmentId: string) => ['system', environmentId, 'version-info'] as const,
 		environmentVersions: (scope: string) => ['system', scope, 'environment-versions'] as const,
-		dockerInfo: (environmentId: string) => ['system', environmentId, 'docker-info'] as const
+		dockerInfo: (environmentId: string) => ['system', environmentId, 'docker-info'] as const,
+		dockerPlugins: (environmentId: string) => ['system', environmentId, 'docker-plugins'] as const
 	},
 	containers: {
 		all: ['containers'] as const,

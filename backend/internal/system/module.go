@@ -73,6 +73,15 @@ func RegisterSystem(api huma.API, h *SystemHandler) {
 		Security:    handlerutil.DefaultOperationSecurity(),
 	}, authz.PermSystemRead, h.GetDockerInfo)
 
+	middleware.RegisterWithPermission(api, huma.Operation{
+		OperationID: "list-docker-plugins",
+		Method:      http.MethodGet,
+		Path:        "/agents/{id}/system/docker/plugins",
+		Summary:     "List Docker Engine managed plugins",
+		Tags:        []string{"System"},
+		Security:    handlerutil.DefaultOperationSecurity(),
+	}, authz.PermSystemRead, h.ListDockerPlugins)
+
 	middleware.RegisterWithActionPermissions(api, huma.Operation{
 		OperationID: "system-containers-action",
 		Method:      http.MethodPost,
