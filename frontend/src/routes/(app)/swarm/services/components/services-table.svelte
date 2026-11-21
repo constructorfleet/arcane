@@ -20,8 +20,9 @@
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import type { SwarmServicesPaginatedResponse } from '#lib/types/ui/swarm.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
+	import { hasPermission } from '#lib/utils/auth.js';
 	import { getSwarmServiceModeLabel, getSwarmServiceModeVariant } from '#lib/utils/docker.js';
-	import { type EnvironmentPage, type EnvironmentRow } from '#lib/utils/environments.js';
+	import { environmentHref, type EnvironmentPage, type EnvironmentRow } from '#lib/utils/environments.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	let {
@@ -157,12 +158,20 @@
 	>
 {/snippet}
 
-{#snippet StackCell({ value }: { value: unknown })}
-	{#if value}
-		<span class="text-sm">{String(value)}</span>
+{#snippet StackCell({ item }: { item: ServiceRow })}
+	{#if item.stackName && hasPermission('swarm-stacks:read', item.environmentId)}
+		<a
+			class="text-sm text-primary hover:underline"
+			href={environmentHref(resolve('/(app)/swarm/stacks/[name]', { name: item.stackName }), item.environmentId)}
+			>{item.stackName}</a
+		>
 	{:else}
-		<span class="text-sm text-muted-foreground">{m.common_na()}</span>
+		<span class="text-sm text-muted-foreground">{item.stackName || m.common_na()}</span>
 	{/if}
+{/snippet}
+
+{#snippet MobileStack(item: ServiceRow)}
+	{@render StackCell({ item })}
 {/snippet}
 
 {#snippet ReplicasCell({ item }: { item: ServiceRow })}
@@ -212,7 +221,6 @@
 			variant: modeIconVariant(item.mode)
 		})}
 		title={(item: ServiceRow) => getShortName(item.name, item.stackName)}
-		subtitle={(item: ServiceRow) => ((mobileFieldVisibility['stackName'] ?? true) ? (item.stackName ?? null) : null)}
 		badges={[
 			(item: ServiceRow) =>
 				(mobileFieldVisibility['mode'] ?? true)
@@ -220,6 +228,13 @@
 					: null
 		]}
 		fields={[
+			{
+				label: m.swarm_stack(),
+				getValue: (item: ServiceRow) => (item.stackName ? item : null),
+				type: 'component',
+				component: MobileStack,
+				show: mobileFieldVisibility['stackName'] ?? true
+			},
 			{
 				label: m.swarm_replicas(),
 				getValue: (item: ServiceRow) => `${item.runningReplicas} / ${item.replicas}`,

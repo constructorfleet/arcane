@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
 	import type { ColumnSpec, FilterOption, MobileFieldVisibility } from '#lib/components/arcane-table/index.js';
@@ -10,7 +12,8 @@
 	import type { SwarmTaskSummary } from '#lib/types/swarm.js';
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import type { SwarmTasksPaginatedResponse } from '#lib/types/ui/swarm.js';
-	import type { EnvironmentPage, EnvironmentRow } from '#lib/utils/environments.js';
+	import { hasPermission } from '#lib/utils/auth.js';
+	import { environmentHref, type EnvironmentPage, type EnvironmentRow } from '#lib/utils/environments.js';
 	import { formatDateTimeShort } from '#lib/utils/formatting.js';
 	import { getSwarmTaskIconVariant, getSwarmTaskStateVariant } from '#lib/utils/swarm-tasks.js';
 
@@ -67,10 +70,13 @@
 		...(showEnvironment ? environmentColumns<TaskRow>() : []),
 		{ accessorKey: 'name', title: m.common_name(), sortable: true, cell: serviceScoped ? TaskNameCell : undefined },
 		{ id: 'container', title: m.container(), cell: ContainerCell },
-		...(serviceScoped ? [] : [{ accessorKey: 'serviceName', title: m.swarm_service(), sortable: true } as const]),
+		...(serviceScoped
+			? []
+			: [{ accessorKey: 'serviceName', title: m.swarm_service(), sortable: true, cell: ServiceCell } as const]),
 		{
 			accessorKey: 'nodeName',
 			title: m.swarm_node(),
+			cell: NodeCell,
 			sortable: true,
 			filterOptions: nodeFilters.length ? nodeFilters : undefined
 		},
@@ -103,6 +109,38 @@
 
 {#snippet ContainerCell({ item }: { item: TaskRow })}
 	<SwarmTaskContainer task={item} environmentId={item.environmentId} />
+{/snippet}
+
+{#snippet ServiceCell({ item }: { item: TaskRow })}
+	{#if item.serviceId && item.serviceName && hasPermission('swarm-services:read', item.environmentId)}
+		<a
+			class="text-primary hover:underline"
+			href={environmentHref(resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.serviceId }), item.environmentId)}
+			>{item.serviceName}</a
+		>
+	{:else}
+		{item.serviceName}
+	{/if}
+{/snippet}
+
+{#snippet NodeCell({ item }: { item: TaskRow })}
+	{#if item.nodeId && item.nodeName && hasPermission('swarm-nodes:read', item.environmentId)}
+		<a
+			class="text-primary hover:underline"
+			href={environmentHref(resolve('/(app)/swarm/nodes/[nodeId]', { nodeId: item.nodeId }), item.environmentId)}
+			>{item.nodeName}</a
+		>
+	{:else}
+		{item.nodeName}
+	{/if}
+{/snippet}
+
+{#snippet MobileService(item: TaskRow)}
+	{@render ServiceCell({ item })}
+{/snippet}
+
+{#snippet MobileNode(item: TaskRow)}
+	{@render NodeCell({ item })}
 {/snippet}
 
 {#snippet StateCell({ value }: { value: unknown })}
@@ -139,8 +177,7 @@
 			variant: getSwarmTaskIconVariant(item.currentState)
 		})}
 		title={(item: TaskRow) => (serviceScoped ? item.name || item.id.slice(0, 12) : item.name)}
-		subtitle={(item: TaskRow) =>
-			serviceScoped ? item.id.slice(0, 12) : (mobileFieldVisibility['serviceName'] ?? true) ? item.serviceName : null}
+		subtitle={(item: TaskRow) => (serviceScoped ? item.id.slice(0, 12) : null)}
 		badges={[
 			(item: TaskRow) =>
 				(mobileFieldVisibility['currentState'] ?? true)
@@ -152,8 +189,17 @@
 		]}
 		fields={[
 			{
+				label: m.swarm_service(),
+				getValue: (item: TaskRow) => (item.serviceName ? item : null),
+				type: 'component',
+				component: MobileService,
+				show: !serviceScoped && (mobileFieldVisibility['serviceName'] ?? true)
+			},
+			{
 				label: m.swarm_node(),
-				getValue: (item: TaskRow) => item.nodeName,
+				getValue: (item: TaskRow) => (item.nodeName ? item : null),
+				type: 'component',
+				component: MobileNode,
 				icon: ConnectionIcon,
 				iconVariant: 'gray' as const,
 				show: mobileFieldVisibility['nodeName'] ?? true

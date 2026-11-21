@@ -1,16 +1,22 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+
 	import { KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import { VolumesIcon, TerminalIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { ContainerDetails } from '#lib/types/container.js';
+	import { hasPermission } from '#lib/utils/auth.js';
+	import { environmentHref } from '#lib/utils/environments.js';
 
 	interface Props {
 		container: ContainerDetails;
+		environmentId: string;
 	}
 
-	let { container }: Props = $props();
+	let { container, environmentId }: Props = $props();
+	const canReadVolume = $derived(hasPermission('volumes:read', environmentId));
 
 	const mountIconBgClass: Record<string, string> = {
 		volume: 'bg-primary/10',
@@ -62,7 +68,17 @@
 											{#if mount.type === 'tmpfs'}
 												{m.containers_mount_type_tmpfs()}
 											{:else if mount.type === 'volume'}
-												{mount.name || m.containers_mount_type_volume()}
+												{#if mount.name && canReadVolume}
+													<a
+														class="text-primary hover:underline"
+														href={environmentHref(
+															resolve('/(app)/volumes/[volumeName]', { volumeName: mount.name }),
+															environmentId
+														)}>{mount.name}</a
+													>
+												{:else}
+													{mount.name || m.containers_mount_type_volume()}
+												{/if}
 											{:else}
 												{m.containers_mount_type_bind()}
 											{/if}

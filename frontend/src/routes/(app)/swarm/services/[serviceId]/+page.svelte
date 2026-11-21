@@ -413,7 +413,7 @@
 
 			{#if showNetworkTab}
 				<Tabs.Content value="network" class="h-full">
-					<ServiceNetwork ports={endpointPorts} networks={specNetworks} {virtualIPs} {networkDetails} />
+					<ServiceNetwork ports={endpointPorts} networks={specNetworks} {virtualIPs} {networkDetails} environmentId={envId} />
 				</Tabs.Content>
 			{/if}
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { toast } from 'svelte-sonner';
 
 	import { HardenedImageBadge } from '#lib/components/badges/index.js';
@@ -11,6 +12,8 @@
 	import { containerService } from '#lib/services/container-service.js';
 	import type { ContainerDetails } from '#lib/types/container.js';
 	import { extractApiErrorMessage } from '#lib/utils/api.js';
+	import { hasPermission } from '#lib/utils/auth.js';
+	import { environmentHref } from '#lib/utils/environments.js';
 	import { formatDateTimeShort, formatElapsedTime, formatRelativeTime, parseInstant } from '#lib/utils/formatting.js';
 	import { hardenedSupportSummary } from '#lib/utils/hardened-images.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
@@ -136,7 +139,19 @@
 		<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 			<KeyValueCard label={m.common_id()} valueTitle={m.common_click_to_select()}>{container.id}</KeyValueCard>
 
-			<KeyValueCard label={m.common_image_id()} valueTitle={m.common_click_to_select()}>{container.imageId}</KeyValueCard>
+			{#if container.imageId && hasPermission('images:read', environmentId)}
+				<KeyValueCard label={m.common_image_id()} valueFormat="custom">
+					<a
+						class="font-mono text-sm break-all text-primary hover:underline"
+						href={environmentHref(resolve('/(app)/images/[imageId]', { imageId: container.imageId }), environmentId)}
+						>{container.imageId}</a
+					>
+				</KeyValueCard>
+			{:else}
+				<KeyValueCard label={m.common_image_id()} valueTitle={m.common_click_to_select()}>
+					{container.imageId || m.common_na()}
+				</KeyValueCard>
+			{/if}
 
 			{#if container.hardened}
 				<KeyValueCard label={m.docker_hardened_image()} valueFormat="text">

@@ -693,7 +693,7 @@
 
 	{#if hasMounts}
 		<Tabs.Content value="storage" class="h-full">
-			<ContainerStorage {container} />
+			<ContainerStorage {container} environmentId={currentEnvId} />
 		</Tabs.Content>
 	{/if}
 

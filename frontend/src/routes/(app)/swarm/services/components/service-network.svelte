@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+
 	import { KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
@@ -6,15 +8,19 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import type { SwarmServiceNetworkDetail, SwarmServicePort } from '#lib/types/swarm.js';
 	import type { ServiceNetworkAttachment, ServiceVirtualIP } from '#lib/types/ui/swarm.js';
+	import { hasPermission } from '#lib/utils/auth.js';
+	import { environmentHref } from '#lib/utils/environments.js';
 
 	interface Props {
 		ports: SwarmServicePort[];
+		environmentId: string;
 		networks: ServiceNetworkAttachment[];
 		virtualIPs: ServiceVirtualIP[];
 		networkDetails: Record<string, SwarmServiceNetworkDetail>;
 	}
 
-	let { ports, networks, virtualIPs, networkDetails }: Props = $props();
+	let { ports, networks, virtualIPs, networkDetails, environmentId }: Props = $props();
+	const canReadNetwork = $derived(hasPermission('networks:read', environmentId));
 
 	function formatPort(port: SwarmServicePort): string {
 		const protocol = port.protocol || 'tcp';
@@ -119,13 +125,21 @@
 {/snippet}
 
 {#snippet networkSummary(info: SwarmServiceNetworkDetail | undefined, aliases: string[], networkId: string)}
+	{@const label = info?.name ?? (aliases.length > 0 ? aliases[0] : networkId.slice(0, 12))}
 	<div class="flex items-center gap-3 pb-1">
 		<div class="rounded-lg bg-info/10 p-2">
 			<NetworksIcon class="size-4 text-info" />
 		</div>
 		<div class="min-w-0 flex-1">
 			<div class="text-sm font-semibold break-all text-foreground">
-				{info?.name ?? (aliases.length > 0 ? aliases[0] : networkId.slice(0, 12))}
+				{#if info?.id && canReadNetwork}
+					<a
+						class="text-primary hover:underline"
+						href={environmentHref(resolve('/(app)/networks/[networkId]', { networkId: info.id }), environmentId)}>{label}</a
+					>
+				{:else}
+					{label}
+				{/if}
 			</div>
 			<div class="mt-1 flex flex-wrap items-center gap-2">
 				{#if info?.driver}

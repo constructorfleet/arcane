@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { refreshAll } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
 
@@ -18,6 +19,7 @@
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { getCustomHostname } from '#lib/utils/docker.js';
+	import { environmentHref } from '#lib/utils/environments.js';
 	import { withOccurrenceKeys } from '#lib/utils/formatting.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
@@ -31,6 +33,7 @@
 	const queryClient = useQueryClient();
 	const envId = $derived(environmentId);
 	const customHostname = $derived(getCustomHostname(container));
+	const canReadNetwork = $derived(hasPermission('networks:read', envId));
 	const canConnect = $derived(hasPermission('networks:connect', envId));
 	const canDisconnect = $derived(hasPermission('networks:disconnect', envId));
 
@@ -171,7 +174,19 @@
 							<div class="flex items-center gap-3 pb-1">
 								<NetworksIcon class="size-4 shrink-0 text-info" />
 								<div class="min-w-0 flex-1">
-									<div class="text-sm font-semibold break-all text-foreground">{networkName}</div>
+									<div class="text-sm font-semibold break-all text-foreground">
+										{#if rawNetworkConfig.networkId && canReadNetwork}
+											<a
+												class="text-primary hover:underline"
+												href={environmentHref(
+													resolve('/(app)/networks/[networkId]', { networkId: rawNetworkConfig.networkId }),
+													envId
+												)}>{networkName}</a
+											>
+										{:else}
+											{networkName}
+										{/if}
+									</div>
 									<div class="text-xs text-muted-foreground">{m.network_interface()}</div>
 								</div>
 								{#if canDisconnect}
