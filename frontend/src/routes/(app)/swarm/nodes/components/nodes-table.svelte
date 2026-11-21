@@ -30,7 +30,7 @@
 	import type { SwarmNodesPaginatedResponse } from '#lib/types/ui/swarm.js';
 	import { extractApiErrorMessage, handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasAnyPermission, hasPermission } from '#lib/utils/auth.js';
-	import { type EnvironmentPage, type EnvironmentRow } from '#lib/utils/environments.js';
+	import { environmentHref, type EnvironmentPage, type EnvironmentRow } from '#lib/utils/environments.js';
 	import { capitalizeFirstLetter } from '#lib/utils/formatting.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
@@ -203,6 +203,11 @@
 		});
 	}
 
+	function nodeDetailsHref(node: NodeRow) {
+		if (!hasPermission('swarm-nodes:read', node.environmentId)) return undefined;
+		return environmentHref(resolve('/(app)/swarm/nodes/[nodeId]', { nodeId: node.id }), node.environmentId);
+	}
+
 	function viewNodeTasks(node: NodeRow) {
 		goto(resolve(`/(app)/swarm/tasks?nodeId=${encodeURIComponent(node.id)}&env=${encodeURIComponent(node.environmentId)}`));
 	}
@@ -301,7 +306,7 @@
 	const columns = [
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
 		...environmentColumns<NodeRow>().map((column) => ({ ...column, title: m.query_agent() })),
-		{ accessorKey: 'hostname', title: m.hostname(), sortable: true },
+		{ accessorKey: 'hostname', title: m.hostname(), sortable: true, cell: HostnameCell },
 		{ accessorKey: 'role', title: m.common_role(), sortable: true, cell: RoleCell },
 		{ accessorKey: 'status', title: m.common_status(), sortable: true, cell: StatusCell },
 		{ accessorKey: 'availability', title: m.swarm_availability(), sortable: true, cell: AvailabilityCell },
@@ -326,6 +331,15 @@
 
 	let mobileFieldVisibility = $state<Record<string, boolean>>({});
 </script>
+
+{#snippet HostnameCell({ item }: { item: NodeRow })}
+	{@const href = nodeDetailsHref(item)}
+	{#if href}
+		<a {href} class="font-medium hover:underline">{item.hostname}</a>
+	{:else}
+		{item.hostname}
+	{/if}
+{/snippet}
 
 {#snippet RoleCell({ value }: { value: unknown })}
 	<span class="text-sm">{capitalizeFirstLetter(String(value ?? ''))}</span>
@@ -400,6 +414,7 @@
 			variant: item.role === 'manager' ? 'purple' : 'blue'
 		})}
 		title={(item: NodeRow) => item.hostname}
+		href={nodeDetailsHref}
 		subtitle={(item: NodeRow) => ((mobileFieldVisibility['engineVersion'] ?? false) ? (item.engineVersion ?? '') : null)}
 		badges={[
 			(item: NodeRow) =>
@@ -450,7 +465,9 @@
 
 {#snippet RowActions({ item }: { item: NodeRow })}
 	<RowActionsMenu name={item.hostname} triggerClass="relative size-8 p-0" iconClass="">
-		{#if hasPermission('swarm-nodes:read', item.environmentId)}
+		{@const detailsHref = nodeDetailsHref(item)}
+		{#if detailsHref}
+			<DropdownMenu.Item onclick={() => goto(detailsHref)}>{m.common_inspect()}</DropdownMenu.Item>
 			<DropdownMenu.Item onclick={() => viewNodeTasks(item)}>
 				<JobsIcon class="size-4" />
 				{m.view_tasks()}
