@@ -15,6 +15,15 @@
 	import {
 		UsersIcon,
 		EnvironmentsIcon,
+		ArrowUpIcon,
+		ArrowDownIcon,
+		StopIcon,
+		PauseIcon,
+		PlayIcon,
+		InspectIcon,
+		NetworksIcon,
+		ContainersIcon,
+		VolumesIcon,
 		JobsIcon,
 		TrashIcon,
 		AgentConnectionIcon,
@@ -32,6 +41,7 @@
 	import { hasAnyPermission, hasPermission } from '#lib/utils/auth.js';
 	import { environmentHref, type EnvironmentPage, type EnvironmentRow } from '#lib/utils/environments.js';
 	import { capitalizeFirstLetter } from '#lib/utils/formatting.js';
+	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	import { getSwarmNodeAgentActionLabel, getSwarmNodeAgentLabel, getSwarmNodeAgentVariant } from '../agent-status';
@@ -205,7 +215,10 @@
 
 	function nodeDetailsHref(node: NodeRow) {
 		if (!hasPermission('swarm-nodes:read', node.environmentId)) return undefined;
-		return environmentHref(resolve('/(app)/swarm/nodes/[nodeId]', { nodeId: node.id }), node.environmentId);
+		return resourceTableHref(
+			environmentHref(resolve('/(app)/swarm/nodes/[nodeId]', { nodeId: node.id }), node.environmentId),
+			requestOptions.pagination?.page
+		);
 	}
 
 	function viewNodeTasks(node: NodeRow) {
@@ -330,6 +343,11 @@
 	];
 
 	let mobileFieldVisibility = $state<Record<string, boolean>>({});
+	const nodeResourceViews = [
+		{ id: 'networks', icon: NetworksIcon, label: m.resource_view_networks() },
+		{ id: 'containers', icon: ContainersIcon, label: m.resource_view_containers() },
+		{ id: 'volumes', icon: VolumesIcon, label: m.resource_view_volumes() }
+	] as const;
 </script>
 
 {#snippet HostnameCell({ item }: { item: NodeRow })}
@@ -467,7 +485,17 @@
 	<RowActionsMenu name={item.hostname} triggerClass="relative size-8 p-0" iconClass="">
 		{@const detailsHref = nodeDetailsHref(item)}
 		{#if detailsHref}
-			<DropdownMenu.Item onclick={() => goto(detailsHref)}>{m.common_inspect()}</DropdownMenu.Item>
+			<DropdownMenu.Item onclick={() => goto(detailsHref)}><InspectIcon />{m.common_inspect()}</DropdownMenu.Item>
+			{#each nodeResourceViews as view (view.id)}
+				{#if item.agent?.environmentId && hasPermission(`${view.id}:list`, item.agent.environmentId)}
+					<DropdownMenu.Item onclick={() => goto(detailsHref + `&tab=resources&resource=${view.id}`)}
+						><view.icon />{view.label}</DropdownMenu.Item
+					>
+				{/if}
+			{/each}
+			<DropdownMenu.Item onclick={() => goto(detailsHref + '&tab=agent')}
+				><AgentConnectionIcon />{m.resource_view_agent()}</DropdownMenu.Item
+			>
 			<DropdownMenu.Item onclick={() => viewNodeTasks(item)}>
 				<JobsIcon class="size-4" />
 				{m.view_tasks()}
@@ -484,23 +512,23 @@
 		{/if}
 		{#if hasPermission('swarm-nodes:promote', item.environmentId)}
 			<DropdownMenu.Item onclick={() => promoteNode(item)} disabled={isLoading || item.role === 'manager'}>
-				{m.swarm_node_promote()}
+				<ArrowUpIcon />{m.swarm_node_promote()}
 			</DropdownMenu.Item>
 		{/if}
 		{#if hasPermission('swarm-nodes:demote', item.environmentId)}
 			<DropdownMenu.Item onclick={() => demoteNode(item)} disabled={isLoading || item.role !== 'manager'}>
-				{m.swarm_node_demote()}
+				<ArrowDownIcon />{m.swarm_node_demote()}
 			</DropdownMenu.Item>
 		{/if}
 		{#if canUpdateNode(item)}
 			<DropdownMenu.Item onclick={() => setAvailability(item, 'drain')} disabled={isLoading || item.availability === 'drain'}>
-				{m.drain()}
+				<StopIcon />{m.drain()}
 			</DropdownMenu.Item>
 			<DropdownMenu.Item onclick={() => setAvailability(item, 'pause')} disabled={isLoading || item.availability === 'pause'}>
-				{m.common_pause()}
+				<PauseIcon />{m.common_pause()}
 			</DropdownMenu.Item>
 			<DropdownMenu.Item onclick={() => setAvailability(item, 'active')} disabled={isLoading || item.availability === 'active'}>
-				{m.swarm_node_activate()}
+				<PlayIcon />{m.swarm_node_activate()}
 			</DropdownMenu.Item>
 		{/if}
 		{#if hasPermission('swarm-nodes:delete', item.environmentId)}

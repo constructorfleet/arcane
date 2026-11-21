@@ -12,7 +12,7 @@
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import IfPermitted from '#lib/components/if-permitted.svelte';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
-	import { LayersIcon, InspectIcon, TrashIcon, StopIcon, PlayIcon } from '#lib/icons/index.js';
+	import { LayersIcon, EditIcon, ContainersIcon, InspectIcon, TrashIcon, StopIcon, PlayIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { swarmService } from '#lib/services/swarm-service.js';
@@ -20,8 +20,9 @@
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import type { SwarmStacksPaginatedResponse } from '#lib/types/ui/swarm.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
-	import { type EnvironmentPage, type EnvironmentRow } from '#lib/utils/environments.js';
+	import { environmentHref, type EnvironmentPage, type EnvironmentRow } from '#lib/utils/environments.js';
 	import { formatRelativeTime } from '#lib/utils/formatting.js';
+	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	import { bringDownStack, bringUpStack } from '../stack-actions.js';
@@ -45,11 +46,11 @@
 
 	let isLoading = $state(false);
 
-	function inspectStack(stack: StackRow) {
-		goto(
-			resolve(`/(app)/swarm/stacks/[name]?env=${encodeURIComponent(stack.environmentId)}`, {
-				name: encodeURIComponent(stack.name)
-			})
+	function stackHref(stack: StackRow, tab?: 'services' | 'source') {
+		const path = resolve('/(app)/swarm/stacks/[name]', { name: encodeURIComponent(stack.name) });
+		return resourceTableHref(
+			environmentHref(path + (tab ? `?tab=${tab}` : ''), stack.environmentId),
+			requestOptions.pagination?.page
 		);
 	}
 
@@ -104,12 +105,7 @@
 </script>
 
 {#snippet NameCell({ item }: { item: StackRow })}
-	<a
-		href={resolve(`/(app)/swarm/stacks/[name]?env=${encodeURIComponent(item.environmentId)}`, {
-			name: encodeURIComponent(item.name)
-		})}
-		class="text-sm font-medium text-primary-text hover:underline"
-	>
+	<a href={stackHref(item)} class="text-sm font-medium text-primary-text hover:underline">
 		{item.name}
 	</a>
 {/snippet}
@@ -160,11 +156,18 @@
 
 {#snippet RowActions({ item }: { item: StackRow })}
 	<RowActionsMenu name={item.name} triggerClass="relative size-8 p-0" iconClass="">
-		<DropdownMenu.Item onclick={() => inspectStack(item)}>
+		<DropdownMenu.Item onclick={() => goto(stackHref(item))}>
 			<InspectIcon class="size-4" />
 			{m.common_inspect()}
 		</DropdownMenu.Item>
+		<DropdownMenu.Item onclick={() => goto(stackHref(item, 'services'))}>
+			<ContainersIcon />{m.resource_view_services()}
+		</DropdownMenu.Item>
 		<IfPermitted perm="swarm-stacks:update" envId={item.environmentId}>
+			<DropdownMenu.Separator />
+			{#if item.hasSource}
+				<DropdownMenu.Item onclick={() => goto(stackHref(item, 'source'))}><EditIcon />{m.common_edit()}</DropdownMenu.Item>
+			{/if}
 			{#if item.services > 0}
 				<DropdownMenu.Item onclick={() => bringDownStack(stackActionOptions(item))} disabled={isLoading}>
 					<StopIcon class="size-4" />

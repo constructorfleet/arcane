@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
+	import { untrack } from 'svelte';
 
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
 	import { m } from '#lib/paraglide/messages.js';
@@ -9,12 +11,16 @@
 	import type { SwarmTasksPaginatedResponse } from '#lib/types/ui/swarm.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { environmentName, environmentRows, type EnvironmentPage } from '#lib/utils/environments.js';
+	import { resourceTablePage } from '#lib/utils/resource-navigation.js';
 
 	import SwarmTasksTable from '../../tasks/components/tasks-table.svelte';
 
 	let { environmentId, serviceId }: { environmentId: string; serviceId: string } = $props();
 	let requestOptions = $state<SearchPaginationSortRequest>({
-		pagination: { page: 1, limit: 20 },
+		pagination: {
+			page: untrack(() => resourceTablePage((page.shallow?.url ?? page.url).searchParams.get('tablePage'))),
+			limit: 20
+		},
 		sort: { column: 'updated', direction: 'desc' }
 	});
 	const nodeRequest: SearchPaginationSortRequest = { pagination: { page: 1, limit: -1 } };

@@ -55,6 +55,7 @@
 	import { composeTreeSplitProps } from '#lib/utils/compose-flow.js';
 	import { formatDateTimeShort, truncateString } from '#lib/utils/formatting.js';
 	import { bytes } from '#lib/utils/formatting.js';
+	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 	import {
 		buildWorkspaceMultipartUpdate,
@@ -900,7 +901,9 @@
 					<div class="flex flex-col p-3 sm:flex-row sm:items-center">
 						<div class="mb-2 w-full font-medium break-all sm:mb-0 sm:w-1/3">
 							<a
-								href={resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(currentEnvId)}`, { containerId: c.id })}
+								href={resourceDetailHref(
+									resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(currentEnvId)}`, { containerId: c.id })
+								)}
 								class="flex items-center text-primary-text hover:underline"
 							>
 								<ContainersIcon class="mr-1.5 size-3.5 text-muted-foreground" />
@@ -930,7 +933,9 @@
 					<div class="flex items-center justify-between gap-3 p-3">
 						<code class="font-mono text-sm break-all">{truncateString(id, 48)}</code>
 						<a
-							href={resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(currentEnvId)}`, { containerId: id })}
+							href={resourceDetailHref(
+								resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(currentEnvId)}`, { containerId: id })
+							)}
 							class="text-sm text-primary-text hover:underline">{m.common_view()}</a
 						>
 					</div>

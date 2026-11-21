@@ -19,6 +19,7 @@
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { environmentHref, type EnvironmentPage, type EnvironmentRow } from '#lib/utils/environments.js';
 	import { formatDateTimeShort } from '#lib/utils/formatting.js';
+	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
 	import { getSwarmTaskIconVariant, getSwarmTaskStateVariant } from '#lib/utils/swarm-tasks.js';
 
 	let {
@@ -112,15 +113,17 @@
 </script>
 
 {#snippet ContainerCell({ item }: { item: TaskRow })}
-	<SwarmTaskContainer task={item} environmentId={item.environmentId} />
+	<SwarmTaskContainer task={item} environmentId={item.environmentId} tablePage={requestOptions.pagination?.page} />
 {/snippet}
 
 {#snippet ServiceCell({ item }: { item: TaskRow })}
 	{#if item.serviceId && item.serviceName && hasPermission('swarm-services:read', item.environmentId)}
 		<a
 			class="text-primary hover:underline"
-			href={environmentHref(resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.serviceId }), item.environmentId)}
-			>{item.serviceName}</a
+			href={resourceTableHref(
+				environmentHref(resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.serviceId }), item.environmentId),
+				requestOptions.pagination?.page
+			)}>{item.serviceName}</a
 		>
 	{:else}
 		{item.serviceName}
@@ -131,8 +134,10 @@
 	{#if item.nodeId && item.nodeName && hasPermission('swarm-nodes:read', item.environmentId)}
 		<a
 			class="text-primary hover:underline"
-			href={environmentHref(resolve('/(app)/swarm/nodes/[nodeId]', { nodeId: item.nodeId }), item.environmentId)}
-			>{item.nodeName}</a
+			href={resourceTableHref(
+				environmentHref(resolve('/(app)/swarm/nodes/[nodeId]', { nodeId: item.nodeId }), item.environmentId),
+				requestOptions.pagination?.page
+			)}>{item.nodeName}</a
 		>
 	{:else}
 		{item.nodeName}
@@ -176,9 +181,9 @@
 	{@const canReadService = hasPermission('swarm-services:read', item.environmentId)}
 	{@const canUpdateService = hasPermission('swarm-services:update', item.environmentId)}
 	{#if item.serviceId && (canReadService || (item.desiredState === 'running' && canUpdateService))}
-		{@const href = environmentHref(
-			resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.serviceId }),
-			item.environmentId
+		{@const href = resourceTableHref(
+			environmentHref(resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.serviceId }), item.environmentId),
+			requestOptions.pagination?.page
 		)}
 		<RowActionsMenu name={item.name || item.id} triggerClass="relative size-8 p-0" iconClass="">
 			{#if canReadService}
@@ -257,7 +262,7 @@
 			}
 		]}
 	>
-		<SwarmTaskContainer task={item} environmentId={item.environmentId} />
+		<SwarmTaskContainer task={item} environmentId={item.environmentId} tablePage={requestOptions.pagination?.page} />
 		{#if serviceScoped && item.error}
 			<p class="mt-1 text-sm wrap-anywhere text-destructive">{item.error}</p>
 		{/if}

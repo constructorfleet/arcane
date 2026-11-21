@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 
-	import { KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
+	import RelatedResourceTable from '#lib/components/resource-detail/related-resource-table.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import { NetworksIcon, GlobeIcon } from '#lib/icons/index.js';
@@ -10,6 +10,7 @@
 	import type { ServiceNetworkAttachment, ServiceVirtualIP } from '#lib/types/ui/swarm.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { environmentHref } from '#lib/utils/environments.js';
+	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 
 	interface Props {
 		ports: SwarmServicePort[];
@@ -33,181 +34,42 @@
 		return `${target}/${protocol}`;
 	}
 
-	// Match the network detail page's color convention for driver badges
-	function driverVariant(driver: string): 'blue' | 'purple' | 'amber' | 'green' | 'gray' {
-		if (driver === 'overlay') return 'blue';
-		if (driver === 'macvlan') return 'purple';
-		if (driver === 'bridge') return 'green';
-		if (driver === 'host') return 'amber';
-		return 'gray';
-	}
-
-	const vipMap = $derived.by(() => {
-		const map: Record<string, string> = {};
-		for (const vip of virtualIPs) {
-			const id = vip.networkID;
-			const addr = vip.addr;
-			if (id && addr) map[id] = addr;
-		}
-		return map;
+	const rows = $derived.by(() => {
+		const attachments = new Map(networks.map((network) => [network.target, network.aliases]));
+		const ips = new Map(virtualIPs.flatMap((vip) => (vip.networkID && vip.addr ? [[vip.networkID, vip.addr] as const] : [])));
+		const ids = new Set([...attachments.keys(), ...ips.keys()]);
+		return [...ids].map((id) => {
+			const info = networkDetails[id];
+			const aliases = attachments.get(id) ?? [];
+			const config = info?.configNetwork;
+			const addresses = [...(config?.ipv4Configs ?? []), ...(config?.ipv6Configs ?? [])].map(({ subnet, gateway, ipRange }) =>
+				[subnet, gateway, ipRange].filter(Boolean).join(' / ')
+			);
+			const flags = [
+				info?.internal && m.internal(),
+				info?.attachable && m.attachable(),
+				info?.ingress && m.ingress(),
+				info?.configOnly && m.config_only(),
+				config?.name ?? info?.configFrom,
+				config?.driver,
+				config?.scope,
+				config?.options?.['parent'],
+				...addresses
+			]
+				.filter(Boolean)
+				.join(' · ');
+			return {
+				id,
+				name: info?.name ?? aliases[0] ?? id.slice(0, 12),
+				values: [info?.driver, info?.scope, ips.get(id), aliases.join(', '), flags],
+				href:
+					info?.id && canReadNetwork
+						? resourceDetailHref(environmentHref(resolve('/(app)/networks/[networkId]', { networkId: info.id }), environmentId))
+						: undefined
+			};
+		});
 	});
 </script>
-
-{#snippet networkAttachment(network: ServiceNetworkAttachment)}
-	{@const networkId = network.target}
-	{@const aliases = network.aliases}
-	{@const vip = vipMap[networkId]}
-	{@const info = networkDetails[networkId]}
-	<section class="py-5 first:pt-0 last:pb-0">
-		{@render networkSummary(info, aliases, networkId)}
-
-		<KeyValueGrid>
-			{#if vip}
-				<KeyValueCard label={m.networks_service_vip_label()}>{vip}</KeyValueCard>
-			{/if}
-
-			<KeyValueCard label={m.common_id()}>{networkId}</KeyValueCard>
-
-			{#if aliases.length > 0}
-				<KeyValueCard label={m.containers_aliases()} stacked>
-					{#each aliases as alias (alias)}
-						<span class="cursor-pointer font-mono break-all select-all">{alias}</span>
-					{/each}
-				</KeyValueCard>
-			{/if}
-
-			{#if info?.configNetwork}
-				{@render configurationNetwork(info.configNetwork)}
-			{/if}
-		</KeyValueGrid>
-	</section>
-{/snippet}
-
-{#snippet configurationNetwork(configNetwork: NonNullable<SwarmServiceNetworkDetail['configNetwork']>)}
-	<div class="border-b border-border/50 py-3 lg:col-span-2 2xl:col-span-3">
-		<div>
-			<div class="mb-2 flex items-center justify-between">
-				<div>
-					<div class="text-sm font-semibold text-foreground">
-						{m.config_only()}: {configNetwork.name}
-					</div>
-					<div class="mt-1 flex flex-wrap items-center gap-1.5">
-						{#if configNetwork.driver}
-							<Badge variant="gray" size="sm">{configNetwork.driver}</Badge>
-						{/if}
-						{#if configNetwork.scope}
-							<Badge variant="gray" size="sm">{configNetwork.scope}</Badge>
-						{/if}
-						{#if configNetwork.options?.['parent']}
-							<span class="text-xs text-muted-foreground">{configNetwork.options['parent']}</span>
-						{/if}
-					</div>
-				</div>
-				<div class="flex items-center gap-2">
-					<Badge variant={configNetwork.enableIPv4 ? 'indigo' : 'gray'} size="sm"
-						>{configNetwork.enableIPv4 ? m.ipv4_enabled() : m.common_disabled()}</Badge
-					>
-					<Badge variant={configNetwork.enableIPv6 ? 'indigo' : 'gray'} size="sm"
-						>{configNetwork.enableIPv6 ? m.ipv6_enabled() : m.common_disabled()}</Badge
-					>
-				</div>
-			</div>
-			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-				{#if configNetwork.ipv4Configs && configNetwork.ipv4Configs.length > 0}
-					{@render IpamConfigList(configNetwork.ipv4Configs, m.ipv4_enabled())}
-				{/if}
-				{#if configNetwork.ipv6Configs && configNetwork.ipv6Configs.length > 0}
-					{@render IpamConfigList(configNetwork.ipv6Configs, m.ipv6_enabled())}
-				{/if}
-			</div>
-		</div>
-	</div>
-{/snippet}
-
-{#snippet networkSummary(info: SwarmServiceNetworkDetail | undefined, aliases: string[], networkId: string)}
-	{@const label = info?.name ?? (aliases.length > 0 ? aliases[0] : networkId.slice(0, 12))}
-	<div class="flex items-center gap-3 pb-1">
-		<div class="rounded-lg bg-info/10 p-2">
-			<NetworksIcon class="size-4 text-info" />
-		</div>
-		<div class="min-w-0 flex-1">
-			<div class="text-sm font-semibold break-all text-foreground">
-				{#if info?.id && canReadNetwork}
-					<a
-						class="text-primary hover:underline"
-						href={environmentHref(resolve('/(app)/networks/[networkId]', { networkId: info.id }), environmentId)}>{label}</a
-					>
-				{:else}
-					{label}
-				{/if}
-			</div>
-			<div class="mt-1 flex flex-wrap items-center gap-2">
-				{#if info?.driver}
-					<Badge variant={driverVariant(info.driver)} minWidth="20">{info.driver}</Badge>
-				{/if}
-				{#if info?.scope}
-					<Badge variant="gray" minWidth="20">{info.scope}</Badge>
-				{/if}
-				{#if info?.internal}
-					<Badge variant="blue" minWidth="20">{m.internal()}</Badge>
-				{/if}
-				{#if info?.attachable}
-					<Badge variant="green" minWidth="20">{m.attachable()}</Badge>
-				{/if}
-				{#if info?.ingress}
-					<Badge variant="cyan" minWidth="20">{m.ingress()}</Badge>
-				{/if}
-				{#if info?.configOnly}
-					<Badge variant="pink" minWidth="20">{m.config_only()}</Badge>
-				{/if}
-				{#if info?.configFrom}
-					<span class="text-xs text-muted-foreground">{info.configFrom}</span>
-				{/if}
-			</div>
-		</div>
-	</div>
-{/snippet}
-
-{#snippet IpamConfigList(
-	configs: NonNullable<NonNullable<SwarmServiceNetworkDetail['configNetwork']>['ipv4Configs']>,
-	heading: string
-)}
-	{#each configs as cfg (`${cfg.subnet ?? ''}:${cfg.gateway ?? ''}:${cfg.ipRange ?? ''}`)}
-		<div class="space-y-1">
-			<div class="mb-1 text-xs font-semibold text-muted-foreground">{heading}</div>
-			{#if cfg.subnet}
-				<div class="flex flex-col sm:flex-row sm:items-center">
-					<span class="w-full text-sm font-medium text-muted-foreground sm:w-16">{m.common_subnet()}:</span>
-					<code
-						class="cursor-pointer rounded-xl bg-muted px-1.5 py-0.5 font-mono text-xs break-all text-muted-foreground select-all sm:text-sm"
-					>
-						{cfg.subnet}
-					</code>
-				</div>
-			{/if}
-			{#if cfg.gateway}
-				<div class="flex flex-col sm:flex-row sm:items-center">
-					<span class="w-full text-sm font-medium text-muted-foreground sm:w-16">{m.common_gateway()}:</span>
-					<code
-						class="cursor-pointer rounded-xl bg-muted px-1.5 py-0.5 font-mono text-xs break-all text-muted-foreground select-all sm:text-sm"
-					>
-						{cfg.gateway}
-					</code>
-				</div>
-			{/if}
-			{#if cfg.ipRange}
-				<div class="flex flex-col sm:flex-row sm:items-center">
-					<span class="w-full text-sm font-medium text-muted-foreground sm:w-16">{m.networks_ipam_iprange_label()}:</span>
-					<code
-						class="cursor-pointer rounded-xl bg-muted px-1.5 py-0.5 font-mono text-xs break-all text-muted-foreground select-all sm:text-sm"
-					>
-						{cfg.ipRange}
-					</code>
-				</div>
-			{/if}
-		</div>
-	{/each}
-{/snippet}
 
 <div class="space-y-6">
 	<Card.Root>
@@ -242,17 +104,17 @@
 			</div>
 		</Card.Header>
 		<Card.Content>
-			{#if networks.length > 0 || virtualIPs.length > 0}
-				<div class="divide-y divide-border/60">
-					{#each networks as network (network.target)}
-						{@render networkAttachment(network)}
-					{/each}
-				</div>
-			{:else}
-				<div class="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
-					<div class="text-sm">{m.containers_no_networks_connected()}</div>
-				</div>
-			{/if}
+			<RelatedResourceTable
+				columns={[
+					m.common_driver(),
+					m.common_scope(),
+					m.networks_service_vip_label(),
+					m.containers_aliases(),
+					m.common_configuration()
+				]}
+				{rows}
+				empty={m.containers_no_networks_connected()}
+			/>
 		</Card.Content>
 	</Card.Root>
 </div>

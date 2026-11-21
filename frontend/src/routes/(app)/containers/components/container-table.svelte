@@ -60,6 +60,7 @@
 	import { type EnvironmentPage, type EnvironmentRow, hasShownPermission, listScopes, rowKey } from '#lib/utils/environments.js';
 	import { formatDateTimeShort } from '#lib/utils/formatting.js';
 	import { quadletUnitHref } from '#lib/utils/podman.js';
+	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 
 	import { createContainerActions } from '../container-table.actions';
 	import {
@@ -1041,7 +1042,11 @@
 		<RowActionsMenu name={getContainerDisplayName(item)}>
 			<DropdownMenu.Item
 				onclick={() =>
-					goto(resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(envId)}`, { containerId: item.id }))}
+					goto(
+						resourceDetailHref(
+							resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(envId)}`, { containerId: item.id })
+						)
+					)}
 				disabled={isBulkActionRunning || !!status}
 			>
 				<InspectIcon class="size-4" />

@@ -16,6 +16,7 @@
 	import { environmentHref } from '#lib/utils/environments.js';
 	import { formatDateTimeShort, formatElapsedTime, formatRelativeTime, parseInstant } from '#lib/utils/formatting.js';
 	import { hardenedSupportSummary } from '#lib/utils/hardened-images.js';
+	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	interface Props {
@@ -143,8 +144,9 @@
 				<KeyValueCard label={m.common_image_id()} valueFormat="custom">
 					<a
 						class="font-mono text-sm break-all text-primary hover:underline"
-						href={environmentHref(resolve('/(app)/images/[imageId]', { imageId: container.imageId }), environmentId)}
-						>{container.imageId}</a
+						href={resourceDetailHref(
+							environmentHref(resolve('/(app)/images/[imageId]', { imageId: container.imageId }), environmentId)
+						)}>{container.imageId}</a
 					>
 				</KeyValueCard>
 			{:else}

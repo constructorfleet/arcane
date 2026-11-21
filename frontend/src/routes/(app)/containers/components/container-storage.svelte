@@ -9,6 +9,7 @@
 	import type { ContainerDetails } from '#lib/types/container.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { environmentHref } from '#lib/utils/environments.js';
+	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 
 	interface Props {
 		container: ContainerDetails;
@@ -71,9 +72,8 @@
 												{#if mount.name && canReadVolume}
 													<a
 														class="text-primary hover:underline"
-														href={environmentHref(
-															resolve('/(app)/volumes/[volumeName]', { volumeName: mount.name }),
-															environmentId
+														href={resourceDetailHref(
+															environmentHref(resolve('/(app)/volumes/[volumeName]', { volumeName: mount.name }), environmentId)
 														)}>{mount.name}</a
 													>
 												{:else}

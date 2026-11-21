@@ -21,6 +21,7 @@
 	import { getCustomHostname } from '#lib/utils/docker.js';
 	import { environmentHref } from '#lib/utils/environments.js';
 	import { withOccurrenceKeys } from '#lib/utils/formatting.js';
+	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	interface Props {
@@ -178,9 +179,11 @@
 										{#if rawNetworkConfig.networkId && canReadNetwork}
 											<a
 												class="text-primary hover:underline"
-												href={environmentHref(
-													resolve('/(app)/networks/[networkId]', { networkId: rawNetworkConfig.networkId }),
-													envId
+												href={resourceDetailHref(
+													environmentHref(
+														resolve('/(app)/networks/[networkId]', { networkId: rawNetworkConfig.networkId }),
+														envId
+													)
 												)}>{networkName}</a
 											>
 										{:else}

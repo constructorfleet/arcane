@@ -11,6 +11,8 @@ type UrlTabItem<T extends string> = TabItem & { value: T; visible?: boolean };
 
 type UseUrlTabOptions<T extends string> = {
 	defaultTab: () => T;
+	param?: string;
+	history?: boolean;
 	ready?: () => boolean;
 	aliases?: () => Readonly<Partial<Record<string, T>>>;
 } & ({ validTabs: () => readonly T[]; tabs?: never } | { tabs: () => readonly UrlTabItem<T>[]; validTabs?: never });
@@ -19,6 +21,8 @@ export function useUrlTab<T extends string>({
 	validTabs: tabValues,
 	tabs,
 	defaultTab,
+	param = 'tab',
+	history = false,
 	ready = () => true,
 	aliases = () => ({})
 }: UseUrlTabOptions<T>) {
@@ -33,7 +37,7 @@ export function useUrlTab<T extends string>({
 		return new URL((page.shallow?.url ?? page.url).href);
 	}
 
-	function updateUrl(url: URL) {
+	function updateUrl(url: URL, replace = true) {
 		const state = page.state;
 		const href = `${url.pathname}${url.search}${url.hash}`;
 		if (!isInAppPath(href)) return;
@@ -48,7 +52,7 @@ export function useUrlTab<T extends string>({
 			})
 			.then(() =>
 				goto(target, {
-					replace: true,
+					replace,
 					shallow: true,
 					reset: false,
 					state
@@ -66,7 +70,7 @@ export function useUrlTab<T extends string>({
 		return tabs.includes(aliased as T) ? (aliased as T) : fallback;
 	}
 
-	let value = $derived(resolveTab(currentUrl().searchParams.get('tab')));
+	let value = $derived(resolveTab(currentUrl().searchParams.get(param)));
 	let mounted = $state(false);
 
 	onMount(() => {
@@ -81,9 +85,9 @@ export function useUrlTab<T extends string>({
 		if (!validTabs().includes(tab as T)) return;
 
 		const url = currentUrl();
-		if (url.searchParams.get('tab') !== tab) {
-			url.searchParams.set('tab', tab);
-			updateUrl(url);
+		if (url.searchParams.get(param) !== tab) {
+			url.searchParams.set(param, tab);
+			updateUrl(url, !history);
 		}
 
 		value = tab as T;
@@ -91,9 +95,9 @@ export function useUrlTab<T extends string>({
 
 	$effect(() => {
 		const url = currentUrl();
-		const selected = resolveTab(url.searchParams.get('tab'));
-		if (mounted && ready() && url.searchParams.get('tab') !== selected) {
-			url.searchParams.set('tab', selected);
+		const selected = resolveTab(url.searchParams.get(param));
+		if (mounted && ready() && url.searchParams.get(param) !== selected) {
+			url.searchParams.set(param, selected);
 			untrack(() => updateUrl(url));
 		}
 	});

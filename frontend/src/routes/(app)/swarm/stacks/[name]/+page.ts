@@ -4,6 +4,7 @@ import { m } from '#lib/paraglide/messages.js';
 import { swarmStackQuery, swarmStackServiceListQuery, swarmStackTaskListQuery } from '#lib/query/swarm.js';
 import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 import { environmentName, resolveDetailEnvironmentId } from '#lib/utils/environments.js';
+import { resourceTablePage } from '#lib/utils/resource-navigation.js';
 import { resolveInitialTableRequest } from '#lib/utils/tables.js';
 import { tryCatch } from '#lib/utils/try-catch.js';
 
@@ -35,6 +36,10 @@ export const load: PageLoad = async ({ params, parent, url }) => {
 			direction: 'asc'
 		}
 	} satisfies SearchPaginationSortRequest);
+
+	const tablePage = resourceTablePage(url.searchParams.get('tablePage'));
+	const options = url.searchParams.get('tab') === 'tasks' ? tasksRequestOptions : servicesRequestOptions;
+	if (options.pagination) options.pagination.page = tablePage;
 
 	const operationResult = await tryCatch(
 		(async () => {

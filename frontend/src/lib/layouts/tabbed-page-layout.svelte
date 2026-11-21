@@ -1,10 +1,9 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 
-	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
+	import ResourcePrevious from '#lib/components/resource-detail/resource-previous.svelte';
 	import { TabBar, type TabItem } from '#lib/components/tab-bar/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
-	import { ArrowLeftIcon } from '#lib/icons/index.js';
 	import { cn } from '#lib/utils.js';
 
 	interface Props {
@@ -23,7 +22,6 @@
 
 	let {
 		backUrl,
-		backLabel,
 		tabItems,
 		selectedTab,
 		onTabChange,
@@ -48,10 +46,7 @@
 			<div class="flex items-start gap-3">
 				<div class="flex max-w-7-10 min-w-0 items-start gap-2">
 					{#if backUrl}
-						<ArcaneButton action="base" tone="ghost" href={backUrl}>
-							<ArrowLeftIcon class="size-4" />
-							{backLabel ?? ''}
-						</ArcaneButton>
+						<ResourcePrevious fallback={backUrl} />
 					{/if}
 					<div class="min-w-0">
 						{@render headerInfo()}
@@ -69,14 +64,14 @@
 			{/if}
 
 			<div class="mt-4 -mb-px">
-				<TabBar items={tabItems} onValueChange={onTabChange} />
+				<TabBar items={tabItems} />
 			</div>
 		</div>
 	</div>
 {/snippet}
 
 <div class={cn('flex h-full min-h-0 flex-col', className)}>
-	<Tabs.Root value={selectedTab} class="flex min-h-0 w-full flex-1 flex-col">
+	<Tabs.Root value={selectedTab} onValueChange={onTabChange} class="flex min-h-0 w-full flex-1 flex-col">
 		{#if showFloatingHeader === false}
 			{@render fullHeader()}
 		{/if}
@@ -89,6 +84,7 @@
 					class="bubble-shadow-lg pointer-events-auto max-w-full rounded-lg border border-border/50 bg-popover/90 px-4 py-3 backdrop-blur-md supports-backdrop-filter:bg-popover/80"
 				>
 					<div class="flex items-center gap-4">
+						{#if backUrl}<ResourcePrevious fallback={backUrl} />{/if}
 						<div class="min-w-0">
 							{@render headerInfo()}
 						</div>

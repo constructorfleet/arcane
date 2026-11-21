@@ -4,12 +4,13 @@ import { swarmNodeListQuery } from '#lib/query/swarm.js';
 import { environmentStore } from '#lib/stores/environment.store.svelte.js';
 import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 import { throwPageLoadError } from '#lib/utils/api.js';
+import { resourceTablePage } from '#lib/utils/resource-navigation.js';
 import { resolveInitialTableRequest } from '#lib/utils/tables.js';
 import { tryCatch } from '#lib/utils/try-catch.js';
 
 import type { PageLoad } from './$types';
 
-export const load: PageLoad = async ({ parent }) => {
+export const load: PageLoad = async ({ parent, url }) => {
 	const [{ queryClient }] = await Promise.all([parent(), environmentStore.ready]);
 	const requestOptions = resolveInitialTableRequest('arcane-swarm-nodes-table', {
 		pagination: {
@@ -21,6 +22,8 @@ export const load: PageLoad = async ({ parent }) => {
 			direction: 'asc'
 		}
 	} satisfies SearchPaginationSortRequest);
+
+	if (requestOptions.pagination) requestOptions.pagination.page = resourceTablePage(url.searchParams.get('tablePage'));
 
 	const result = await tryCatch(
 		(async () => {

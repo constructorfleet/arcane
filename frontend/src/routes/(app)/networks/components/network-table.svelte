@@ -3,6 +3,7 @@
 
 	import type { NetworkSummary } from '#lib/types/network.js';
 	import type { NetworksPaginatedResponse } from '#lib/types/ui/network.js';
+	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 
 	function networkDetailHref(item: NetworkSummary & { environmentId: string }) {
 		const params = new URLSearchParams({ env: item.environmentId });
@@ -10,7 +11,7 @@
 			params.set('cluster', item.clusterId);
 			params.set('agents', item.nodes.map((node) => node.id).join(','));
 		}
-		return resolve(`/(app)/networks/[networkId]?${params}`, { networkId: item.id });
+		return resourceDetailHref(resolve(`/(app)/networks/[networkId]?${params}`, { networkId: item.id }));
 	}
 
 	function ipamValues(item: NetworkSummary, key: 'subnet' | 'gateway'): string[] {

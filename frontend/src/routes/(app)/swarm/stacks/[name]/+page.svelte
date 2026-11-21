@@ -5,10 +5,12 @@
 	import { onMount, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
+	import { ActionButtonGroup } from '#lib/components/action-button-group/index.js';
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import EditorTabStrip from '#lib/components/editor-tab-strip.svelte';
 	import ResizableSplit from '#lib/components/resizable-split.svelte';
-	import { TabBar, type TabItem } from '#lib/components/tab-bar/index.js';
+	import { type TabItem } from '#lib/components/tab-bar/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as CodeBlock from '#lib/components/ui/code-block/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
@@ -16,7 +18,8 @@
 	import { useHighlightedCode } from '#lib/hooks/use-highlighted-code.svelte.js';
 	import { useUrlTab } from '#lib/hooks/use-url-tab.svelte.js';
 	import { ContainersIcon, JobsIcon, TrashIcon, EditIcon, FileTextIcon, StopIcon, PlayIcon } from '#lib/icons/index.js';
-	import { ResourcePageLayout, type ActionButton, type StatCardConfig } from '#lib/layouts/index.js';
+	import type { ActionButton } from '#lib/layouts/index.js';
+	import TabbedPageLayout from '#lib/layouts/tabbed-page-layout.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { swarmStackQuery, swarmStackServiceListQuery, swarmStackTaskListQuery } from '#lib/query/swarm.js';
@@ -108,6 +111,7 @@
 		...(canViewSource ? [{ value: 'source', label: 'Source', icon: FileTextIcon }] : [])
 	]);
 	const urlTab = useUrlTab<StackTab>({
+		history: true,
 		validTabs: () => tabItems.map((tab) => tab.value as StackTab),
 		defaultTab: () => {
 			if (hasLiveStack) return 'services';
@@ -296,26 +300,22 @@
 			disabled: isLoading.refresh
 		}
 	]);
-
-	const statCards: StatCardConfig[] = $derived([
-		{
-			title: m.services(),
-			value: totalServices,
-			icon: ContainersIcon,
-			iconColor: 'text-info'
-		},
-		{
-			title: m.tasks(),
-			value: totalTasks,
-			icon: JobsIcon,
-			iconColor: 'text-indigo'
-		}
-	]);
 </script>
 
-<ResourcePageLayout title={stackName} subtitle={stackSubtitle} {actionButtons} {statCards}>
-	{#snippet mainContent()}
-		<div class="flex min-h-screen-inset-18 flex-col gap-4">
+<TabbedPageLayout backUrl="/swarm/stacks" {tabItems} {selectedTab} onTabChange={urlTab.select}>
+	{#snippet headerInfo()}
+		<h1 class="truncate text-sm font-semibold">{stackName}</h1>
+		<div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+			<span>{stackSubtitle}</span>
+			<Badge variant="secondary">{m.services()} {totalServices}</Badge>
+			<Badge variant="secondary">{m.tasks()} {totalTasks}</Badge>
+		</div>
+	{/snippet}
+	{#snippet headerActions()}
+		<ActionButtonGroup buttons={actionButtons} />
+	{/snippet}
+	{#snippet tabContent()}
+		<div class="flex min-h-0 flex-1 flex-col gap-4">
 			{#if !hasLiveStack && canViewSource}
 				<Card.Root>
 					<Card.Content>
@@ -324,115 +324,104 @@
 				</Card.Root>
 			{/if}
 
-			<Tabs.Root value={selectedTab} class="flex min-h-0 flex-1 flex-col">
-				<div class="pb-3">
-					<TabBar items={tabItems} onValueChange={urlTab.select} />
-				</div>
+			<Tabs.Content value="services" class="min-h-0 flex-1">
+				<SwarmServicesTable
+					{services}
+					invalidateKey={queryKeys.swarm.stack(envId, data.stackName)}
+					bind:requestOptions={servicesRequestOptions}
+					onRetry={() => servicesQuery.refetch()}
+					persistKey={`arcane-swarm-stack-services-table-${stackName}`}
+					showEnvironment={false}
+				/>
+			</Tabs.Content>
+			<Tabs.Content value="tasks" class="min-h-0 flex-1">
+				<SwarmTasksTable
+					{tasks}
+					bind:requestOptions={tasksRequestOptions}
+					onRetry={() => tasksQuery.refetch()}
+					persistKey={`arcane-swarm-stack-tasks-table-${stackName}`}
+					showEnvironment={false}
+				/>
+			</Tabs.Content>
+			<Tabs.Content value="source" class="flex min-h-96 flex-1 flex-col">
+				{#if sourceState === 'available' && source}
+					{@const stackSource = source}
+					<div class="flex min-h-0 flex-1 flex-col">
+						{#key `arcane.swarm.split:${stackName}:source`}
+							<ResizableSplit
+								class="min-h-0 flex-1"
+								variant="gap"
+								handleSize={12}
+								firstClass="flex min-h-0 flex-col"
+								secondClass="flex min-h-0 flex-col"
+								bind:size={sourceTreeWidth}
+								minSize={200}
+								maxSize={480}
+								minSecondSize={360}
+								defaultRatio={0.2}
+								stackBelow={1024}
+								ariaLabel={m.compose_editor_resize_files_panel()}
+								persistKey={`arcane.swarm.split:${stackName}:source`}
+							>
+								{#snippet first()}
+									<WorkspaceFileTreePanel
+										leadingRows={sourceWorkspaceLeadingRows}
+										entries={[]}
+										selectedFile={selectedSourceFile}
+										onSelect={openSourceTab}
+									/>
+								{/snippet}
 
-				<Tabs.Content value="services" class="min-h-0 flex-1">
-					<SwarmServicesTable
-						{services}
-						invalidateKey={queryKeys.swarm.stack(envId, data.stackName)}
-						bind:requestOptions={servicesRequestOptions}
-						onRetry={() => servicesQuery.refetch()}
-						persistKey={`arcane-swarm-stack-services-table-${stackName}`}
-						showEnvironment={false}
-					/>
-				</Tabs.Content>
-				<Tabs.Content value="tasks" class="min-h-0 flex-1">
-					<SwarmTasksTable
-						{tasks}
-						bind:requestOptions={tasksRequestOptions}
-						onRetry={() => tasksQuery.refetch()}
-						persistKey={`arcane-swarm-stack-tasks-table-${stackName}`}
-						showEnvironment={false}
-					/>
-				</Tabs.Content>
-				<Tabs.Content value="source" class="flex min-h-0 flex-1 flex-col">
-					{#if sourceState === 'available' && source}
-						{@const stackSource = source}
-						<div class="flex min-h-0 flex-1 flex-col">
-							{#key `arcane.swarm.split:${stackName}:source`}
-								<ResizableSplit
-									class="min-h-0 flex-1"
-									variant="gap"
-									handleSize={12}
-									firstClass="flex min-h-0 flex-col"
-									secondClass="flex min-h-0 flex-col"
-									bind:size={sourceTreeWidth}
-									minSize={200}
-									maxSize={480}
-									minSecondSize={360}
-									defaultRatio={0.2}
-									stackBelow={1024}
-									ariaLabel={m.compose_editor_resize_files_panel()}
-									persistKey={`arcane.swarm.split:${stackName}:source`}
-								>
-									{#snippet first()}
-										<WorkspaceFileTreePanel
-											leadingRows={sourceWorkspaceLeadingRows}
-											entries={[]}
-											selectedFile={selectedSourceFile}
-											onSelect={openSourceTab}
-										/>
-									{/snippet}
-
-									{#snippet second()}
-										<EditorTabStrip
-											tabs={sourceTabs}
-											activeKey={activeSourceTab}
-											onSelect={openSourceTab}
-											onClose={closeSourceTab}
-										>
-											<div class="relative min-h-0 flex-1">
-												{#if activeSourceTab === 'compose' || stackSource.envContent?.length}
-													<CodeBlock.Root variant="ghost" class="absolute inset-0">
-														<CodeBlock.Content lineNumbers class="flex-1">
-															{#each sourceLines.current as line, index (index)}
-																<CodeBlock.Line code={line} />
-															{/each}
-														</CodeBlock.Content>
-													</CodeBlock.Root>
-												{:else}
-													<div class="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
-														No saved `.env` file was stored for this stack.
-													</div>
-												{/if}
-											</div>
-										</EditorTabStrip>
-									{/snippet}
-								</ResizableSplit>
-							{/key}
-						</div>
-					{:else if sourceState === 'loading'}
-						<Card.Root>
-							<Card.Content>
-								<p class="text-center text-sm text-muted-foreground">{m.swarm_stack_source_loading()}</p>
-							</Card.Content>
-						</Card.Root>
-					{:else if sourceState === 'missing'}
-						<Card.Root>
-							<Card.Content>
-								<div class="space-y-2 text-sm">
-									<p class="font-medium">{m.common_not_found_title({ resource: 'Saved source' })}</p>
-									<p class="text-muted-foreground">
-										{m.common_not_found_description({ resource: 'saved source' })}
-									</p>
-								</div>
-							</Card.Content>
-						</Card.Root>
-					{:else if sourceState === 'error'}
-						<Card.Root>
-							<Card.Content>
-								<div class="space-y-2 text-sm">
-									<p class="font-medium">{m.common_action_failed()}</p>
-									<p class="text-muted-foreground">{m.swarm_stack_source_load_error()}</p>
-								</div>
-							</Card.Content>
-						</Card.Root>
-					{/if}
-				</Tabs.Content>
-			</Tabs.Root>
+								{#snippet second()}
+									<EditorTabStrip tabs={sourceTabs} activeKey={activeSourceTab} onSelect={openSourceTab} onClose={closeSourceTab}>
+										<div class="relative min-h-0 flex-1">
+											{#if activeSourceTab === 'compose' || stackSource.envContent?.length}
+												<CodeBlock.Root variant="ghost" class="absolute inset-0">
+													<CodeBlock.Content lineNumbers class="flex-1">
+														{#each sourceLines.current as line, index (index)}
+															<CodeBlock.Line code={line} />
+														{/each}
+													</CodeBlock.Content>
+												</CodeBlock.Root>
+											{:else}
+												<div class="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
+													No saved `.env` file was stored for this stack.
+												</div>
+											{/if}
+										</div>
+									</EditorTabStrip>
+								{/snippet}
+							</ResizableSplit>
+						{/key}
+					</div>
+				{:else if sourceState === 'loading'}
+					<Card.Root>
+						<Card.Content>
+							<p class="text-center text-sm text-muted-foreground">{m.swarm_stack_source_loading()}</p>
+						</Card.Content>
+					</Card.Root>
+				{:else if sourceState === 'missing'}
+					<Card.Root>
+						<Card.Content>
+							<div class="space-y-2 text-sm">
+								<p class="font-medium">{m.common_not_found_title({ resource: 'Saved source' })}</p>
+								<p class="text-muted-foreground">
+									{m.common_not_found_description({ resource: 'saved source' })}
+								</p>
+							</div>
+						</Card.Content>
+					</Card.Root>
+				{:else if sourceState === 'error'}
+					<Card.Root>
+						<Card.Content>
+							<div class="space-y-2 text-sm">
+								<p class="font-medium">{m.common_action_failed()}</p>
+								<p class="text-muted-foreground">{m.swarm_stack_source_load_error()}</p>
+							</div>
+						</Card.Content>
+					</Card.Root>
+				{/if}
+			</Tabs.Content>
 		</div>
 	{/snippet}
-</ResourcePageLayout>
+</TabbedPageLayout>

@@ -17,7 +17,7 @@
 
 	import { getSwarmNodeAgentLabel, getSwarmNodeAgentVariant } from '../agent-status';
 	import NodeDockerDetails from '../components/node-docker-details.svelte';
-	import NodeDockerNetworks from '../components/node-docker-networks.svelte';
+	import NodeLocalResources from '../components/node-local-resources.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -28,7 +28,6 @@
 			? agent.environmentId
 			: undefined
 	);
-	const canListNetworks = $derived(!!agentId && readableEnvironments('networks:list', agentId).length > 0);
 	const canReadDocker = $derived(
 		!!agentId &&
 			agent.state === 'connected' &&
@@ -42,7 +41,7 @@
 		{ value: 'resources', label: m.swarm_node_local_resources_tab(), icon: LayersIcon },
 		{ value: 'agent', label: m.agent(), icon: AgentConnectionIcon }
 	]);
-	const urlTab = useUrlTab({ validTabs: () => tabItems.map((tab) => tab.value), defaultTab: () => 'overview' });
+	const urlTab = useUrlTab({ history: true, validTabs: () => tabItems.map((tab) => tab.value), defaultTab: () => 'overview' });
 	const selectedTab = $derived(urlTab.value);
 	const dockerQuery = createQuery(() => ({
 		queryKey: queryKeys.system.dockerInfo(agentId ?? ''),
@@ -51,20 +50,6 @@
 	}));
 	const docker = $derived(
 		canReadDocker && !dockerQuery.isError && dockerQuery.data?.Swarm?.NodeID === node.id ? dockerQuery.data : undefined
-	);
-	const resourceLinks = $derived(
-		(
-			[
-				{ resource: 'containers', label: m.containers() },
-				{ resource: 'images', label: m.images() },
-				{ resource: 'volumes', label: m.resource_volumes_cap() },
-				{ resource: 'networks', label: m.resource_networks_cap() }
-			] as const
-		).flatMap(({ resource, label }) =>
-			agentId && readableEnvironments(`${resource}:list`, agentId).length
-				? [{ href: environmentHref(resolve(`/(app)/${resource}`), agentId), label }]
-				: []
-		)
 	);
 	const contentClass = 'space-y-4 rounded-lg border border-border p-4 sm:p-6';
 	const fieldClass = 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3';
@@ -154,19 +139,10 @@
 		</Tabs.Content>
 		<Tabs.Content value="resources">
 			<div class={contentClass}>
-				{#if resourceLinks.length}
-					<div class="flex flex-wrap gap-2">
-						{#each resourceLinks as { href, label } (href)}
-							<a {href} class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted">{label}</a>
-						{/each}
-					</div>
+				{#if selectedTab === 'resources' && agentId && agent.state === 'connected' && agent.connected !== false}
+					{#key `${node.id}:${agentId}`}<NodeLocalResources nodeId={node.id} {agentId} />{/key}
 				{:else}
 					<p class="text-sm text-muted-foreground">{m.swarm_node_local_resources_unavailable()}</p>
-				{/if}
-				{#if selectedTab === 'resources' && canListNetworks && agentId}
-					{#key `${node.id}:${agentId}`}
-						<NodeDockerNetworks nodeId={node.id} {agentId} />
-					{/key}
 				{/if}
 			</div>
 		</Tabs.Content>

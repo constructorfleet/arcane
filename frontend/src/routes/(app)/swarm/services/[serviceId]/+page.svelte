@@ -174,10 +174,6 @@
 	const hasLabels = $derived(Object.keys(labels).length > 0);
 	const hasAdvancedConfig = $derived(command.length > 0 || args.length > 0 || !!workingDir || !!user || !!hostname);
 	const showConfiguration = $derived(hasEnvVars || hasLabels || hasAdvancedConfig);
-	const hasPorts = $derived(endpointPorts.length > 0);
-	const hasNetworks = $derived(specNetworks.length > 0 || virtualIPs.length > 0);
-	const showNetworkTab = $derived(hasPorts || hasNetworks);
-	const hasMounts = $derived(mounts.length > 0);
 
 	const envId = $derived(data.envId);
 	const canUpdateService = $derived(hasPermission('swarm-services:update', envId));
@@ -251,14 +247,11 @@
 		...(canViewServiceLogs ? [{ value: 'logs', label: m.common_logs(), icon: FileTextIcon }] : []),
 		{ value: 'tasks', label: m.tasks(), icon: JobsIcon },
 		...(showConfiguration ? [{ value: 'config', label: m.common_configuration(), icon: SettingsIcon }] : []),
-		...(showNetworkTab ? [{ value: 'network', label: m.resource_networks_cap(), icon: NetworksIcon }] : []),
-		...(hasMounts ? [{ value: 'storage', label: m.storage(), icon: VolumesIcon }] : [])
+		{ value: 'network', label: m.resource_networks_cap(), icon: NetworksIcon },
+		{ value: 'storage', label: m.storage(), icon: VolumesIcon }
 	]);
 
-	const urlTab = useUrlTab({
-		validTabs: () => tabItems.map((tab) => tab.value),
-		defaultTab: () => 'overview'
-	});
+	const urlTab = useUrlTab({ history: true, validTabs: () => tabItems.map((tab) => tab.value), defaultTab: () => 'overview' });
 	const selectedTab = $derived(urlTab.value);
 
 	function onTabChange(value: string) {
@@ -431,17 +424,13 @@
 				</Tabs.Content>
 			{/if}
 
-			{#if showNetworkTab}
-				<Tabs.Content value="network" class="h-full">
-					<ServiceNetwork ports={endpointPorts} networks={specNetworks} {virtualIPs} {networkDetails} environmentId={envId} />
-				</Tabs.Content>
-			{/if}
+			<Tabs.Content value="network" class="h-full">
+				<ServiceNetwork ports={endpointPorts} networks={specNetworks} {virtualIPs} {networkDetails} environmentId={envId} />
+			</Tabs.Content>
 
-			{#if hasMounts}
-				<Tabs.Content value="storage" class="h-full">
-					<ServiceStorage {mounts} />
-				</Tabs.Content>
-			{/if}
+			<Tabs.Content value="storage" class="h-full">
+				<ServiceStorage {mounts} environmentId={envId} serviceId={service.id} />
+			</Tabs.Content>
 		{/snippet}
 	</TabbedPageLayout>
 

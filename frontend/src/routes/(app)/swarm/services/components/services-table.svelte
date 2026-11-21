@@ -22,6 +22,7 @@
 		InspectIcon,
 		RestartIcon,
 		EditIcon,
+		VolumesIcon,
 		LayersIcon
 	} from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
@@ -33,6 +34,7 @@
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { getSwarmServiceModeLabel, getSwarmServiceModeVariant, isSwarmServiceModeScalable } from '#lib/utils/docker.js';
 	import { environmentHref, type EnvironmentPage, type EnvironmentRow } from '#lib/utils/environments.js';
+	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	let {
@@ -90,9 +92,15 @@
 
 	const isAnyLoading = $derived(Object.values(isLoading).some(Boolean));
 
-	function openService(service: ServiceRow, action?: App.PageState['swarmServiceAction']) {
+	function openService(service: ServiceRow, action?: App.PageState['swarmServiceAction'], tab?: 'tasks' | 'network' | 'storage') {
 		goto(
-			resolve(`/(app)/swarm/services/[serviceId]?env=${encodeURIComponent(service.environmentId)}`, { serviceId: service.id }),
+			resourceTableHref(
+				environmentHref(
+					resolve('/(app)/swarm/services/[serviceId]', { serviceId: service.id }) + (tab ? `?tab=${tab}` : ''),
+					service.environmentId
+				),
+				requestOptions.pagination?.page
+			),
 			{ state: { swarmServiceAction: action } }
 		);
 	}
@@ -156,7 +164,10 @@
 
 {#snippet NameCell({ item }: { item: ServiceRow })}
 	<a
-		href={resolve(`/(app)/swarm/services/[serviceId]?env=${encodeURIComponent(item.environmentId)}`, { serviceId: item.id })}
+		href={resourceTableHref(
+			environmentHref(resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.id }), item.environmentId),
+			requestOptions.pagination?.page
+		)}
 		class="text-sm font-medium text-primary-text hover:underline"
 	>
 		{getShortName(item.name, item.stackName)}
@@ -173,8 +184,10 @@
 	{#if item.stackName && hasPermission('swarm-stacks:read', item.environmentId)}
 		<a
 			class="text-sm text-primary hover:underline"
-			href={environmentHref(resolve('/(app)/swarm/stacks/[name]', { name: item.stackName }), item.environmentId)}
-			>{item.stackName}</a
+			href={resourceTableHref(
+				environmentHref(resolve('/(app)/swarm/stacks/[name]', { name: item.stackName }), item.environmentId),
+				requestOptions.pagination?.page
+			)}>{item.stackName}</a
 		>
 	{:else}
 		<span class="text-sm text-muted-foreground">{item.stackName || m.common_na()}</span>
@@ -288,7 +301,19 @@
 			<InspectIcon class="size-4" />
 			{m.common_inspect()}
 		</DropdownMenu.Item>
+		<IfPermitted perm="swarm-services:read" envId={item.environmentId}>
+			<DropdownMenu.Item onclick={() => openService(item, undefined, 'tasks')}
+				><ContainersIcon />{m.view_tasks()}</DropdownMenu.Item
+			>
+			<DropdownMenu.Item onclick={() => openService(item, undefined, 'network')}
+				><NetworksIcon />{m.resource_view_networks()}</DropdownMenu.Item
+			>
+			<DropdownMenu.Item onclick={() => openService(item, undefined, 'storage')}
+				><VolumesIcon />{m.resource_view_volumes()}</DropdownMenu.Item
+			>
+		</IfPermitted>
 		<IfPermitted perm="swarm-services:update" envId={item.environmentId}>
+			<DropdownMenu.Separator />
 			<IfPermitted perm="swarm-services:read" envId={item.environmentId}>
 				<DropdownMenu.Item onclick={() => openService(item, 'edit')}>
 					<EditIcon class="size-4" />

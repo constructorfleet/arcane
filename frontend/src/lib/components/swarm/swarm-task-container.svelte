@@ -10,10 +10,11 @@
 	import type { SwarmTaskSummary } from '#lib/types/swarm.js';
 	import { extractApiErrorMessage, handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
+	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
 	import { getSwarmTaskContainerTarget } from '#lib/utils/swarm-tasks.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
-	let { task, environmentId }: { task: SwarmTaskSummary; environmentId: string } = $props();
+	let { task, environmentId, tablePage }: { task: SwarmTaskSummary; environmentId: string; tablePage?: number } = $props();
 	const key = $derived(`${environmentId}:${task.id}:${task.nodeId}:${task.containerId ?? ''}`);
 	let operation = $state({ key: '', loading: false, error: '' });
 	const loading = $derived(operation.key === key && operation.loading);
@@ -41,9 +42,12 @@
 				}
 				if (requestedKey !== key) return;
 				await goto(
-					resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(target.environmentId)}`, {
-						containerId: target.containerId
-					})
+					resourceTableHref(
+						resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(target.environmentId)}`, {
+							containerId: target.containerId
+						}),
+						tablePage
+					)
 				);
 			})()
 		);

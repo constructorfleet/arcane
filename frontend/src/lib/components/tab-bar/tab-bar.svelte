@@ -6,7 +6,7 @@
 
 	interface Props {
 		items: TabItem[];
-		onValueChange: (value: string) => void;
+		onValueChange?: (value: string) => void;
 		class?: string;
 	}
 
@@ -21,7 +21,7 @@
 			variant="underline"
 			class="flex-shrink-0 whitespace-nowrap"
 			disabled={item.disabled}
-			onclick={() => onValueChange(item.value)}
+			onclick={onValueChange ? () => onValueChange?.(item.value) : undefined}
 		>
 			{#if IconComponent}
 				<IconComponent class="size-4" />

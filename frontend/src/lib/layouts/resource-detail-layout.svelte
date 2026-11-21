@@ -3,9 +3,8 @@
 
 	import ActionButtonGroup from '#lib/components/action-button-group/action-button-group.svelte';
 	import type { ActionButton } from '#lib/components/action-button-group/types.js';
-	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
 	import EnvironmentDestinationSelect from '#lib/components/form/environment-destination-select.svelte';
-	import { ArrowLeftIcon } from '#lib/icons/index.js';
+	import ResourcePrevious from '#lib/components/resource-detail/resource-previous.svelte';
 	import { cn } from '#lib/utils.js';
 
 	interface Props {
@@ -23,7 +22,6 @@
 
 	let {
 		backUrl,
-		backLabel,
 		title,
 		environmentId,
 		subtitle,
@@ -48,9 +46,7 @@
 			class="bubble-shadow-lg flex items-center gap-3 rounded-lg border border-border/60 bg-popover/95 px-4 py-2 backdrop-blur-md supports-backdrop-filter:bg-popover/85"
 		>
 			{#if backUrl}
-				<ArcaneButton action="base" tone="ghost" href={backUrl} class="size-8 rounded-md p-0">
-					<ArrowLeftIcon class="size-4" />
-				</ArcaneButton>
+				<ResourcePrevious fallback={backUrl} />
 
 				<div class="h-4 w-px bg-border/60"></div>
 			{/if}
@@ -70,9 +66,7 @@
 		<div class="flex items-start gap-3">
 			<div class="flex min-w-0 flex-1 items-start gap-2">
 				{#if backUrl}
-					<ArcaneButton action="base" tone="ghost" size="icon" href={backUrl} class="size-8 shrink-0" title={backLabel}>
-						<ArrowLeftIcon class="size-4" />
-					</ArcaneButton>
+					<ResourcePrevious fallback={backUrl} />
 				{/if}
 				<div class="min-w-0 flex-1">
 					<div class="flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">

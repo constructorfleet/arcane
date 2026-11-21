@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 
 	import type { Volume } from '#lib/types/volume.js';
+	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 
 	function volumeDetailHref(item: Volume & { environmentId: string }, tab = 'overview') {
 		const params = new URLSearchParams({ env: item.environmentId, tab });
@@ -10,7 +11,7 @@
 			params.set('driver', item.driver);
 			params.set('agents', item.nodes.map((node) => node.id).join(','));
 		}
-		return resolve(`/(app)/volumes/[volumeName]?${params}`, { volumeName: item.name });
+		return resourceDetailHref(resolve(`/(app)/volumes/[volumeName]?${params}`, { volumeName: item.name }));
 	}
 </script>
 

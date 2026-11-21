@@ -52,6 +52,7 @@
 	import { hardenedImageDisplay, hardenedSupportSummary } from '#lib/utils/hardened-images.js';
 	import { blockedUpdateTitle } from '#lib/utils/image-updates.js';
 	import { inUseBadge } from '#lib/utils/mobile-card-badges.js';
+	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	import ImageTagDialog from './image-tag-dialog.svelte';
@@ -322,8 +323,9 @@
 		{#if item.repo && item.repo !== '<none>'}
 			<a
 				class="font-medium whitespace-nowrap hover:underline"
-				href={resolve(`/(app)/images/[imageId]?env=${encodeURIComponent(item.environmentId)}`, { imageId: item.id })}
-				>{item.repo}</a
+				href={resourceDetailHref(
+					resolve(`/(app)/images/[imageId]?env=${encodeURIComponent(item.environmentId)}`, { imageId: item.id })
+				)}>{item.repo}</a
 			>
 		{:else}
 			<span class="text-muted-foreground italic">{m.images_untagged()}</span>
@@ -577,7 +579,8 @@
 	{@const envId = item.environmentId}
 	<RowActionsMenu name={item.repo && item.repo !== '<none>' ? `${item.repo}:${item.tag}` : item.id}>
 		<DropdownMenu.Item
-			onclick={() => goto(resolve(`/(app)/images/[imageId]?env=${encodeURIComponent(envId)}`, { imageId: item.id }))}
+			onclick={() =>
+				goto(resourceDetailHref(resolve(`/(app)/images/[imageId]?env=${encodeURIComponent(envId)}`, { imageId: item.id })))}
 		>
 			<InspectIcon class="size-4" />
 			{m.common_inspect()}
