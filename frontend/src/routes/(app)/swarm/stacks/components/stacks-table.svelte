@@ -155,7 +155,7 @@
 {/snippet}
 
 {#snippet RowActions({ item }: { item: StackRow })}
-	<RowActionsMenu name={item.name} triggerClass="relative size-8 p-0" iconClass="">
+	<RowActionsMenu name={item.name}>
 		<DropdownMenu.Item onclick={() => goto(stackHref(item))}>
 			<InspectIcon class="size-4" />
 			{m.common_inspect()}

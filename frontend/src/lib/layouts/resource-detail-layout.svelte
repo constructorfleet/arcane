@@ -63,8 +63,8 @@
 
 <div class={cn('space-y-6 pb-8', className)}>
 	<div class="space-y-3">
-		<div class="flex items-start gap-3">
-			<div class="flex min-w-0 flex-1 items-start gap-2">
+		<div class="flex flex-wrap items-center gap-3">
+			<div class="flex min-w-0 flex-1 items-center gap-3">
 				{#if backUrl}
 					<ResourcePrevious fallback={backUrl} />
 				{/if}
@@ -74,7 +74,7 @@
 							{#if environmentId}
 								<EnvironmentDestinationSelect value={environmentId} variant="prefix" readonly />
 							{/if}
-							<h1 class="truncate text-sm font-semibold" {title}>{title}</h1>
+							<h1 class="truncate text-xl leading-7 font-semibold sm:text-2xl" {title}>{title}</h1>
 						</div>
 						{@render badges?.()}
 					</div>

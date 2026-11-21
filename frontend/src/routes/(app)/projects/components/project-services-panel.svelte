@@ -194,10 +194,7 @@
 					{/if}
 					{#if item.containerId}
 						{@const containerId = item.containerId}
-						<RowActionsMenu
-							name={item.name}
-							triggerClass="size-6 shrink-0 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100"
-						>
+						<RowActionsMenu name={item.name}>
 							<DropdownMenu.Item
 								onclick={() => goto(resolve(`/(app)/containers/[containerId]?${containerQuery}`, { containerId }))}
 								disabled={isAnyLoading}

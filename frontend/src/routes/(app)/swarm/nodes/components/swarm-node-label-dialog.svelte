@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
@@ -11,13 +12,14 @@
 
 	type SwarmNodeLabelDialogProps = {
 		open: boolean;
+		initial?: { key: string; value: string };
 		onAdd: (key: string, value: string) => void | Promise<void>;
 	};
 
-	let { open = $bindable(false), onAdd }: SwarmNodeLabelDialogProps = $props();
+	let { open = $bindable(false), initial, onAdd }: SwarmNodeLabelDialogProps = $props();
 
-	let key = $state('');
-	let value = $state('');
+	let key = $state(untrack(() => initial?.key ?? ''));
+	let value = $state(untrack(() => initial?.value ?? ''));
 	let isSubmitting = $state(false);
 
 	const isReservedPrefix = $derived(key.trim().startsWith('engine.labels') || key.trim().startsWith('com.docker.swarm'));
@@ -50,13 +52,18 @@
 	}
 </script>
 
-<ResponsiveDialog.Root bind:open title={m.add_label()} description={m.common_labels_description({ resource: m.swarm_node() })}>
+<ResponsiveDialog.Root
+	bind:open
+	title={initial ? m.swarm_node_edit_label() : m.add_label()}
+	description={m.common_labels_description({ resource: m.swarm_node() })}
+>
 	<form onsubmit={handleSubmit} class="space-y-4 px-6 py-4">
 		<div class="space-y-2">
 			<Label for="label-key" variant={isReservedPrefix ? 'destructive' : 'default'}>{m.swarm_node_label_key()}</Label>
 			<Input
 				id="label-key"
 				bind:value={key}
+				readonly={!!initial}
 				placeholder={m.swarm_service_form_key_placeholder()}
 				required
 				aria-invalid={!!isReservedPrefix}
@@ -79,7 +86,7 @@
 			<ArcaneButton action="base" tone="outline" customLabel={m.common_cancel()} onclick={handleCancel} disabled={isSubmitting} />
 			<ArcaneButton
 				action="base"
-				customLabel={m.common_add_button({ resource: m.common_labels() })}
+				customLabel={initial ? m.common_save() : m.add_label()}
 				onclick={handleSubmit}
 				loading={isSubmitting}
 				disabled={!key.trim() || isReservedPrefix || isSubmitting}

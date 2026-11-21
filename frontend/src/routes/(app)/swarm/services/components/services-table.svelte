@@ -296,7 +296,7 @@
 {/snippet}
 
 {#snippet RowActions({ item }: { item: ServiceRow })}
-	<RowActionsMenu name={item.name} triggerClass="relative size-8 p-0" iconClass="">
+	<RowActionsMenu name={item.name}>
 		<DropdownMenu.Item onclick={() => openService(item)}>
 			<InspectIcon class="size-4" />
 			{m.common_inspect()}

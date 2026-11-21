@@ -6,6 +6,7 @@ import type { APIRequestConfig } from '#lib/services/api-service.js';
 import settingsStore from '#lib/stores/config-store.svelte.js';
 import { environmentStore, LOCAL_DOCKER_ENVIRONMENT_ID, type EnvironmentRef } from '#lib/stores/environment.store.svelte.js';
 import type { Paginated } from '#lib/types/base.js';
+import type { Environment } from '#lib/types/environment.js';
 import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 import { extractApiErrorMessage } from '#lib/utils/api.js';
 import { hasPermission } from '#lib/utils/auth.js';
@@ -308,4 +309,17 @@ export async function fetchAcrossEnvironments<
 		failedEnvironments: failures,
 		excludedEnvironments: excluded
 	};
+}
+
+export function resolveEnvironmentTransport(item: Environment): 'grpc' | 'websocket' | undefined {
+	// Fall back to the last transport so disconnected agents still show one.
+	return (item.connected ? item.agentTransport : undefined) ?? item.lastAgentTransport;
+}
+
+export function getEnvironmentTypeLabel(item: Environment): string {
+	if (item.id === '0') return m.local();
+	const transport = resolveEnvironmentTransport(item);
+	if (!transport) return m.environments_agent_label();
+	if (transport === 'websocket') return m.environments_agent_websocket_label();
+	return m.environments_agent_grpc_label();
 }

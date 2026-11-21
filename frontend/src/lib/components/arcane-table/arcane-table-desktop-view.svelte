@@ -158,7 +158,7 @@
 						pinned: column.id === 'actions',
 						variant: column.id === 'select' ? ('checkbox' as const) : ('default' as const),
 						firstData: column.id !== 'select' && index === (selectionDisabled ? 0 : 1),
-						shrink: column.id === 'actions' || meta?.width === 'min',
+						shrink: meta?.width === 'min',
 						grow: meta?.width === 'max',
 						align: meta?.align,
 						clip: !wrapText && (!!meta?.truncate || (!!columnWidths && !isControl)),
@@ -268,7 +268,7 @@
 
 {#snippet cellContent(cell: ArcaneCell<TData>)}
 	{#if cell.column.id === 'actions'}
-		<div class="flex items-center justify-end gap-0.5 py-1 pr-3 pl-2" data-row-select-ignore>
+		<div class="flex items-center justify-center gap-1" data-row-select-ignore>
 			<FlexRender {cell} />
 		</div>
 	{:else}
@@ -406,7 +406,6 @@
 						class={cn(
 							meta?.width === 'min' && 'w-0',
 							meta?.width === 'max' && 'w-full',
-							header.column.id === 'actions' && 'w-0',
 							colWidth && 'w-(--col-width)',
 							!colWidth && minWidths[header.column.id] && 'min-w-(--col-min)'
 						)}

@@ -13,9 +13,9 @@
 	import { environmentName, environmentRows, type EnvironmentPage } from '#lib/utils/environments.js';
 	import { resourceTablePage } from '#lib/utils/resource-navigation.js';
 
-	import SwarmTasksTable from '../../tasks/components/tasks-table.svelte';
+	import SwarmTasksTable from './tasks-table.svelte';
 
-	let { environmentId, serviceId }: { environmentId: string; serviceId: string } = $props();
+	let { environmentId, resourceId, scope }: { environmentId: string; resourceId: string; scope: 'node' | 'service' } = $props();
 	let requestOptions = $state<SearchPaginationSortRequest>({
 		pagination: {
 			page: untrack(() => resourceTablePage((page.shallow?.url ?? page.url).searchParams.get('tablePage'))),
@@ -29,7 +29,7 @@
 		return {
 			queryKey: queryKeys.swarm.nodes(agent, nodeRequest),
 			queryFn: () => swarmService.getNodes(nodeRequest, agent),
-			enabled: !!agent && hasPermission('swarm-nodes:read', agent)
+			enabled: scope === 'service' && !!agent && hasPermission('swarm-nodes:read', agent)
 		};
 	});
 	const nodeFilters = $derived(
@@ -39,12 +39,17 @@
 	);
 	const tasksQuery = createQuery(() => {
 		const agent = environmentId;
-		const service = serviceId;
+		const id = resourceId;
+		const kind = scope;
 		const options = $state.snapshot(requestOptions);
 		return {
-			queryKey: queryKeys.swarm.serviceTasks(agent, service, options),
-			queryFn: () => swarmService.getServiceTasks(service, options, agent),
-			enabled: !!service && hasPermission('swarm-services:read', agent)
+			queryKey:
+				kind === 'node' ? queryKeys.swarm.nodeTasks(agent, id, options) : queryKeys.swarm.serviceTasks(agent, id, options),
+			queryFn: ({ signal }) =>
+				kind === 'node'
+					? swarmService.getNodeTasks(id, options, agent, { signal })
+					: swarmService.getServiceTasks(id, options, agent),
+			enabled: !!id && hasPermission(kind === 'node' ? 'swarm-nodes:read' : 'swarm-services:read', agent)
 		};
 	});
 	const result = $derived(tasksQuery.data);
@@ -63,7 +68,9 @@
 	<div class="flex flex-wrap items-center justify-between gap-2">
 		<h2 class="text-sm font-semibold">
 			{#if result}
-				{m.swarm_service_tasks_count({ count: result.pagination.grandTotalItems ?? result.pagination.totalItems })}
+				{scope === 'service'
+					? m.swarm_service_tasks_count({ count: result.pagination.grandTotalItems ?? result.pagination.totalItems })
+					: m.tasks()}
 			{:else}
 				{m.tasks()}
 			{/if}
@@ -76,9 +83,9 @@
 		{tasks}
 		bind:requestOptions
 		showEnvironment={false}
-		serviceScoped
+		serviceScoped={scope === 'service'}
 		{nodeFilters}
-		persistKey="arcane-swarm-service-tasks-table"
+		persistKey={`arcane-swarm-${scope}-tasks-table`}
 		loading={tasksQuery.isFetching && !result}
 		refreshError={tasksQuery.error}
 		onRetry={() => tasksQuery.refetch()}

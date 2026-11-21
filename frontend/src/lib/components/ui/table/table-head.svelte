@@ -29,7 +29,7 @@
 		variant === 'expander' && 'w-8 px-2',
 		variant === 'flush' && 'p-0',
 		indent && 'pl-10',
-		pinned && 'sticky right-0 z-(--arcane-z-page-floating) w-0 p-0! whitespace-nowrap',
+		pinned && 'sticky right-0 z-(--arcane-z-page-floating) w-24 min-w-24 px-3 text-center',
 		className
 	)}
 	{...restProps}

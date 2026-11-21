@@ -180,17 +180,22 @@
 {#snippet TaskActions({ item }: { item: TaskRow })}
 	{@const canReadService = hasPermission('swarm-services:read', item.environmentId)}
 	{@const canUpdateService = hasPermission('swarm-services:update', item.environmentId)}
-	{#if item.serviceId && (canReadService || (item.desiredState === 'running' && canUpdateService))}
+	{#if item.serviceId && ((!serviceScoped && canReadService) || (canReadService && canUpdateService) || (item.desiredState === 'running' && canUpdateService))}
 		{@const href = resourceTableHref(
-			environmentHref(resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.serviceId }), item.environmentId),
+			environmentHref(
+				resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.serviceId }) + (serviceScoped ? '?tab=tasks' : ''),
+				item.environmentId
+			),
 			requestOptions.pagination?.page
 		)}
-		<RowActionsMenu name={item.name || item.id} triggerClass="relative size-8 p-0" iconClass="">
+		<RowActionsMenu name={item.name || item.id}>
 			{#if canReadService}
-				<DropdownMenu.Item onclick={() => goto(href)}>
-					<InspectIcon class="size-4" />
-					{m.swarm_view_service()}
-				</DropdownMenu.Item>
+				{#if !serviceScoped}
+					<DropdownMenu.Item onclick={() => goto(href)}>
+						<InspectIcon class="size-4" />
+						{m.swarm_view_service()}
+					</DropdownMenu.Item>
+				{/if}
 				{#if canUpdateService}
 					<DropdownMenu.Item onclick={() => goto(href, { state: { swarmServiceAction: 'edit' } })}>
 						<EditIcon class="size-4" />

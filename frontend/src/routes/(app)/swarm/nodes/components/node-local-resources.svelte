@@ -9,7 +9,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { useUrlTab } from '#lib/hooks/use-url-tab.svelte.js';
-	import { ContainersIcon, ImagesIcon, NetworksIcon, VolumesIcon } from '#lib/icons/index.js';
+	import { ContainersIcon, ImagesIcon, JobsIcon, NetworksIcon, VolumesIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { containerService } from '#lib/services/container-service.js';
 	import { imageService } from '#lib/services/image-service.js';
@@ -21,16 +21,23 @@
 	import { bytes } from '#lib/utils/formatting.js';
 	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 
-	let { nodeId, agentId }: { nodeId: string; agentId: string } = $props();
+	import ScopedTasksPanel from '../../tasks/components/scoped-tasks-panel.svelte';
+
+	let { nodeId, managerId, agentId }: { nodeId: string; managerId: string; agentId?: string } = $props();
 
 	const tabs = [
 		{ value: 'containers', label: m.containers(), icon: ContainersIcon },
 		{ value: 'networks', label: m.resource_networks_cap(), icon: NetworksIcon },
 		{ value: 'images', label: m.images(), icon: ImagesIcon },
-		{ value: 'volumes', label: m.resource_volumes_cap(), icon: VolumesIcon }
+		{ value: 'volumes', label: m.resource_volumes_cap(), icon: VolumesIcon },
+		{ value: 'tasks', label: m.tasks(), icon: JobsIcon }
 	] as const;
 	type Resource = (typeof tabs)[number]['value'];
-	const available = $derived(tabs.filter(({ value }) => hasPermission(`${value}:list`, agentId)));
+	const available = $derived(
+		tabs.filter(({ value }) =>
+			value === 'tasks' ? hasPermission('swarm-nodes:read', managerId) : !!agentId && hasPermission(`${value}:list`, agentId)
+		)
+	);
 	const tab = useUrlTab({
 		tabs: () => available,
 		defaultTab: () => 'networks',
@@ -62,7 +69,14 @@
 			.join(' · ');
 	}
 
-	async function list(kind: Resource, environmentId: string, expectedNode: string, currentPage: number, signal: AbortSignal) {
+	async function list(
+		kind: Resource,
+		environmentId: string | undefined,
+		expectedNode: string,
+		currentPage: number,
+		signal: AbortSignal
+	) {
+		if (!environmentId || kind === 'tasks') return undefined;
 		const options = { pagination: { page: currentPage, limit: 10 } };
 		switch (kind) {
 			case 'containers': {
@@ -130,10 +144,10 @@
 		return {
 			queryKey: ['node-local-resources', ...key],
 			queryFn: ({ signal }) => list(key[2], key[0], key[1], key[3], signal),
-			enabled: available.some(({ value }) => value === resource)
+			enabled: !!agentId && resource !== 'tasks' && available.some(({ value }) => value === resource)
 		};
 	});
-	const canInspect = $derived(hasPermission(`${resource}:read`, agentId));
+	const canInspect = $derived(!!agentId && hasPermission(`${resource}:read`, agentId));
 	const lastPage = $derived(resources.data?.pagination.totalPages ?? 1);
 
 	function changePage(next: number) {
@@ -148,14 +162,16 @@
 	<Tabs.Root value={resource} onValueChange={tab.select}>
 		<TabBar items={tab.items} />
 		<Tabs.Content value={resource} class="mt-4">
-			{#if resources.isPending}
+			{#if resource === 'tasks'}
+				<ScopedTasksPanel environmentId={managerId} resourceId={nodeId} scope="node" />
+			{:else if resources.isPending}
 				<p class="text-sm text-muted-foreground" role="status">{m.common_loading()}</p>
 			{:else if resources.isError}
 				<div class="flex items-center gap-2">
 					<p class="text-sm text-muted-foreground" role="status">{m.swarm_node_local_resources_unavailable()}</p>
 					<Button variant="outline" size="sm" onclick={() => resources.refetch()}>{m.common_retry()}</Button>
 				</div>
-			{:else if resources.data}
+			{:else if resources.data && agentId}
 				<RelatedResourceTable
 					columns={columns[resource]}
 					rows={resources.data.rows.map((row) => ({ ...row, href: canInspect ? inspectHref(row.path, agentId) : undefined }))}

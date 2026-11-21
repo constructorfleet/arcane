@@ -5,7 +5,6 @@
 	import { toast } from 'svelte-sonner';
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
-	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
 	import type { ColumnSpec, MobileFieldVisibility } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
@@ -26,27 +25,29 @@
 		VolumesIcon,
 		JobsIcon,
 		TrashIcon,
-		AgentConnectionIcon,
-		AddIcon,
-		CloseIcon,
-		TagIcon
+		AgentConnectionIcon
 	} from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { swarmService } from '#lib/services/swarm-service.js';
+	import { environmentStore } from '#lib/stores/environment.store.svelte.js';
 	import type { SwarmNodeAgentDeployment, SwarmNode } from '#lib/types/swarm.js';
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import type { SwarmNodesPaginatedResponse } from '#lib/types/ui/swarm.js';
 	import { extractApiErrorMessage, handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasAnyPermission, hasPermission } from '#lib/utils/auth.js';
-	import { environmentHref, type EnvironmentPage, type EnvironmentRow } from '#lib/utils/environments.js';
+	import {
+		environmentHref,
+		getEnvironmentTypeLabel,
+		type EnvironmentPage,
+		type EnvironmentRow
+	} from '#lib/utils/environments.js';
 	import { capitalizeFirstLetter } from '#lib/utils/formatting.js';
 	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	import { getSwarmNodeAgentActionLabel, getSwarmNodeAgentLabel, getSwarmNodeAgentVariant } from '../agent-status';
 	import SwarmNodeAgentDialog from './swarm-node-agent-dialog.svelte';
-	import SwarmNodeLabelDialog from './swarm-node-label-dialog.svelte';
 
 	let {
 		nodes,
@@ -80,8 +81,6 @@
 	let agentDeploymentError = $state('');
 	let agentDeployment = $state<SwarmNodeAgentDeployment | null>(null);
 	let isAgentDeploymentLoading = $state(false);
-	let isAddLabelDialogOpen = $state(false);
-	let nodeToLabel = $state<NodeRow | null>(null);
 
 	function statusVariant(state: string): 'green' | 'red' | 'amber' | 'gray' {
 		if (state === 'ready') return 'green';
@@ -221,10 +220,6 @@
 		);
 	}
 
-	function viewNodeTasks(node: NodeRow) {
-		goto(resolve(`/(app)/swarm/tasks?nodeId=${encodeURIComponent(node.id)}&env=${encodeURIComponent(node.environmentId)}`));
-	}
-
 	async function mutateNode(action: () => Promise<void>, successMessage: string, failureMessage: string) {
 		isLoading = true;
 		await handleApiResultWithCallbacks({
@@ -280,55 +275,23 @@
 		});
 	}
 
-	function openAddLabelDialog(node: NodeRow) {
-		nodeToLabel = node;
-		isAddLabelDialogOpen = true;
-	}
-
-	async function addLabel(key: string, value: string) {
-		const node = nodeToLabel;
-		if (!node) return;
-		const labels = { ...node.labels, [key]: value };
-		await mutateNode(
-			() => swarmService.updateNode(node.id, { labels }, node.environmentId),
-			m.common_update_success({ resource: m.swarm_node() }),
-			m.swarm_node_update_failed({ name: node.hostname })
-		);
-	}
-
-	function removeLabel(node: NodeRow, key: string) {
-		openConfirmDialog({
-			title: m.common_remove_title({ resource: `label "${key}"` }),
-			message: m.common_remove_confirm({ resource: `label "${key}"` }),
-			confirm: {
-				label: m.common_remove(),
-				destructive: true,
-				action: async () => {
-					const labels = { ...node.labels };
-					delete labels[key];
-					await mutateNode(
-						() => swarmService.updateNode(node.id, { labels }, node.environmentId),
-						m.common_update_success({ resource: m.swarm_node() }),
-						m.swarm_node_update_failed({ name: node.hostname })
-					);
-				}
-			}
-		});
-	}
-
 	const columns = [
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
-		...environmentColumns<NodeRow>().map((column) => ({ ...column, title: m.query_agent() })),
 		{ accessorKey: 'hostname', title: m.hostname(), sortable: true, cell: HostnameCell },
 		{ accessorKey: 'role', title: m.common_role(), sortable: true, cell: RoleCell },
 		{ accessorKey: 'status', title: m.common_status(), sortable: true, cell: StatusCell },
 		{ accessorKey: 'availability', title: m.swarm_availability(), sortable: true, cell: AvailabilityCell },
-		{ accessorKey: 'labels', title: m.common_labels(), cell: LabelsCell },
+		{
+			id: 'agentId',
+			title: m.swarm_node_agent_environment_id(),
+			accessorFn: (node) => node.agent?.environmentId,
+			cell: AgentIdCell
+		},
 		{
 			id: 'agent',
-			title: m.agent(),
+			title: m.swarm_node_agent_connection(),
 			accessorFn: (node) => node.agent?.state ?? 'none',
-			cell: AgentCell
+			cell: AgentConnectionCell
 		},
 		{ accessorKey: 'engineVersion', title: m.swarm_engine_version(), sortable: true }
 	] satisfies ColumnSpec<NodeRow>[];
@@ -337,8 +300,8 @@
 		{ id: 'role', label: m.common_role(), defaultVisible: true },
 		{ id: 'status', label: m.common_status(), defaultVisible: true },
 		{ id: 'availability', label: m.swarm_availability(), defaultVisible: true },
-		{ id: 'labels', label: m.common_labels(), defaultVisible: true },
-		{ id: 'agent', label: m.agent(), defaultVisible: true },
+		{ id: 'agentId', label: m.swarm_node_agent_environment_id(), defaultVisible: true },
+		{ id: 'agent', label: m.swarm_node_agent_connection(), defaultVisible: true },
 		{ id: 'engineVersion', label: m.swarm_engine_version(), defaultVisible: false }
 	];
 
@@ -371,56 +334,18 @@
 	<Badge variant={availabilityVariant(String(value ?? ''))} minWidth="20">{String(value ?? m.common_unknown())}</Badge>
 {/snippet}
 
-{#snippet AgentCell({ item }: { item: NodeRow })}
-	<div class="flex flex-col items-start gap-1">
-		{#if item.agent?.environmentId}
-			<span class="text-sm font-medium">{item.agent.environmentName || item.agent.environmentId}</span>
-			<span class="font-mono text-xs text-muted-foreground">{item.agent.environmentId}</span>
-		{/if}
-		<Badge variant={getSwarmNodeAgentVariant(item.agent?.state)} minWidth="20">
-			{getSwarmNodeAgentLabel(item.agent?.state)}
-		</Badge>
-	</div>
+{#snippet AgentIdCell({ value }: { value: unknown })}
+	{@const agentId = typeof value === 'string' ? value : ''}
+	{#if agentId}<code class="text-xs text-muted-foreground" title={agentId}
+			>{agentId.slice(0, 8)}{agentId.length > 8 ? '…' : ''}</code
+		>{:else}{m.common_na()}{/if}
 {/snippet}
 
-{#snippet LabelsCell({ item }: { item: NodeRow })}
-	<div class="flex flex-wrap items-center gap-1.5">
-		{#each Object.entries(item.systemLabels ?? {}) as [key, value] (key)}
-			<div class="group relative overflow-hidden rounded-lg">
-				<Badge variant="gray" class="max-w-50"
-					><span class="block min-w-0 truncate">{`${key}${value ? `=${value}` : ''}`}</span></Badge
-				>
-			</div>
-		{/each}
-		{#each Object.entries(item.labels ?? {}) as [key, value] (key)}
-			<div class="group relative overflow-hidden rounded-lg">
-				<Badge variant="blue" class="max-w-50"
-					><span class="block min-w-0 truncate">{`${key}${value ? `=${value}` : ''}`}</span></Badge
-				>
-				{#if canUpdateNode(item)}
-					<button
-						type="button"
-						class="absolute inset-0 flex cursor-pointer items-center justify-end rounded-lg bg-info/10 pr-1 opacity-0 transition-opacity group-hover:opacity-100"
-						onclick={() => removeLabel(item, key)}
-						title={m.common_remove()}
-					>
-						<div class="scale-90 rounded-full bg-destructive p-0.5 shadow-lg transition-transform group-hover:scale-100">
-							<CloseIcon class="size-3 text-white" />
-						</div>
-					</button>
-				{/if}
-			</div>
-		{/each}
-		{#if canUpdateNode(item)}
-			<button
-				type="button"
-				class="inline-flex items-center gap-1 rounded-xl border border-dashed border-border px-2 py-0.5 text-2xs font-medium transition-colors hover:border-primary hover:text-primary"
-				onclick={() => openAddLabelDialog(item)}
-			>
-				<AddIcon class="size-3" />
-				{m.common_add_button({ resource: 'Label' })}
-			</button>
-		{/if}
+{#snippet AgentConnectionCell({ item }: { item: NodeRow })}
+	{@const agentEnvironment = environmentStore.available.find((entry) => entry.id === item.agent?.environmentId)}
+	<div class="flex items-center gap-2">
+		<Badge variant={getSwarmNodeAgentVariant(item.agent?.state)}>{getSwarmNodeAgentLabel(item.agent?.state)}</Badge>
+		{#if agentEnvironment}<span class="text-xs text-muted-foreground">{getEnvironmentTypeLabel(agentEnvironment)}</span>{/if}
 	</div>
 {/snippet}
 
@@ -461,20 +386,11 @@
 				show: mobileFieldVisibility['availability'] ?? true
 			},
 			{
-				label: m.common_labels(),
-				getValue: (item: NodeRow) =>
-					`${Object.keys(item.labels ?? {}).length + Object.keys(item.systemLabels ?? {}).length} labels`,
-				icon: TagIcon,
-				iconVariant: 'gray' as const,
-				show: mobileFieldVisibility['labels'] ?? true
-			},
-			{
-				label: m.agent(),
-				getValue: (item: NodeRow) =>
-					item.agent?.environmentName || item.agent?.environmentId || getSwarmNodeAgentLabel(item.agent?.state),
+				label: m.swarm_node_agent_environment_id(),
+				getValue: (item: NodeRow) => item.agent?.environmentId,
 				icon: AgentConnectionIcon,
 				iconVariant: 'gray' as const,
-				show: mobileFieldVisibility['agent'] ?? true
+				show: mobileFieldVisibility['agentId'] ?? true
 			}
 		]}
 		rowActions={RowActions}
@@ -482,7 +398,7 @@
 {/snippet}
 
 {#snippet RowActions({ item }: { item: NodeRow })}
-	<RowActionsMenu name={item.hostname} triggerClass="relative size-8 p-0" iconClass="">
+	<RowActionsMenu name={item.hostname}>
 		{@const detailsHref = nodeDetailsHref(item)}
 		{#if detailsHref}
 			<DropdownMenu.Item onclick={() => goto(detailsHref)}><InspectIcon />{m.common_inspect()}</DropdownMenu.Item>
@@ -496,7 +412,7 @@
 			<DropdownMenu.Item onclick={() => goto(detailsHref + '&tab=agent')}
 				><AgentConnectionIcon />{m.resource_view_agent()}</DropdownMenu.Item
 			>
-			<DropdownMenu.Item onclick={() => viewNodeTasks(item)}>
+			<DropdownMenu.Item onclick={() => goto(detailsHref + '&tab=resources&resource=tasks')}>
 				<JobsIcon class="size-4" />
 				{m.view_tasks()}
 			</DropdownMenu.Item>
@@ -567,5 +483,3 @@
 	onDetach={detachEnvironment}
 	onRemoveDeployment={removeDedicatedDeployment}
 />
-
-<SwarmNodeLabelDialog bind:open={isAddLabelDialogOpen} onAdd={addLabel} />

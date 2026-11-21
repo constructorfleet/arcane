@@ -22,6 +22,8 @@ export const queryKeys = {
 		unlockKey: (environmentId: string) => ['swarm', environmentId, 'unlock-key'] as const,
 		joinCandidates: (environmentId: string | null, user: Pick<User, 'id' | 'permissionsByEnv'> | null) =>
 			['swarm', environmentId, 'join-candidates', user?.id ?? null, stableSerialize(user?.permissionsByEnv)] as const,
+		nodeTasks: (environmentId: string, nodeId: string, options: SearchPaginationSortRequest) =>
+			['swarm', environmentId, 'node-tasks', nodeId, stableSerialize(options)] as const,
 		serviceTasks: (environmentId: string, serviceId: string, options: SearchPaginationSortRequest) =>
 			['swarm', environmentId, 'service-tasks', serviceId, stableSerialize(options)] as const,
 		services: (scope: string, options: SearchPaginationSortRequest) =>

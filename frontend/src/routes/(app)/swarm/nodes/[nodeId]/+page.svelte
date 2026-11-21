@@ -11,12 +11,12 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { systemService } from '#lib/services/system-service.js';
-	import { hasPermission } from '#lib/utils/auth.js';
-	import { environmentHref, environmentName, readableEnvironments } from '#lib/utils/environments.js';
+	import { environmentName, readableEnvironments } from '#lib/utils/environments.js';
 	import { bytes, capitalizeFirstLetter, formatDateTime } from '#lib/utils/formatting.js';
 
 	import { getSwarmNodeAgentLabel, getSwarmNodeAgentVariant } from '../agent-status';
 	import NodeDockerDetails from '../components/node-docker-details.svelte';
+	import NodeLabels from '../components/node-labels.svelte';
 	import NodeLocalResources from '../components/node-local-resources.svelte';
 	import type { PageProps } from './$types';
 
@@ -65,15 +65,6 @@
 	{#snippet headerInfo()}
 		<h1 class="min-w-0 truncate text-sm font-semibold">{node.hostname}</h1>
 	{/snippet}
-	{#snippet headerActions()}
-		{#if hasPermission('swarm-nodes:read', data.envId)}
-			<a
-				class="text-sm font-medium text-primary hover:underline"
-				href={environmentHref(resolve('/(app)/swarm/tasks') + '?nodeId=' + encodeURIComponent(node.id), data.envId)}
-				>{m.view_tasks()}</a
-			>
-		{/if}
-	{/snippet}
 	{#snippet tabContent()}
 		<Tabs.Content value="overview">
 			<div class={contentClass}>
@@ -94,19 +85,6 @@
 						<KeyValueCard label={m.swarm_node_reachability()}>{node.reachability || m.common_unknown()}</KeyValueCard>
 					{/if}
 				</div>
-				{#if Object.keys(node.labels ?? {}).length || Object.keys(node.systemLabels ?? {}).length}
-					<section class="space-y-2">
-						<h2 class="text-sm font-semibold">{m.common_labels()}</h2>
-						<div class="flex flex-wrap gap-2">
-							{#each Object.entries(node.systemLabels ?? {}) as [key, value] (key)}
-								<Badge variant="gray" class="max-w-full break-all">{key}={value}</Badge>
-							{/each}
-							{#each Object.entries(node.labels ?? {}) as [key, value] (key)}
-								<Badge variant="blue" class="max-w-full break-all">{key}={value}</Badge>
-							{/each}
-						</div>
-					</section>
-				{/if}
 			</div>
 		</Tabs.Content>
 		<Tabs.Content value="host">
@@ -135,12 +113,17 @@
 				{:else}
 					{@render engineUnavailable()}
 				{/if}
+				{#key `${data.envId}:${node.id}`}<NodeLabels {node} environmentId={data.envId} />{/key}
 			</div>
 		</Tabs.Content>
 		<Tabs.Content value="resources">
 			<div class={contentClass}>
-				{#if selectedTab === 'resources' && agentId && agent.state === 'connected' && agent.connected !== false}
-					{#key `${node.id}:${agentId}`}<NodeLocalResources nodeId={node.id} {agentId} />{/key}
+				{#if selectedTab === 'resources'}
+					{#key `${data.envId}:${node.id}`}<NodeLocalResources
+							nodeId={node.id}
+							managerId={data.envId}
+							agentId={agent.state === 'connected' && agent.connected !== false ? agentId : undefined}
+						/>{/key}
 				{:else}
 					<p class="text-sm text-muted-foreground">{m.swarm_node_local_resources_unavailable()}</p>
 				{/if}

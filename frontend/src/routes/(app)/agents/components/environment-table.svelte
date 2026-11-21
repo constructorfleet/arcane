@@ -36,6 +36,7 @@
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { getEnvironmentStatusVariant, isEnvironmentOnline, resolveEnvironmentStatus } from '#lib/utils/docker.js';
+	import { getEnvironmentTypeLabel, resolveEnvironmentTransport } from '#lib/utils/environments.js';
 	import { capitalizeFirstLetter } from '#lib/utils/formatting.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
@@ -76,19 +77,6 @@
 		{ value: 'websocket', label: m.environments_agent_websocket_label(), icon: EnvironmentsIcon },
 		{ value: 'grpc', label: m.environments_agent_grpc_label(), icon: EnvironmentsIcon }
 	];
-
-	function resolveEnvironmentTransport(item: Environment): 'grpc' | 'websocket' | undefined {
-		// Fall back to the last transport so disconnected agents still show one.
-		return (item.connected ? item.agentTransport : undefined) ?? item.lastAgentTransport;
-	}
-
-	function getEnvironmentTypeLabel(item: Environment): string {
-		if (item.id === '0') return m.local();
-		const transport = resolveEnvironmentTransport(item);
-		if (!transport) return m.environments_agent_label();
-		if (transport === 'websocket') return m.environments_agent_websocket_label();
-		return m.environments_agent_grpc_label();
-	}
 
 	function getEnvironmentTypeVariant(item: Environment): 'gray' | 'purple' | 'blue' {
 		const transport = resolveEnvironmentTransport(item);

@@ -4,7 +4,7 @@
 	import RelatedResourceTable from '#lib/components/resource-detail/related-resource-table.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
-	import { NetworksIcon, GlobeIcon } from '#lib/icons/index.js';
+	import { GlobeIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { SwarmServiceNetworkDetail, SwarmServicePort } from '#lib/types/swarm.js';
 	import type { ServiceNetworkAttachment, ServiceVirtualIP } from '#lib/types/ui/swarm.js';
@@ -95,26 +95,15 @@
 		</Card.Content>
 	</Card.Root>
 
-	<Card.Root>
-		<Card.Header icon={NetworksIcon}>
-			<div class="flex flex-col space-y-1.5">
-				<Card.Title>
-					<h2>{m.resource_networks_cap()}</h2>
-				</Card.Title>
-			</div>
-		</Card.Header>
-		<Card.Content>
-			<RelatedResourceTable
-				columns={[
-					m.common_driver(),
-					m.common_scope(),
-					m.networks_service_vip_label(),
-					m.containers_aliases(),
-					m.common_configuration()
-				]}
-				{rows}
-				empty={m.containers_no_networks_connected()}
-			/>
-		</Card.Content>
-	</Card.Root>
+	<RelatedResourceTable
+		columns={[
+			m.common_driver(),
+			m.common_scope(),
+			m.networks_service_vip_label(),
+			m.containers_aliases(),
+			m.common_configuration()
+		]}
+		{rows}
+		empty={m.containers_no_networks_connected()}
+	/>
 </div>

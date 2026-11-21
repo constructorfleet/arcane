@@ -477,10 +477,7 @@
 							</div>
 						{/if}
 						{#if (canDeleteTags || canPullImages) && !selecting}
-							<RowActionsMenu
-								name={tag.name}
-								triggerClass="order-1 size-8 shrink-0 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 lg:order-none"
-							>
+							<RowActionsMenu name={tag.name}>
 								{#if canPullImages}
 									<DropdownMenu.Item
 										onclick={() => {

@@ -57,12 +57,12 @@
 	} from '#lib/utils/docker.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
+	import ScopedTasksPanel from '../../tasks/components/scoped-tasks-panel.svelte';
 	import ServiceConfiguration from '../components/service-configuration.svelte';
 	import ServiceLogsPanel from '../components/service-logs-panel.svelte';
 	import ServiceNetwork from '../components/service-network.svelte';
 	import ServiceOverview from '../components/service-overview.svelte';
 	import ServiceStorage from '../components/service-storage.svelte';
-	import ServiceTasksPanel from '../components/service-tasks-panel.svelte';
 
 	let { data } = $props();
 	let service = $derived(data?.service as SwarmServiceInspect);
@@ -369,7 +369,7 @@
 				<div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
 					<ContainersIcon class="size-5 text-primary" />
 				</div>
-				<h1 class="max-w-40 min-w-0 truncate text-sm font-semibold sm:max-w-56 md:max-w-72 lg:max-w-88" title={serviceName}>
+				<h1 class="min-w-0 truncate text-sm font-semibold" title={serviceName}>
 					{serviceName}
 				</h1>
 				<Badge variant={getSwarmServiceModeVariant(serviceMode)} minWidth="20">{getSwarmServiceModeLabel(serviceMode)}</Badge>
@@ -402,7 +402,7 @@
 			<Tabs.Content value="tasks" class="h-full">
 				{#if selectedTab === 'tasks'}
 					{#key JSON.stringify([envId, service.id])}
-						<ServiceTasksPanel environmentId={envId} serviceId={service.id} />
+						<ScopedTasksPanel environmentId={envId} resourceId={service.id} scope="service" />
 					{/key}
 				{/if}
 			</Tabs.Content>

@@ -4,6 +4,7 @@
 		name: string;
 		values: (string | null | undefined)[];
 		href?: string;
+		inspect?: { label: string; href?: string }[];
 	};
 </script>
 
@@ -24,7 +25,7 @@
 </script>
 
 {#if rows.length}
-	<div class="overflow-x-auto rounded-lg border border-border">
+	<div class="overflow-x-auto">
 		<Table.Root>
 			<Table.Header>
 				<Table.Row>
@@ -32,7 +33,7 @@
 					{#each columns as label, index (index)}
 						<Table.Head>{label}</Table.Head>
 					{/each}
-					<Table.Head>{m.common_actions()}</Table.Head>
+					<Table.Head pinned>{m.common_actions()}</Table.Head>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
@@ -45,10 +46,14 @@
 						{#each row.values as value, index (index)}
 							<Table.Cell class="max-w-80 wrap-anywhere whitespace-normal">{value || m.common_na()}</Table.Cell>
 						{/each}
-						<Table.Cell>
-							{#if href}
+						<Table.Cell pinned>
+							{#if href || row.inspect?.length}
 								<RowActionsMenu name={row.name}>
-									<DropdownMenu.Item onclick={() => goto(href)}><InspectIcon />{m.common_inspect()}</DropdownMenu.Item>
+									{#each row.inspect ?? [{ label: m.common_inspect(), href }] as action (action.href ?? action.label)}
+										<DropdownMenu.Item disabled={!action.href} onclick={() => action.href && goto(action.href)}>
+											<InspectIcon />{action.label}
+										</DropdownMenu.Item>
+									{/each}
 								</RowActionsMenu>
 							{/if}
 						</Table.Cell>

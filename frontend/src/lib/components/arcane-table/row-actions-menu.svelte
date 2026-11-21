@@ -6,25 +6,15 @@
 	import { EllipsisIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 
-	let {
-		name,
-		children,
-		triggerClass = 'size-8',
-		iconClass = 'size-4'
-	}: {
-		name?: string;
-		children: Snippet;
-		triggerClass?: string;
-		iconClass?: string;
-	} = $props();
+	let { name, children }: { name?: string; children: Snippet } = $props();
 </script>
 
 <DropdownMenu.Root>
 	<DropdownMenu.Trigger>
 		{#snippet child({ props })}
-			<ArcaneButton {...props} action="base" tone="ghost" size="icon" class={triggerClass}>
+			<ArcaneButton {...props} action="base" tone="outline" size="icon">
 				<span class="sr-only">{name ? m.actions_for_name({ name }) : m.common_open_menu()}</span>
-				<EllipsisIcon class={iconClass} />
+				<EllipsisIcon class="size-5" />
 			</ArcaneButton>
 		{/snippet}
 	</DropdownMenu.Trigger>
