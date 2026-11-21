@@ -79,8 +79,8 @@ type (
 	ContainerListResult struct {
 		Items      []types.ContainerSummary
 		Groups     []types.ContainerSummaryGroup
-		Pagination pagination.Response
 		Counts     types.ContainerStatusCounts
+		Pagination pagination.Response
 	}
 
 	containerLifecycleAction struct {
@@ -132,8 +132,9 @@ type (
 	}
 
 	StatusCountOptions struct {
-		IncludeInternal bool
-		IncludeHidden   bool
+		IncludeAttention bool
+		IncludeInternal  bool
+		IncludeHidden    bool
 	}
 )
 
@@ -2066,13 +2067,36 @@ func (s *ContainerService) GetContainerStatusCounts(ctx context.Context, opts St
 	}
 	containers = FilterExcludedContainers(containers, opts.IncludeInternal, opts.IncludeHidden)
 	running, unhealthy := 0, 0
+	var attention *types.ContainerAttentionSnapshot
+	if opts.IncludeAttention {
+		attention = &types.ContainerAttentionSnapshot{
+			SwarmSlots:        make(map[string]string),
+			CandidateIDs:      []string{},
+			HealthySwarmSlots: []string{},
+		}
+	}
 	standalone := make([]container.Summary, 0, len(containers))
 	for _, c := range containers {
+		isUnhealthy := strings.Contains(c.Status, "(unhealthy)")
 		if c.State == "running" {
 			running++
 		}
-		if strings.Contains(c.Status, "(unhealthy)") {
+		if isUnhealthy {
 			unhealthy++
+		}
+		if attention != nil {
+			slot := containerSwarmSlot(c.Labels)
+			switch c.State {
+			case "running":
+				if slot != "" && !isUnhealthy && !strings.Contains(c.Status, "(health: starting)") {
+					attention.HealthySwarmSlots = append(attention.HealthySwarmSlots, slot)
+				}
+			case "exited", "dead", "restarting":
+				attention.CandidateIDs = append(attention.CandidateIDs, c.ID)
+				if slot != "" {
+					attention.SwarmSlots[c.ID] = slot
+				}
+			}
 		}
 		if docker.ComposeProjectLabel(c.Labels) == "" {
 			standalone = append(standalone, c)
@@ -2083,12 +2107,27 @@ func (s *ContainerService) GetContainerStatusCounts(ctx context.Context, opts St
 		slog.WarnContext(ctx, "Failed to count pending container updates", "error", updatesErr)
 	}
 	return types.ContainerStatusCounts{
+		Attention:           attention,
 		RunningContainers:   running,
 		StoppedContainers:   len(containers) - running,
 		TotalContainers:     len(containers),
 		UnhealthyContainers: unhealthy,
 		UpdatesAvailable:    updates,
 	}, nil
+}
+
+func containerSwarmSlot(containerLabels map[string]string) string {
+	serviceID := containerLabels["com.docker.swarm.service.id"]
+	taskID := containerLabels["com.docker.swarm.task.id"]
+	if serviceID == "" || taskID == "" {
+		return ""
+	}
+	taskName, ok := strings.CutSuffix(containerLabels["com.docker.swarm.task.name"], "."+taskID)
+	i := strings.LastIndexByte(taskName, '.')
+	if !ok || i < 0 || i == len(taskName)-1 {
+		return ""
+	}
+	return serviceID + ":" + taskName[i+1:]
 }
 
 func (s *ContainerService) CountPendingUpdates(ctx context.Context, containers []container.Summary) (int, error) {

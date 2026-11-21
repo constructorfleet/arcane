@@ -8,7 +8,6 @@ import type { Activity, ActivityType } from '#lib/types/activity.js';
 import type { ApiKey } from '#lib/types/apikey.js';
 import type { ContainerStatusCounts } from '#lib/types/container.js';
 import type { Environment } from '#lib/types/environment.js';
-import type { Event } from '#lib/types/event.js';
 import type { ImageUsageCounts } from '#lib/types/image.js';
 import type { JobStatus } from '#lib/types/jobschedule.js';
 import type { RunStatus } from '#lib/types/scheduler.js';
@@ -19,6 +18,8 @@ import type { RiskFinding } from '#lib/types/vulnerability.js';
 import { isEnvironmentOnline, resolveEnvironmentStatus } from '#lib/utils/docker.js';
 import type { EnvironmentRow } from '#lib/utils/environments.js';
 import { bytes, formatDateTime, formatRelativeTime, parseInstant } from '#lib/utils/formatting.js';
+
+import { getContainerAttentionFailures, type EnvironmentEvent } from './container-attention.js';
 
 export function shouldLoadEnvironment(environment: Environment): boolean {
 	return environment.enabled && isEnvironmentOnline(environment);
@@ -164,11 +165,6 @@ export interface EnvironmentJob {
 	job: JobStatus;
 }
 
-export interface EnvironmentEvent {
-	environmentId: string;
-	event: Event;
-}
-
 export interface DiskPressure {
 	percent: number;
 	detail: string;
@@ -190,11 +186,9 @@ export interface AttentionSources {
 }
 
 const ATTENTION_SEVERITY_RANK: Record<AttentionSeverity, number> = { critical: 0, warning: 1, info: 2 };
-const CONTAINER_EVENT_WINDOW_HOURS = 1;
 const DISK_WARNING_PERCENT = 85;
 const DISK_CRITICAL_PERCENT = 95;
 const REPEATED_FAILURE_THRESHOLD = 3;
-const CONTAINER_RECOVERY_QUIET_MINUTES = 10;
 const REPEATED_FAILURE_WINDOW_HOURS = 24;
 const FAILED_RUN_STATUSES: ReadonlySet<RunStatus> = new Set(['failed', 'partial', 'needs_attention']);
 
@@ -289,45 +283,17 @@ function failedJobAndRepeatedFailureItems(sources: AttentionSources): AttentionI
 	];
 }
 
-function containerEventItems(events: EnvironmentEvent[], now: Temporal.Instant): AttentionItem[] {
-	const cutoff = now.subtract({ hours: CONTAINER_EVENT_WINDOW_HOURS });
-	const latest = new Map<string, EnvironmentEvent>();
-	const failures = new Map<string, number>();
-	const started = new Map<string, number>();
-	for (const entry of events) {
-		const { event } = entry;
-		const at = parseInstant(event.timestamp);
-		if (!at || Temporal.Instant.compare(at, cutoff) < 0 || !event.resourceId) continue;
-		const key = `${entry.environmentId}:${event.resourceId}`;
-		if (event.type === 'container.start' || event.type === 'container.restart') {
-			started.set(key, Math.max(started.get(key) ?? 0, at.epochMilliseconds));
-			continue;
-		}
-		const failedExit = event.type === 'container.die' && String(event.metadata?.['exitCode'] ?? '0') !== '0';
-		if (failedExit) failures.set(key, (failures.get(key) ?? 0) + 1);
-		if (!failedExit && event.type !== 'container.oom') continue;
-		const existing = latest.get(key);
-		if (!existing || (parseInstant(existing.event.timestamp)?.epochMilliseconds ?? 0) < at.epochMilliseconds) {
-			latest.set(key, entry);
-		}
-	}
-	const quietSince = now.subtract({ minutes: CONTAINER_RECOVERY_QUIET_MINUTES }).epochMilliseconds;
-	const failing = [...latest.entries()]
-		.filter(([key, { event }]) => {
-			const startedAt = started.get(key) ?? 0;
-			if (startedAt <= (parseInstant(event.timestamp)?.epochMilliseconds ?? 0)) return true;
-			return (failures.get(key) ?? 0) > 1 && startedAt > quietSince;
-		})
-		.map(([key, entry]) => ({
-			key,
-			entry,
-			name: entry.event.resourceName || String(entry.event.metadata?.['name'] ?? entry.event.resourceId)
-		}));
+function containerEventItems(
+	events: EnvironmentEvent[],
+	containers: ReadonlyMap<string, ContainerStatusCounts>,
+	now: Temporal.Instant
+): AttentionItem[] {
+	const failing = getContainerAttentionFailures(events, containers, now);
 	const nameCounts = new Map<string, number>();
 	for (const { entry, name } of failing) {
 		nameCounts.set(`${entry.environmentId}:${name}`, (nameCounts.get(`${entry.environmentId}:${name}`) ?? 0) + 1);
 	}
-	return failing.map(({ key, entry: { environmentId, event }, name: displayName }): AttentionItem => {
+	return failing.map(({ key, entry: { environmentId, event }, name: displayName, count }): AttentionItem => {
 		const sharedName = (nameCounts.get(`${environmentId}:${displayName}`) ?? 0) > 1;
 		const name = sharedName ? m.name_with_short_id({ name: displayName, id: (event.resourceId ?? '').slice(0, 8) }) : displayName;
 		const oom = event.type === 'container.oom';
@@ -347,7 +313,7 @@ function containerEventItems(events: EnvironmentEvent[], now: Temporal.Instant):
 					containerId: event.resourceId ?? ''
 				})
 			},
-			count: failures.get(key),
+			count,
 			fullId: sharedName ? event.resourceId : undefined
 		};
 	});
@@ -433,7 +399,7 @@ export function buildAttentionItems(sources: AttentionSources): AttentionItem[] 
 					]
 				: [];
 		}),
-		...containerEventItems(sources.events, sources.now),
+		...containerEventItems(sources.events, sources.containers, sources.now),
 		...sources.findings
 			.filter((finding) => finding.knownExploited && finding.runningImagesAffected > 0)
 			.map((finding): AttentionItem => ({

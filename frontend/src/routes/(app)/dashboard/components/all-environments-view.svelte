@@ -139,6 +139,7 @@
 		unusedVolumesBytes: 0,
 		stoppedContainersBytes: 0
 	};
+	const ATTENTION_REFRESH_MS = 60_000;
 	const RECENT_CONTAINER_EVENTS = { types: ['container.oom,container.die', 'container.start,container.restart'], limit: 50 };
 	const TOP_MEMORY_REQUEST = {
 		pagination: { page: 1, limit: 5 },
@@ -223,9 +224,14 @@
 			queryFn: () =>
 				sumAcrossEnvironments(
 					environments,
-					(scope, config) => containerService.getContainerStatusCountsForEnvironment(scope, config),
+					(scope, config) =>
+						containerService.getContainerStatusCountsForEnvironment(scope, {
+							...config,
+							params: { includeAttention: true }
+						}),
 					EMPTY_CONTAINER_COUNTS
 				),
+			refetchInterval: anyWidgetVisible(ATTENTION_WIDGETS) ? ATTENTION_REFRESH_MS : false,
 			placeholderData: keepPreviousData
 		};
 	});
@@ -334,6 +340,7 @@
 				return { events: value, failedEnvironments: failures, excludedEnvironments: excluded };
 			},
 			enabled: anyWidgetVisible(ATTENTION_WIDGETS),
+			refetchInterval: ATTENTION_REFRESH_MS,
 			placeholderData: keepPreviousData
 		};
 	});

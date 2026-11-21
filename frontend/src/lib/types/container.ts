@@ -115,6 +115,7 @@ export interface ContainerCommitResult {
 }
 
 export interface ContainerStatusCounts {
+	attention?: { candidateIds: string[]; swarmSlots: Record<string, string>; healthySwarmSlots: string[] };
 	runningContainers: number;
 	stoppedContainers: number;
 	totalContainers: number;

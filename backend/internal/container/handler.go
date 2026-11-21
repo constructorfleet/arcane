@@ -43,8 +43,8 @@ type (
 		Data                  []types.ContainerSummary      `json:"data"`
 		Groups                []types.ContainerSummaryGroup `json:"groups,omitempty"`
 		FailedEnvironments    []types.EnvironmentFailure    `json:"failedEnvironments,omitempty" doc:"Environments whose results are missing from a multi-environment response"`
-		Pagination            types.PaginationResponse      `json:"pagination"`
 		Counts                types.ContainerStatusCounts   `json:"counts"`
+		Pagination            types.PaginationResponse      `json:"pagination"`
 		Success               bool                          `json:"success"`
 		ResourceSortSupported bool                          `json:"resourceSortSupported"`
 	}
@@ -70,9 +70,10 @@ type (
 	}
 
 	GetContainerStatusCountsInput struct {
-		EnvironmentID   string `path:"id" doc:"Environment ID"`
-		IncludeInternal bool   `query:"includeInternal" default:"false" doc:"Include internal containers"`
-		IncludeHidden   bool   `query:"includeHidden" default:"false" doc:"Include hidden containers"`
+		EnvironmentID    string `path:"id" doc:"Environment ID"`
+		IncludeAttention bool   `query:"includeAttention" default:"false" doc:"Include IDs of containers whose current state can warrant attention"`
+		IncludeInternal  bool   `query:"includeInternal" default:"false" doc:"Include internal containers"`
+		IncludeHidden    bool   `query:"includeHidden" default:"false" doc:"Include hidden containers"`
 	}
 
 	CreateContainerInput struct {
@@ -192,8 +193,9 @@ func (h *ContainerHandler) GetContainerStatusCounts(ctx context.Context, input *
 	}
 
 	counts, err := h.containerService.GetContainerStatusCounts(ctx, StatusCountOptions{
-		IncludeInternal: input.IncludeInternal,
-		IncludeHidden:   input.IncludeHidden,
+		IncludeInternal:  input.IncludeInternal,
+		IncludeHidden:    input.IncludeHidden,
+		IncludeAttention: input.IncludeAttention,
 	})
 	if err != nil {
 		return nil, huma.Error500InternalServerError("Failed to get container counts: " + err.Error())

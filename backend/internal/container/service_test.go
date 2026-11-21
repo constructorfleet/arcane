@@ -1543,6 +1543,42 @@ func newResourceSortService(t *testing.T, fixture *resourceStatsServer) *Contain
 	})
 }
 
+func TestContainerStatusCountsIncludeCurrentAttentionState(t *testing.T) {
+	fixture := newResourceStatsServer()
+	fixture.addContainer("running", "recovered", "running")
+	fixture.addContainer("exited", "failed", "exited")
+	fixture.addContainer("retrying", "retrying", "restarting")
+	fixture.addContainer("paused", "paused", "paused")
+	fixture.addContainer("previous", "service.1.old", "exited", map[string]string{
+		"com.docker.swarm.service.id": "service",
+		"com.docker.swarm.task.id":    "old",
+		"com.docker.swarm.task.name":  "service.1.old",
+	})
+	fixture.addContainer("replacement", "service.1.new", "running", map[string]string{
+		"com.docker.swarm.service.id": "service",
+		"com.docker.swarm.task.id":    "new",
+		"com.docker.swarm.task.name":  "service.1.new",
+	})
+	fixture.addContainer("starting", "service.2.starting", "running", map[string]string{
+		"com.docker.swarm.service.id": "service",
+		"com.docker.swarm.task.id":    "starting",
+		"com.docker.swarm.task.name":  "service.2.starting",
+	})
+	fixture.containers[len(fixture.containers)-1].Status = "Up 5 seconds (health: starting)" // keep: sets the observed runtime health in the fixture
+	service := newResourceSortService(t, fixture)
+
+	counts, err := service.GetContainerStatusCounts(t.Context(), StatusCountOptions{IncludeAttention: true})
+	require.NoError(t, err)
+	require.NotNil(t, counts.Attention)
+	require.ElementsMatch(t, []string{"exited", "retrying", "previous"}, counts.Attention.CandidateIDs)
+	require.Equal(t, map[string]string{"previous": "service:1"}, counts.Attention.SwarmSlots)
+	require.Equal(t, []string{"service:1"}, counts.Attention.HealthySwarmSlots)
+
+	counts, err = service.GetContainerStatusCounts(t.Context(), StatusCountOptions{})
+	require.NoError(t, err)
+	require.Nil(t, counts.Attention)
+}
+
 func resourceSortParams(sort, order string, start, limit int) pagination.QueryParams {
 	return pagination.QueryParams{
 		Sort:    sort,

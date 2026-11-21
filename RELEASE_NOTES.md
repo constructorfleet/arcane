@@ -1,5 +1,5 @@
-# 3.0.1-cf.74
+# 3.0.1-cf.75
 
-- Link named volumes, attached networks, and the local image from Container Details. The resource opens on the container's agent.
-- Link verified network attachments from Swarm Service Details and link Services and Nodes from the Swarm Tasks table and mobile cards. Each link uses its resource-read permission.
-- Link a service's stack and expose the existing vulnerability image destination in mobile cards.
+- Check the container's current state on its agent before counting a recent exit or OOM event under Home's Needs Attention. Recovered or removed containers clear their warning. (#182)
+- Refresh active attention inputs while Home is open. Failed containers that are still exited, dead, or restarting remain eligible, and the Events page retains the history.
+- Group repeated failed Swarm tasks by service slot. Clear the warning when a healthy replacement is observed for that slot.

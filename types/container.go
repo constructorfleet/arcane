@@ -144,6 +144,8 @@ type (
 	}
 
 	ContainerStatusCounts struct {
+		Attention *ContainerAttentionSnapshot `json:"attention,omitempty" doc:"Current container failures and Swarm replacements when requested"`
+
 		RunningContainers int `json:"runningContainers"`
 		StoppedContainers int `json:"stoppedContainers"`
 		TotalContainers   int `json:"totalContainers"`
@@ -151,6 +153,12 @@ type (
 		UnhealthyContainers int `json:"unhealthyContainers" doc:"Containers whose healthcheck reports unhealthy"`
 
 		UpdatesAvailable int `json:"updatesAvailable" doc:"Standalone containers with a pending image update"`
+	}
+
+	ContainerAttentionSnapshot struct {
+		SwarmSlots        map[string]string `json:"swarmSlots" doc:"Swarm slot by failed container ID"`
+		CandidateIDs      []string          `json:"candidateIds" doc:"IDs of containers currently exited, dead, or restarting"`
+		HealthySwarmSlots []string          `json:"healthySwarmSlots" doc:"Swarm slots with a healthy running container"`
 	}
 
 	ContainerActionResult struct {
