@@ -439,6 +439,34 @@ func (s *Service) RollbackService(ctx context.Context, serviceID string) (*types
 	return &types.SwarmServiceUpdateResponse{Warnings: updateResult.Warnings}, nil
 }
 
+func (s *Service) ForceUpdateService(ctx context.Context, serviceID string) (*types.SwarmServiceUpdateResponse, error) {
+	if err := s.ensureManager(ctx); err != nil {
+		return nil, err
+	}
+
+	serviceResult, err := s.docker.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.ServiceInspectResult, error) {
+		return dockerClient.ServiceInspect(ctx, serviceID, client.ServiceInspectOptions{})
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to inspect swarm service: %w", err)
+	}
+
+	service := serviceResult.Service
+	spec := service.Spec
+	spec.TaskTemplate.ForceUpdate++ // keep: changes only the native task replacement counter
+	result, err := s.docker.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.ServiceUpdateResult, error) {
+		return dockerClient.ServiceUpdate(ctx, service.ID, client.ServiceUpdateOptions{
+			Version:          service.Version,
+			Spec:             spec,
+			RegistryAuthFrom: swarm.RegistryAuthFromSpec,
+		})
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to force update swarm service: %w", err)
+	}
+	return &types.SwarmServiceUpdateResponse{Warnings: result.Warnings}, nil
+}
+
 func (s *Service) ScaleService(ctx context.Context, serviceID string, replicas uint64) (*types.SwarmServiceUpdateResponse, error) {
 	if err := s.ensureManager(ctx); err != nil {
 		return nil, err

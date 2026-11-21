@@ -108,7 +108,7 @@ func RegisterRoutes(api huma.API, h *Handler) {
 			OperationID: "swarm-service-action",
 			Method:      http.MethodPost,
 			Path:        "/agents/{id}/swarm/services/{serviceId}",
-			Summary:     "Rollback a swarm service",
+			Summary:     "Rollback or force update a swarm service",
 			Tags: []string{
 				"Swarm",
 			},
@@ -116,9 +116,10 @@ func RegisterRoutes(api huma.API, h *Handler) {
 		},
 		"action",
 		map[string]string{
-			"rollback": authz.PermSwarmServicesUpdate,
+			"rollback":     authz.PermSwarmServicesUpdate,
+			"force-update": authz.PermSwarmServicesUpdate,
 		},
-		h.RollbackService,
+		h.RunServiceAction,
 	)
 	middleware.RegisterWithPermission(
 		api,

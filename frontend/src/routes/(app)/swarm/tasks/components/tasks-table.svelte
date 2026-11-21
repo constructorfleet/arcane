@@ -1,13 +1,17 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
 	import type { ColumnSpec, FilterOption, MobileFieldVisibility } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
+	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
+	import { confirmForceUpdateService } from '#lib/components/swarm/force-update-service.js';
 	import SwarmTaskContainer from '#lib/components/swarm/swarm-task-container.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
-	import { JobsIcon, ConnectionIcon } from '#lib/icons/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+	import { JobsIcon, ConnectionIcon, RestartIcon, InspectIcon, EditIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { SwarmTaskSummary } from '#lib/types/swarm.js';
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
@@ -168,6 +172,45 @@
 	{/if}
 {/snippet}
 
+{#snippet TaskActions({ item }: { item: TaskRow })}
+	{@const canReadService = hasPermission('swarm-services:read', item.environmentId)}
+	{@const canUpdateService = hasPermission('swarm-services:update', item.environmentId)}
+	{#if item.serviceId && (canReadService || (item.desiredState === 'running' && canUpdateService))}
+		{@const href = environmentHref(
+			resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.serviceId }),
+			item.environmentId
+		)}
+		<RowActionsMenu name={item.name || item.id} triggerClass="relative size-8 p-0" iconClass="">
+			{#if canReadService}
+				<DropdownMenu.Item onclick={() => goto(href)}>
+					<InspectIcon class="size-4" />
+					{m.swarm_view_service()}
+				</DropdownMenu.Item>
+				{#if canUpdateService}
+					<DropdownMenu.Item onclick={() => goto(href, { state: { swarmServiceAction: 'edit' } })}>
+						<EditIcon class="size-4" />
+						{m.swarm_edit_service()}
+					</DropdownMenu.Item>
+				{/if}
+			{/if}
+			{#if item.desiredState === 'running' && canUpdateService}
+				<DropdownMenu.Item
+					onclick={() =>
+						confirmForceUpdateService({
+							serviceId: item.serviceId,
+							serviceName: item.serviceName || item.serviceId,
+							environmentId: item.environmentId,
+							refresh: onRetry
+						})}
+				>
+					<RestartIcon class="size-4" />
+					{m.swarm_service_force_update()}
+				</DropdownMenu.Item>
+			{/if}
+		</RowActionsMenu>
+	{/if}
+{/snippet}
+
 {#snippet TaskMobileCardSnippet({ item, mobileFieldVisibility }: { item: TaskRow; mobileFieldVisibility: MobileFieldVisibility })}
 	<UniversalMobileCard
 		{item}
@@ -187,6 +230,7 @@
 						}
 					: null
 		]}
+		rowActions={TaskActions}
 		fields={[
 			{
 				label: m.swarm_service(),
@@ -232,5 +276,6 @@
 	{refreshError}
 	{columns}
 	{mobileFields}
+	rowActions={TaskActions}
 	mobileCard={TaskMobileCardSnippet}
 />

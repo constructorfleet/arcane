@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { goto, refreshAll } from '$app/navigation';
+	import { afterNavigate, goto, refreshAll, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { toast } from 'svelte-sonner';
 
 	import { ActionButtonGroup, type ActionButton } from '#lib/components/action-button-group/index.js';
@@ -8,6 +9,7 @@
 	import ServiceEditorDialog from '#lib/components/dialogs/service-editor-dialog.svelte';
 	import ResourceNotFound from '#lib/components/resource-not-found.svelte';
 	import SheetFooterActions from '#lib/components/sheets/sheet-footer-actions.svelte';
+	import { confirmForceUpdateService } from '#lib/components/swarm/force-update-service.js';
 	import { type TabItem } from '#lib/components/tab-bar/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
@@ -208,6 +210,15 @@
 						onclick: openEdit
 					},
 					{
+						id: 'force-update',
+						action: 'redeploy' as const,
+						group: 'deploy' as const,
+						label: m.swarm_service_force_update_short(),
+						icon: RedeployIcon,
+						onclick: () =>
+							confirmForceUpdateService({ serviceId: service.id, serviceName, environmentId: envId, refresh: refreshData })
+					},
+					{
 						id: 'rollback',
 						action: 'redeploy' as const,
 						group: 'deploy' as const,
@@ -270,6 +281,15 @@
 	function openEdit() {
 		editOpen = true;
 	}
+
+	afterNavigate(() => {
+		const { swarmServiceAction, ...state } = page.state;
+		if (!swarmServiceAction) return;
+
+		void replaceState('', state);
+		if (swarmServiceAction === 'edit' && canUpdateService) openEdit();
+		if (swarmServiceAction === 'scale' && canScaleService) scaleDialogOpen = true;
+	});
 
 	async function handleUpdate(payload: { spec: Record<string, unknown>; options?: Record<string, unknown> }) {
 		if (!service?.id) return;

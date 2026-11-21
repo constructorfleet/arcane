@@ -64,7 +64,7 @@ type (
 	SwarmServiceActionInput struct {
 		EnvironmentID string `path:"id" doc:"Environment ID"`
 		ServiceID     string `path:"serviceId" doc:"Service ID"`
-		Action        string `query:"action" required:"true" enum:"rollback" doc:"Service action"`
+		Action        string `query:"action" required:"true" enum:"rollback,force-update" doc:"Service action"`
 	}
 
 	ScaleSwarmServiceInput struct {
@@ -162,13 +162,24 @@ func (h *Handler) ListServiceTasks(ctx context.Context, input *ListSwarmServiceT
 	return &handlerutil.Page[types.SwarmTaskSummary]{Body: types.Paginated[types.SwarmTaskSummary]{Success: true, Data: items, Pagination: handlerutil.PaginationResponse(paginationResp)}}, nil
 }
 
-func (h *Handler) RollbackService(ctx context.Context, input *SwarmServiceActionInput) (*handlerutil.Out[types.SwarmServiceUpdateResponse], error) {
-	resp, err := h.service.RollbackService(ctx, input.ServiceID)
+func (h *Handler) RunServiceAction(ctx context.Context, input *SwarmServiceActionInput) (*handlerutil.Out[types.SwarmServiceUpdateResponse], error) {
+	actions := map[string]struct {
+		run      func(context.Context, string) (*types.SwarmServiceUpdateResponse, error)
+		auditKey string
+	}{
+		"rollback":     {run: h.service.RollbackService, auditKey: "service.rollback"},
+		"force-update": {run: h.service.ForceUpdateService, auditKey: "service.force_update"},
+	}
+	action, ok := actions[input.Action]
+	if !ok {
+		return nil, huma.Error400BadRequest("Unknown swarm service action")
+	}
+	resp, err := action.run(ctx, input.ServiceID)
 	if err != nil {
 		return nil, h.mapError(err, "Failed to update swarm service: "+err.Error())
 	}
 
-	h.audit(ctx, input.EnvironmentID, "service.rollback", "swarm_service", input.ServiceID, "", map[string]any{"serviceId": input.ServiceID})
+	h.audit(ctx, input.EnvironmentID, action.auditKey, "swarm_service", input.ServiceID, "", map[string]any{"serviceId": input.ServiceID})
 
 	return &handlerutil.Out[types.SwarmServiceUpdateResponse]{Body: types.ApiResponse[types.SwarmServiceUpdateResponse]{Success: true, Data: *resp}}, nil
 }

@@ -1,5 +1,5 @@
-# 3.0.1-cf.76
+# 3.0.1-cf.77
 
-- Consolidate the Containers, Images, Volumes, and Networks shortcuts under Local Resources in Node Details. Each opens on the verified node agent. (#174)
-- Add paginated Docker network inventory with driver, scope, subnet, gateway, and IP range, and link each readable network to its details. (#174)
-- Show installed Docker-managed plugins with enabled state, source reference, and capability, alongside effective daemon settings reported by Docker. Reading daemon.json requires host access. (#174)
+- Add a Force update quick action to Swarm service rows and Service Details. Docker recreates tasks using the current service specification and update policy. (#185)
+- Offer Force update service from an active task row, including tasks stuck in Preparing. The confirmation identifies the affected service and explains the impact on its tasks. (#185)
+- Open existing Scale and Edit forms from service row menus, and offer View service and Edit service on task rows. (#185)

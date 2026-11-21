@@ -11,9 +11,19 @@
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import IfPermitted from '#lib/components/if-permitted.svelte';
+	import { confirmForceUpdateService } from '#lib/components/swarm/force-update-service.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
-	import { ContainersIcon, GlobeIcon, TrashIcon, NetworksIcon, InspectIcon } from '#lib/icons/index.js';
+	import {
+		ContainersIcon,
+		GlobeIcon,
+		TrashIcon,
+		NetworksIcon,
+		InspectIcon,
+		RestartIcon,
+		EditIcon,
+		LayersIcon
+	} from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { swarmService } from '#lib/services/swarm-service.js';
 	import type { SwarmServiceSummary, SwarmServicePort } from '#lib/types/swarm.js';
@@ -21,7 +31,7 @@
 	import type { SwarmServicesPaginatedResponse } from '#lib/types/ui/swarm.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
-	import { getSwarmServiceModeLabel, getSwarmServiceModeVariant } from '#lib/utils/docker.js';
+	import { getSwarmServiceModeLabel, getSwarmServiceModeVariant, isSwarmServiceModeScalable } from '#lib/utils/docker.js';
 	import { environmentHref, type EnvironmentPage, type EnvironmentRow } from '#lib/utils/environments.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
@@ -80,9 +90,10 @@
 
 	const isAnyLoading = $derived(Object.values(isLoading).some(Boolean));
 
-	function inspectService(service: ServiceRow) {
+	function openService(service: ServiceRow, action?: App.PageState['swarmServiceAction']) {
 		goto(
-			resolve(`/(app)/swarm/services/[serviceId]?env=${encodeURIComponent(service.environmentId)}`, { serviceId: service.id })
+			resolve(`/(app)/swarm/services/[serviceId]?env=${encodeURIComponent(service.environmentId)}`, { serviceId: service.id }),
+			{ state: { swarmServiceAction: action } }
 		);
 	}
 
@@ -273,10 +284,36 @@
 
 {#snippet RowActions({ item }: { item: ServiceRow })}
 	<RowActionsMenu name={item.name} triggerClass="relative size-8 p-0" iconClass="">
-		<DropdownMenu.Item onclick={() => inspectService(item)}>
+		<DropdownMenu.Item onclick={() => openService(item)}>
 			<InspectIcon class="size-4" />
 			{m.common_inspect()}
 		</DropdownMenu.Item>
+		<IfPermitted perm="swarm-services:update" envId={item.environmentId}>
+			<IfPermitted perm="swarm-services:read" envId={item.environmentId}>
+				<DropdownMenu.Item onclick={() => openService(item, 'edit')}>
+					<EditIcon class="size-4" />
+					{m.common_edit()}
+				</DropdownMenu.Item>
+				{#if isSwarmServiceModeScalable(item.mode)}
+					<DropdownMenu.Item onclick={() => openService(item, 'scale')}>
+						<LayersIcon class="size-4" />
+						{m.swarm_service_scale()}
+					</DropdownMenu.Item>
+				{/if}
+			</IfPermitted>
+			<DropdownMenu.Item
+				onclick={() =>
+					confirmForceUpdateService({
+						serviceId: item.id,
+						serviceName: item.name,
+						environmentId: item.environmentId,
+						refresh: onRetry
+					})}
+			>
+				<RestartIcon class="size-4" />
+				{m.swarm_service_force_update_short()}
+			</DropdownMenu.Item>
+		</IfPermitted>
 		<IfPermitted perm="swarm-services:delete" envId={item.environmentId}>
 			<DropdownMenu.Separator />
 			<DropdownMenu.Item variant="destructive" onclick={() => handleDelete(item)} disabled={isAnyLoading}>

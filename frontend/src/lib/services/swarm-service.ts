@@ -91,6 +91,12 @@ class SwarmService extends BaseAPIService {
 		);
 	}
 
+	async forceUpdateService(serviceId: string, environmentId: string): Promise<SwarmServiceUpdateResponse> {
+		return this.handleResponse(
+			this.api.post(`/agents/${environmentId}/swarm/services/${serviceId}`, undefined, { params: { action: 'force-update' } })
+		);
+	}
+
 	async scaleService(
 		serviceId: string,
 		request: SwarmServiceScaleRequest,

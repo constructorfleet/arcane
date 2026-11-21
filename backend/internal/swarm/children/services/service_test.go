@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	stdjson "encoding/json"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"fmt"
@@ -38,6 +39,46 @@ func newSwarmTestDockerClient(t *testing.T, server *httptest.Server) *client.Cli
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = cli.Close() })
 	return cli
+}
+
+func TestForceUpdateServicePreservesCurrentSpecAndRegistryAuth(t *testing.T) {
+	spec := swarm.ServiceSpec{
+		Annotations: swarm.Annotations{Name: "service-1", Labels: map[string]string{"owner": "fixture"}},
+		TaskTemplate: swarm.TaskSpec{
+			ContainerSpec: &swarm.ContainerSpec{Image: "registry.example.test/example:stable"},
+			ForceUpdate:   3,
+		},
+		Mode:         swarm.ServiceMode{Replicated: &swarm.ReplicatedService{Replicas: new(uint64(3))}},
+		UpdateConfig: &swarm.UpdateConfig{Parallelism: 1, Order: swarm.UpdateOrderStopFirst},
+	}
+	golden := spec
+	golden.TaskTemplate.ForceUpdate = 4 // keep: models the single expected change
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1.41/services/service-1":
+			assert.NoError(t, stdjson.NewEncoder(w).Encode(swarm.Service{
+				ID: "service-1", Meta: swarm.Meta{Version: swarm.Version{Index: 7}}, Spec: spec,
+			}))
+		case r.Method == http.MethodPost && r.URL.Path == "/v1.41/services/service-1/update":
+			assert.Equal(t, "7", r.URL.Query().Get("version"))
+			assert.Equal(t, "spec", r.URL.Query().Get("registryAuthFrom"))
+			assert.Empty(t, r.URL.Query().Get("rollback"))
+			var request swarm.ServiceSpec
+			if assert.NoError(t, stdjson.NewDecoder(r.Body).Decode(&request)) {
+				assert.Equal(t, golden, request)
+			}
+			_, _ = w.Write([]byte(`{"Warnings":["accepted"]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	service := NewService(newSettingsDockerService(t, newSwarmTestDockerClient(t, server)), func(context.Context) error { return nil }, nil)
+
+	result, err := service.ForceUpdateService(t.Context(), "service-1")
+	require.NoError(t, err)
+	require.Equal(t, []string{"accepted"}, result.Warnings)
 }
 
 func TestService_ServiceModes(t *testing.T) {
