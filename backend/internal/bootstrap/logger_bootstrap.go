@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -72,6 +73,21 @@ func (h *requestLogHandler) Enabled(ctx context.Context, level slog.Level) bool 
 	return h.handler.Enabled(ctx, level)
 }
 
+func redactRequestQuery(query string) string {
+	params := strings.Split(query, "&")
+	for i, param := range params {
+		decoded, err := url.QueryUnescape(param)
+		if err != nil {
+			decoded = param
+		}
+		if redacted := redactSecrets(decoded); redacted != decoded {
+			params[i] = redacted
+		}
+	}
+
+	return strings.Join(params, "&")
+}
+
 func (h *requestLogHandler) Handle(ctx context.Context, r slog.Record) error {
 	var attrs []slog.Attr
 	var requestAttrs, responseAttrs []slog.Attr
@@ -119,7 +135,13 @@ func (h *requestLogHandler) Handle(ctx context.Context, r slog.Record) error {
 			}
 		case "query", "referer":
 			if debug && a.Value.Kind() == slog.KindString && a.Value.String() != "" {
-				debugAttrs = append(debugAttrs, a)
+				value := a.Value.String()
+				if a.Key == "query" {
+					value = redactRequestQuery(value)
+				} else {
+					value = redactSecrets(value)
+				}
+				debugAttrs = append(debugAttrs, slog.String(a.Key, value))
 			}
 		}
 	}
