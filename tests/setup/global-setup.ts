@@ -87,10 +87,19 @@ async function globalSetup() {
 				execFileSync('docker', ['pull', image], { stdio: 'inherit' });
 			}
 		}
-		console.log('Building and starting Docker containers...');
-		execFileSync('docker', ['compose', '-f', composeFile, 'up', '-d', '--build'], {
-			stdio: 'inherit'
-		});
+		const reuseTestImage = process.env.PLAYWRIGHT_REUSE_TEST_IMAGE === '1';
+		console.log(
+			reuseTestImage
+				? 'Starting Docker containers with the existing test image...'
+				: 'Building and starting Docker containers...'
+		);
+		execFileSync(
+			'docker',
+			['compose', '-f', composeFile, 'up', '-d', reuseTestImage ? '--no-build' : '--build'],
+			{
+				stdio: 'inherit'
+			}
+		);
 		console.log('Docker containers are up.');
 	} catch (error) {
 		captureComposeDiagnostics(composeFile);

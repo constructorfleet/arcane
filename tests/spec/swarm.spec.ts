@@ -11,47 +11,59 @@ test.describe('Swarm UI', () => {
 		const environmentResponse = await page.request.get('/api/agents/0');
 		expect(environmentResponse.ok()).toBeTruthy();
 		const { data: environment }: { data: { name: string } } = await environmentResponse.json();
-		await expect(page.locator('main').getByText(environment.name, { exact: true })).toBeVisible();
+		const administration = page.locator('[data-slot="card"]').filter({
+			has: page.locator('[data-slot="card-title"]').filter({ hasText: /^Cluster administration$/ })
+		});
+		await expect(administration.getByText(environment.name, { exact: true })).toBeVisible();
 
 		const swarmInfoResponsePromise = page.waitForResponse('**/api/agents/0/swarm/info');
-		await page
-			.locator('main')
-			.getByRole('button', { name: 'Inspect', exact: true })
-			.first()
-			.click();
+		await administration.getByRole('button', { name: 'Inspect cluster', exact: true }).click();
 		const swarmInfoResponse = await swarmInfoResponsePromise;
-		await expect(page.getByRole('dialog', { name: environment.name })).toBeVisible();
+		const clusterDialog = page.getByRole('dialog', { name: 'Inspect cluster', exact: true });
+		await expect(clusterDialog).toBeVisible();
 
-		const initializeCard = page
+		const initializeCard = clusterDialog
 			.locator('[data-slot="card-title"]')
 			.filter({ hasText: 'Initialize Cluster' });
 		if (swarmInfoResponse.ok()) {
-			await expect(page.getByRole('button', { name: 'Actions' })).toBeVisible();
-			await expect(page.getByText('Initialize Cluster')).toHaveCount(0);
-			await expect(page.getByText('Join Existing Cluster')).toHaveCount(0);
-			await page.getByRole('button', { name: 'Actions' }).click();
-			await expect(page.getByText('Unlock / Leave')).toBeVisible();
-			await expect(page.getByRole('button', { name: 'Leave Cluster' })).toBeVisible();
+			await expect(
+				clusterDialog.getByRole('button', { name: 'Actions', exact: true })
+			).toBeVisible();
+			await expect(clusterDialog.getByText('Initialize Cluster')).toHaveCount(0);
+			await expect(clusterDialog.getByText('Join Existing Cluster')).toHaveCount(0);
+			await clusterDialog.getByRole('button', { name: 'Actions', exact: true }).click();
+			const lifecycleDialog = page.getByRole('dialog', { name: 'Unlock / Leave', exact: true });
+			await expect(
+				lifecycleDialog.getByRole('button', { name: 'Leave Cluster', exact: true })
+			).toBeVisible();
 		} else {
 			await expect(initializeCard).toBeVisible();
-			await expect(page.getByText('Join Existing Cluster')).toBeVisible();
-			await expect(page.getByText('Choose how to set up this engine')).toBeVisible();
+			await expect(clusterDialog.getByText('Join Existing Cluster')).toBeVisible();
+			await expect(clusterDialog.getByText('Choose how to set up this engine')).toBeVisible();
 			await expect(
-				page.locator('[data-slot="card-title"]').filter({ hasText: 'Cluster Status' })
+				clusterDialog.locator('[data-slot="card-title"]').filter({ hasText: 'Cluster Status' })
 			).toHaveCount(0);
 			await expect(
-				page.locator('[data-slot="card-title"]').filter({ hasText: 'Join Tokens' })
+				clusterDialog.locator('[data-slot="card-title"]').filter({ hasText: 'Join Tokens' })
 			).toHaveCount(0);
 			await expect(
-				page.locator('[data-slot="card-title"]').filter({ hasText: 'Update Swarm Spec' })
+				clusterDialog.locator('[data-slot="card-title"]').filter({ hasText: 'Update Swarm Spec' })
 			).toHaveCount(0);
 
-			await expect(page.getByPlaceholder('Remote manager addrs (comma separated)')).toBeVisible();
-			await expect(page.getByPlaceholder('Listen address (optional)').first()).toBeHidden();
-			await page.getByText('Advanced settings').first().click();
-			await expect(page.getByPlaceholder('Listen address (optional)').first()).toBeVisible();
-			await expect(page.getByRole('button', { name: 'Initialize' })).toBeVisible();
-			await expect(page.getByRole('button', { name: 'Join' })).toBeVisible();
+			await expect(
+				clusterDialog.getByPlaceholder('Remote manager addrs (comma separated)')
+			).toBeVisible();
+			await expect(
+				clusterDialog.getByPlaceholder('Listen address (optional)').first()
+			).toBeHidden();
+			await clusterDialog.getByText('Advanced settings').first().click();
+			await expect(
+				clusterDialog.getByPlaceholder('Listen address (optional)').first()
+			).toBeVisible();
+			await expect(
+				clusterDialog.getByRole('button', { name: 'Initialize', exact: true })
+			).toBeVisible();
+			await expect(clusterDialog.getByRole('button', { name: 'Join', exact: true })).toBeVisible();
 		}
 	});
 });

@@ -99,11 +99,7 @@ test.describe('Networks Page', () => {
 		await expect(
 			page.getByText(`${counts.total} ${counts.total === 1 ? 'Total Network' : 'Total Networks'}`)
 		).toBeVisible();
-		await expect(
-			page.getByText(
-				`${counts.unused} ${counts.unused === 1 ? 'Unused Network' : 'Unused Networks'}`
-			)
-		).toBeVisible();
+		await expect(page.getByText(`${counts.unused} No observed container use`)).toBeVisible();
 	});
 
 	test('creates and removes a network through the UI', async ({ page }) => {

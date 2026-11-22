@@ -608,7 +608,11 @@ test.describe('Lifecycle', () => {
 
 			await page.getByLabel('Container Name *', { exact: true }).fill(containerName);
 			await page.getByLabel('Image *', { exact: true }).fill(TEST_IMAGE);
-			await page.getByLabel('Command', { exact: true }).fill('sleep 3600');
+			const command = page.getByRole('group', { name: 'Command', exact: true });
+			for (const value of ['sleep', '3600']) {
+				await command.getByRole('button', { name: 'Add argument' }).click();
+				await command.getByRole('textbox').last().fill(value);
+			}
 			await page.getByLabel('Working Directory', { exact: true }).fill('/tmp');
 
 			await page.getByRole('tab', { name: 'Environment', exact: true }).click();
@@ -635,7 +639,7 @@ test.describe('Lifecycle', () => {
 			await page.getByRole('tab', { name: 'Networks', exact: true }).click();
 			await page.getByRole('button', { name: 'Add', exact: true }).click();
 			await selectSearchableOption(page, page.getByRole('tabpanel'), networkName);
-			await page.getByPlaceholder('Aliases').fill('lifecycle-alias');
+			await page.getByRole('textbox', { name: 'Aliases', exact: true }).fill('lifecycle-alias');
 
 			await page.getByRole('tab', { name: 'Advanced', exact: true }).click();
 			await page.locator('#restart-policy').click();
@@ -727,7 +731,9 @@ test.describe('Lifecycle', () => {
 				has: page.getByRole('heading', { name: 'Connect to network', exact: true })
 			});
 			await selectSearchableOption(page, connectSection, networkName);
-			await connectSection.getByPlaceholder('Aliases').fill('attached-live');
+			await connectSection
+				.getByRole('textbox', { name: 'Comma-separated network aliases', exact: true })
+				.fill('attached-live');
 
 			const connectResponsePromise = page.waitForResponse(
 				(response) =>
@@ -835,10 +841,15 @@ test.describe('Lifecycle', () => {
 			await expect(page.getByLabel('Container Name *', { exact: true })).toHaveValue(
 				newContainerName.replace(/-edited$/, '')
 			);
-			await expect(page.getByLabel('Command', { exact: true })).toHaveValue('sleep 3600');
+			const argumentsFields = page
+				.getByRole('group', { name: 'Command', exact: true })
+				.getByRole('textbox');
+			await expect(argumentsFields).toHaveCount(2);
+			await expect(argumentsFields.nth(0)).toHaveValue('sleep');
+			await expect(argumentsFields.nth(1)).toHaveValue('3600');
 
 			await page.getByLabel('Container Name *', { exact: true }).fill(newContainerName);
-			await page.getByLabel('Command', { exact: true }).fill('sleep 7200');
+			await argumentsFields.nth(1).fill('7200');
 			await page.getByRole('tab', { name: 'Environment', exact: true }).click();
 			const environmentGroup = formGroup(page, 'Environment Variables');
 			const environmentKeys = environmentGroup.getByPlaceholder('KEY');

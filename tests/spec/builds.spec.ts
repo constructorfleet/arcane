@@ -56,8 +56,18 @@ async function openAdvancedBuildOptions(page: Page) {
 	await expect(page.locator('#dockerfile')).toBeVisible();
 }
 
+async function scrollToBuildHeader(page: Page) {
+	// The Build tab stays in the full header even while its floating copy is visible.
+	await page
+		.getByRole('tab', { name: 'Build', exact: true, includeHidden: true })
+		.evaluate((tab) => tab.scrollIntoView({ block: 'center', behavior: 'instant' }));
+}
+
 async function selectBuildProvider(page: Page, provider: 'local' | 'depot') {
-	const providerTrigger = page.locator('[data-slot="select-trigger"]').first();
+	await scrollToBuildHeader(page);
+	const providerTrigger = page
+		.getByRole('combobox', { name: /Build Provider/ })
+		.and(page.locator(':not([inert] *)'));
 	await expect(providerTrigger).toBeVisible();
 	await providerTrigger.click();
 
@@ -73,8 +83,12 @@ function getToastTitle(page: Page) {
 	return page.locator('li[data-sonner-toast] div[data-title]');
 }
 
-function getBuildButton(page: Page) {
-	return page.getByRole('button', { name: 'Build', exact: true }).first();
+async function submitBuild(page: Page) {
+	await scrollToBuildHeader(page);
+	await page
+		.getByRole('button', { name: 'Build', exact: true })
+		.and(page.locator(':not([inert] *)'))
+		.click();
 }
 
 function upsertSettingEntry(
@@ -224,7 +238,7 @@ test.describe('Build workspace provider flows', () => {
 			});
 		});
 
-		await getBuildButton(page).click();
+		await submitBuild(page);
 		await expect.poll(() => buildRequest.payload, { timeout: 10000 }).not.toBeNull();
 
 		expect(buildRequest.payload).toMatchObject({
@@ -296,7 +310,7 @@ test.describe('Build workspace provider flows', () => {
 			await route.abort();
 		});
 
-		await getBuildButton(page).click();
+		await submitBuild(page);
 		await expect(
 			getToastTitle(page).filter({
 				hasText: 'Select a repository name configured for this registry'
@@ -373,7 +387,7 @@ test.describe('Build workspace provider flows', () => {
 			});
 		});
 
-		await getBuildButton(page).click();
+		await submitBuild(page);
 		await expect.poll(() => buildPayload, { timeout: 10000 }).not.toBeNull();
 
 		expect(buildPayload).toMatchObject({
@@ -438,7 +452,7 @@ test.describe('Build workspace provider flows', () => {
 			});
 		});
 
-		await getBuildButton(page).click();
+		await submitBuild(page);
 		await expect.poll(() => buildPayload, { timeout: 10000 }).not.toBeNull();
 
 		expect(buildPayload).toMatchObject({
@@ -484,7 +498,7 @@ test.describe('Build workspace provider flows', () => {
 			await route.abort();
 		});
 
-		await getBuildButton(page).click();
+		await submitBuild(page);
 		const localUnsupportedToast = getToastTitle(page).filter({
 			hasText: 'Unsupported build options for provider local:'
 		});
@@ -521,7 +535,7 @@ test.describe('Build workspace provider flows', () => {
 			await route.abort();
 		});
 
-		await getBuildButton(page).click();
+		await submitBuild(page);
 		await expect(
 			getToastTitle(page).filter({
 				hasText:

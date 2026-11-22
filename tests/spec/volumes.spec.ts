@@ -176,7 +176,11 @@ test.describe('Volumes Page', () => {
 		await page.goto('/volumes');
 		await page.waitForLoadState('load');
 
-		await expect(page.getByText(`${volumeCount.total} Total Volumes`)).toBeVisible();
+		await expect(
+			page.getByText(
+				`${volumeCount.total} ${volumeCount.total === 1 ? 'Total Volume' : 'Total Volumes'}`
+			)
+		).toBeVisible();
 	});
 
 	test('Inspect Volume', async ({ page }) => {
