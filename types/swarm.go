@@ -1,6 +1,7 @@
 package types
 
 import (
+	"cmp"
 	"encoding/json"
 	"encoding/json/jsontext"
 	"fmt"
@@ -642,9 +643,20 @@ func NewSwarmServiceInspect(service swarm.Service) (SwarmServiceInspect, error) 
 }
 
 func NewSwarmTaskSummary(task swarm.Task, serviceName, nodeName string) SwarmTaskSummary {
-	name := ""
-	if task.Name != "" {
-		name = task.Name
+	name := task.Name
+	if name == "" {
+		service := cmp.Or(serviceName, task.ServiceID)
+		node := cmp.Or(nodeName, task.NodeID)
+		switch {
+		case service == "":
+			name = task.ID
+		case task.Slot != 0:
+			name = fmt.Sprintf("%s.%d", service, task.Slot)
+		case node != "":
+			name = service + "." + node
+		default:
+			name = service
+		}
 	}
 
 	image := ""
@@ -656,8 +668,6 @@ func NewSwarmTaskSummary(task swarm.Task, serviceName, nodeName string) SwarmTas
 	if task.Status.ContainerStatus != nil {
 		containerID = task.Status.ContainerStatus.ContainerID
 	}
-
-	slot := task.Slot
 
 	return SwarmTaskSummary{
 		ID:           task.ID,
@@ -671,7 +681,7 @@ func NewSwarmTaskSummary(task swarm.Task, serviceName, nodeName string) SwarmTas
 		Error:        task.Status.Err,
 		ContainerID:  containerID,
 		Image:        image,
-		Slot:         slot,
+		Slot:         task.Slot,
 		CreatedAt:    task.CreatedAt,
 		UpdatedAt:    task.UpdatedAt,
 	}

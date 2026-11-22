@@ -73,7 +73,7 @@
 	const columns = $derived([
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
 		...(showEnvironment ? environmentColumns<TaskRow>() : []),
-		{ accessorKey: 'name', title: m.common_name(), sortable: true, cell: serviceScoped ? TaskNameCell : undefined },
+		{ accessorKey: 'name', title: m.common_name(), sortable: true, cell: TaskNameCell },
 		{ id: 'container', title: m.container(), cell: ContainerCell },
 		...(serviceScoped
 			? []
@@ -163,7 +163,9 @@
 {#snippet TaskNameCell({ item }: { item: TaskRow })}
 	<div title={item.id}>
 		{#if item.name}<div class="truncate" title={item.name}>{item.name}</div>{/if}
-		<div class="font-mono text-xs text-muted-foreground">{item.id.slice(0, 12)}</div>
+		{#if !item.name || (serviceScoped && item.name !== item.id)}
+			<div class="font-mono text-xs text-muted-foreground">{item.id.slice(0, 12)}</div>
+		{/if}
 	</div>
 {/snippet}
 
@@ -229,8 +231,8 @@
 			component: JobsIcon,
 			variant: getSwarmTaskIconVariant(item.currentState)
 		})}
-		title={(item: TaskRow) => (serviceScoped ? item.name || item.id.slice(0, 12) : item.name)}
-		subtitle={(item: TaskRow) => (serviceScoped ? item.id.slice(0, 12) : null)}
+		title={(item: TaskRow) => item.name || item.id.slice(0, 12)}
+		subtitle={(item: TaskRow) => (serviceScoped && item.name && item.name !== item.id ? item.id.slice(0, 12) : null)}
 		badges={[
 			(item: TaskRow) =>
 				(mobileFieldVisibility['currentState'] ?? true)

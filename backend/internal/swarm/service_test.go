@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/moby/moby/api/types/swarm"
 	"github.com/stretchr/testify/require"
 
 	"getarcane.dev/arcane/v3/pkg/httpx"
@@ -69,6 +70,30 @@ func TestAggregateTasksMergesEnvironments(t *testing.T) {
 	require.EqualValues(t, 2, body.Pagination.TotalItems)
 	require.Len(t, body.FailedEnvironments, 1)
 	require.Equal(t, "c", body.FailedEnvironments[0].Environment.ID)
+}
+
+func TestTaskPaginationUsesResolvedTaskNames(t *testing.T) {
+	tasks := []types.SwarmTaskSummary{
+		types.NewSwarmTaskSummary(swarm.Task{ID: "a", ServiceID: "replicated-id", Slot: 2}, "web", ""),
+		types.NewSwarmTaskSummary(swarm.Task{ID: "b", ServiceID: "global-id", NodeID: "node-id"}, "exporter", "swarm03"),
+		types.NewSwarmTaskSummary(swarm.Task{ID: "c", ServiceID: "missing-service", NodeID: "missing-node"}, "", ""),
+		types.NewSwarmTaskSummary(swarm.Task{ID: "d", ServiceID: "pending-id"}, "pending", ""),
+		types.NewSwarmTaskSummary(swarm.Task{ID: "e"}, "", ""),
+		types.NewSwarmTaskSummary(swarm.Task{ID: "f", Annotations: swarm.Annotations{Name: "explicit"}, Slot: 3}, "web", ""),
+	}
+	require.Equal(t, "web.2", tasks[0].Name)
+	require.Equal(t, "exporter.swarm03", tasks[1].Name)
+	require.Equal(t, "missing-service.missing-node", tasks[2].Name)
+	require.Equal(t, "pending", tasks[3].Name)
+	require.Equal(t, "e", tasks[4].Name)
+	require.Equal(t, "explicit", tasks[5].Name)
+
+	page := taskPagination.SearchOrderAndPaginate(tasks, pagination.QueryParams{
+		Params:      pagination.Params{Limit: 10},
+		SearchQuery: pagination.SearchQuery{Search: "exporter.swarm03"},
+	})
+	require.Len(t, page.Items, 1)
+	require.Equal(t, "b", page.Items[0].ID)
 }
 
 func TestServiceTaskPaginationFiltersBeforeSlicing(t *testing.T) {
