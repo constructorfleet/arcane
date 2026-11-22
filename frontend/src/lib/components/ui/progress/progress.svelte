@@ -18,6 +18,7 @@
 </script>
 
 <ProgressPrimitive.Root
+	data-slot="progress"
 	bind:ref
 	class={cn('relative h-4 w-full overflow-hidden rounded-full bg-secondary', className)}
 	{value}

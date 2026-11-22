@@ -280,6 +280,7 @@
 								<FilterIcon class="size-4" />
 								{#if activeFilterCount > 0}
 									<span
+										data-slot="filter-count"
 										class="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-3xs font-medium text-primary-foreground"
 									>
 										{activeFilterCount}

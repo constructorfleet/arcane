@@ -12,6 +12,7 @@
 </script>
 
 <SwitchPrimitive.Root
+	data-slot="switch"
 	bind:ref
 	bind:checked
 	class={cn(
@@ -21,6 +22,7 @@
 	{...restProps}
 >
 	<SwitchPrimitive.Thumb
+		data-slot="switch-thumb"
 		class={cn(
 			'pointer-events-none block size-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0'
 		)}

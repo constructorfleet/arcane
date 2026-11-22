@@ -1,4 +1,4 @@
-# 3.0.1-cf.82
+# 3.0.1-cf.83
 
-- Show task names across Swarm, service, stack, and node task views using the service name and replica slot or assigned node. (#192)
-- Use the resolved names for search and sorting. Show the task ID if older agents return an empty name. (#192)
+- Give Vega Graphite controls and labels 2 px corners, use 4 px corners on panels, and make table rows and headers square. (#190)
+- Apply the sharper treatment to grouped fields, switches, filters, progress bars, drawers, and notifications while preserving the selected palette. (#190)

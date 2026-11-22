@@ -366,7 +366,7 @@
 	<TabbedPageLayout backUrl="/swarm/services" backLabel={m.common_back()} {tabItems} {selectedTab} {onTabChange}>
 		{#snippet headerInfo()}
 			<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-				<div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+				<div data-slot="swarm-service-icon" class="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
 					<ContainersIcon class="size-5 text-primary" />
 				</div>
 				<h1 class="min-w-0 truncate text-sm font-semibold" title={serviceName}>
