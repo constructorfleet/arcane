@@ -37,6 +37,10 @@ class VolumeService extends BaseAPIService {
 		return res.data.data;
 	}
 
+	async listVolumeDrivers(environmentId: string, config?: APIRequestConfig): Promise<string[]> {
+		return this.handleResponse(this.api.get(`/agents/${environmentId}/volume-drivers`, config));
+	}
+
 	async createVolume(options: VolumeCreate, environmentId: string): Promise<Volume> {
 		return this.handleResponse(this.api.post(`/agents/${environmentId}/volumes`, options));
 	}

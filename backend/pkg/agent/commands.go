@@ -126,6 +126,7 @@ var (
 		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/gitops/syncs/{syncId}/backup/preview", CommandName: "gitops_sync.backup.preview"},
 		{Method: http.MethodPost, PathPattern: "/api/agents/{id}/gitops/syncs/{syncId}/backup/resolve", CommandName: "gitops_sync.backup.resolve"},
 
+		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/volume-drivers", CommandName: "volume.drivers"},
 		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/volumes/counts", CommandName: "volume.counts"},
 		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/volumes", CommandName: "volume.list"},
 		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/volumes/{volumeName}", CommandName: "volume.inspect"},

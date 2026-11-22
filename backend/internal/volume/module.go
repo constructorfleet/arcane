@@ -117,6 +117,15 @@ func RegisterVolumes(
 	}, authz.PermVolumesRead, h.GetVolume)
 
 	middleware.RegisterWithPermission(api, huma.Operation{
+		OperationID: "list-volume-drivers",
+		Method:      http.MethodGet,
+		Path:        "/agents/{id}/volume-drivers",
+		Summary:     "List available Docker volume drivers",
+		Tags:        []string{"Volumes"},
+		Security:    handlerutil.DefaultOperationSecurity(),
+	}, authz.PermVolumesCreate, h.ListVolumeDrivers)
+
+	middleware.RegisterWithPermission(api, huma.Operation{
 		OperationID: "create-volume",
 		Method:      http.MethodPost,
 		Path:        "/agents/{id}/volumes",

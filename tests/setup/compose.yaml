@@ -29,6 +29,7 @@ services:
       - '-allowGET=(/v[\d.]+)?/_ping'
       - '-allowGET=(/v[\d.]+)?/version'
       - '-allowGET=(/v[\d.]+)?/info'
+      - '-allowGET=(/v[\d.]+)?/plugins'
       - '-allowGET=(/v[\d.]+)?/events'
       - '-allowGET=(/v[\d.]+)?/system/df'
       - '-allowGET=(/v[\d.]+)?/containers(/.*)?'

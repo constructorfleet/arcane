@@ -419,6 +419,45 @@ func (s *VolumeService) GetVolumeByName(ctx context.Context, name string) (*type
 	return &v, nil
 }
 
+func (s *VolumeService) ListVolumeDrivers(ctx context.Context) ([]string, error) {
+	return s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) ([]string, error) {
+		info, err := dockerClient.Info(ctx, client.InfoOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("list Docker volume drivers: %w", err)
+		}
+
+		drivers := map[string]struct{}{"local": {}}
+		for _, name := range info.Info.Plugins.Volume {
+			if name != "" {
+				drivers[name] = struct{}{}
+			}
+		}
+
+		plugins, err := dockerClient.PluginList(ctx, client.PluginListOptions{})
+		if err != nil && !errdefs.IsNotImplemented(err) && !errdefs.IsNotFound(err) && !errdefs.IsPermissionDenied(err) {
+			return nil, fmt.Errorf("list managed Docker plugins: %w", err)
+		}
+		for _, plugin := range plugins.Items {
+			if !plugin.Enabled || plugin.Name == "" {
+				continue
+			}
+			for _, capability := range plugin.Config.Interface.Types {
+				if capability.Prefix == "docker" && capability.Capability == "volumedriver" {
+					drivers[plugin.Name] = struct{}{}
+					break
+				}
+			}
+		}
+
+		names := make([]string, 0, len(drivers))
+		for name := range drivers {
+			names = append(names, name)
+		}
+		slices.Sort(names)
+		return names, nil
+	})
+}
+
 func (s *VolumeService) CreateVolume(ctx context.Context, options client.VolumeCreateOptions, user types.Actor) (*types.Volume, error) {
 	slog.DebugContext(ctx, "volume service: create volume", "volume", options.Name, "driver", options.Driver, "user", user.ID)
 	if strings.TrimSpace(options.Name) == "" {

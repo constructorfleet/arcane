@@ -43,6 +43,48 @@ import (
 	"getarcane.dev/types/v3"
 )
 
+func TestListVolumeDrivers(t *testing.T) {
+	for _, testCase := range []struct {
+		name        string
+		want        []string
+		pluginsCode int
+	}{
+		{name: "managed and engine drivers", pluginsCode: http.StatusOK, want: []string{"legacy", "local", "rbd:v20.2"}},
+		{name: "engine without managed plugins", pluginsCode: http.StatusNotFound, want: []string{"legacy", "local"}},
+		{name: "managed plugin listing denied by proxy", pluginsCode: http.StatusForbidden, want: []string{"legacy", "local"}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch {
+				case strings.HasSuffix(r.URL.Path, "/info"):
+					_, _ = io.WriteString(w, `{"Plugins":{"Volume":["local","legacy","local"]}}`)
+				case strings.HasSuffix(r.URL.Path, "/plugins"):
+					w.WriteHeader(testCase.pluginsCode)
+					if testCase.pluginsCode != http.StatusOK {
+						_, _ = io.WriteString(w, `{"message":"plugins unsupported"}`)
+						return
+					}
+					_, _ = io.WriteString(w, `[
+						{"Name":"rbd:v20.2","Enabled":true,"Config":{"Interface":{"Types":["docker.volumedriver/1.0"]}}},
+						{"Name":"legacy","Enabled":true,"Config":{"Interface":{"Types":["docker.volumedriver/1.0"]}}},
+						{"Name":"disabled","Enabled":false,"Config":{"Interface":{"Types":["docker.volumedriver/1.0"]}}},
+						{"Name":"network","Enabled":true,"Config":{"Interface":{"Types":["docker.networkdriver/1.0"]}}}
+					]`)
+				default:
+					t.Errorf("unexpected Docker request: %s %s", r.Method, r.URL.Path)
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+			}))
+			t.Cleanup(server.Close)
+			service := &VolumeService{dockerService: newVolumeTestDockerService(t, newVolumeWorkspaceTestDockerClient(t, server))}
+			got, err := service.ListVolumeDrivers(t.Context())
+			require.NoError(t, err)
+			require.Equal(t, testCase.want, got)
+		})
+	}
+}
+
 func TestEnrichVolumesWithUsageData(t *testing.T) {
 	tests := []struct {
 		assertions   func(t *testing.T, got []volume.Volume)

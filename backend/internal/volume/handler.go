@@ -160,6 +160,15 @@ func (h *VolumeHandler) GetVolume(ctx context.Context, input *GetVolumeInput) (*
 	}, nil
 }
 
+func (h *VolumeHandler) ListVolumeDrivers(ctx context.Context, _ *types.EnvironmentInput) (*handlerutil.Out[[]string], error) {
+	drivers, err := h.volumeService.ListVolumeDrivers(ctx)
+	if err != nil {
+		return nil, huma.NewError(common.ToAPIError(err).HTTPStatus(), "Failed to list volume drivers", err)
+	}
+
+	return &handlerutil.Out[[]string]{Body: types.ApiResponse[[]string]{Success: true, Data: drivers}}, nil
+}
+
 func (h *VolumeHandler) CreateVolume(ctx context.Context, input *CreateVolumeInput) (*handlerutil.Out[*types.Volume], error) {
 	user, err := handlerutil.RequireUser(ctx)
 	if err != nil {
