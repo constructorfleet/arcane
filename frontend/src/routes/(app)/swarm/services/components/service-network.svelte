@@ -96,6 +96,7 @@
 	</Card.Root>
 
 	<RelatedResourceTable
+		persistKey="arcane-swarm-service-network-table"
 		columns={[
 			m.common_driver(),
 			m.common_scope(),

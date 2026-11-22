@@ -997,3 +997,31 @@ input:autofill:active {
 		animation: none;
 	}
 }
+
+[data-slot='table'] {
+	--table-selection-width: 3.25rem;
+}
+
+:is([data-slot='table-head'], [data-slot='table-cell'])[data-selection] {
+	position: sticky;
+	left: 0;
+	z-index: var(--arcane-z-page-floating);
+	width: var(--table-selection-width);
+	min-width: var(--table-selection-width);
+	max-width: var(--table-selection-width);
+	padding-inline: 0.875rem;
+	background: var(--background);
+	box-shadow: inset -1px 0 var(--border);
+}
+
+[data-slot='table-head'][data-selection] {
+	background: var(--table-head);
+}
+
+[data-selection] + [data-pinned] {
+	left: var(--table-selection-width);
+}
+
+[data-slot='table-row'][data-state='selected'] > [data-selection] {
+	background: color-mix(in oklab, var(--primary) 15%, var(--background));
+}

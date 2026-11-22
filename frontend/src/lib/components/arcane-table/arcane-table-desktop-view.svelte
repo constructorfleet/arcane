@@ -157,7 +157,6 @@
 					column.id,
 					{
 						pinned: column.id === 'actions',
-						variant: column.id === 'select' ? ('checkbox' as const) : ('default' as const),
 						firstData: index === expanderIndex,
 						shrink: meta?.width === 'min',
 						grow: meta?.width === 'max',
@@ -320,7 +319,7 @@
 			{/if}
 			<Table.Cell
 				pinned={props?.pinned}
-				variant={props?.variant}
+				data-selection={cell.column.id === 'select' || undefined}
 				indent={isGroupedRow && !!props?.firstData}
 				style={props?.width !== undefined ? `--col-width: ${props.width}px` : undefined}
 				class={cn(
@@ -395,7 +394,7 @@
 						colspan={header.colSpan}
 						aria-sort={sorted ? ariaSort[sorted] : undefined}
 						pinned={header.column.id === 'actions'}
-						variant={header.column.id === 'select' ? 'checkbox' : 'default'}
+						data-selection={header.column.id === 'select' || undefined}
 						data-column-id={meta?.width === 'max' || header.column.id === 'select' || header.column.id === 'actions'
 							? undefined
 							: header.column.id}
@@ -433,9 +432,8 @@
 		variant={unstyled ? 'static' : 'default'}
 		data-state={hasSelection ? 'selected' : undefined}
 	>
-		{#if hasActions}<Table.Cell pinned aria-hidden="true" />{/if}
 		{#if !selectionDisabled}
-			<Table.Cell variant="checkbox">
+			<Table.Cell data-selection>
 				<TableCheckbox
 					checked={selectionState === 'all'}
 					indeterminate={selectionState === 'some'}
@@ -444,6 +442,7 @@
 				/>
 			</Table.Cell>
 		{/if}
+		{#if hasActions}<Table.Cell pinned aria-hidden="true" />{/if}
 		<Table.Cell colspan={columnsCount - expanderIndex}>
 			<button
 				type="button"

@@ -103,7 +103,7 @@
 			{#if showFloatingHeader !== false}
 				{@render fullHeader()}
 			{/if}
-			<div class="flex min-h-0 flex-1 flex-col px-1 py-4 pb-2 sm:px-4">
+			<div class="flex min-h-0 flex-1 flex-col px-3 py-5 sm:px-5">
 				{@render tabContent(selectedTab)}
 			</div>
 		</div>

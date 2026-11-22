@@ -1,4 +1,5 @@
-# 3.0.1-cf.83
+# 3.0.1-cf.84
 
-- Give Vega Graphite controls and labels 2 px corners, use 4 px corners on panels, and make table rows and headers square. (#190)
-- Apply the sharper treatment to grouped fields, switches, filters, progress bars, drawers, and notifications while preserving the selected palette. (#190)
+- Show a readable task name even when an older response lacks one. Use the service and task placement data when available. (#192)
+- Put selection checkboxes in a separate first column. Increase table header emphasis and spacing in tables and detail tabs. (#187)
+- Give related resource lists the shared search, pagination, and view controls. Keep Services rows to a uniform height with mode, replicas, image, update time, and stack. (#187)

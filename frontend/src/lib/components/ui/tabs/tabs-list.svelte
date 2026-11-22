@@ -21,8 +21,8 @@
 	class={cn(
 		'inline-flex max-w-full flex-wrap items-center justify-start text-muted-foreground',
 		variant === 'default' && 'gap-0.5 rounded-xl bg-muted p-1',
-		variant === 'underline' && 'w-full gap-5 border-b border-border',
-		scrollable && 'scrollbar-hide overflow-x-auto',
+		variant === 'underline' && 'w-full gap-3 border-b border-border sm:gap-5',
+		scrollable && 'scrollbar-hide flex-nowrap overflow-x-auto',
 		className
 	)}
 	{...restProps}

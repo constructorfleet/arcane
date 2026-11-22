@@ -113,6 +113,7 @@
 </script>
 
 <RelatedResourceTable
+	persistKey="arcane-swarm-service-storage-table"
 	columns={[
 		m.common_type(),
 		m.containers_mount_label_container(),

@@ -416,16 +416,6 @@
 		const cols: ArcaneColumnDef<TData>[] = [];
 		const trailing: ArcaneColumnDef<TData>[] = [];
 
-		if (rowActions) {
-			cols.push({
-				id: 'actions',
-				header: m.common_actions(),
-				enableHiding: false,
-				cell: ({ row }) =>
-					rowActions ? renderSnippet(rowActions, { row, item: row.original as TData, view: viewMode }) : undefined
-			});
-		}
-
 		if (!isSelectionDisabled) {
 			cols.push({
 				id: 'select',
@@ -455,6 +445,16 @@
 				},
 				enableSorting: false,
 				enableHiding: false
+			});
+		}
+
+		if (rowActions) {
+			cols.push({
+				id: 'actions',
+				header: m.common_actions(),
+				enableHiding: false,
+				cell: ({ row }) =>
+					rowActions ? renderSnippet(rowActions, { row, item: row.original as TData, view: viewMode }) : undefined
 			});
 		}
 

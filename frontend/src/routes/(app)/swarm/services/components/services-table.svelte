@@ -27,13 +27,14 @@
 	} from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { swarmService } from '#lib/services/swarm-service.js';
-	import type { SwarmServiceSummary, SwarmServicePort } from '#lib/types/swarm.js';
+	import type { SwarmServiceSummary } from '#lib/types/swarm.js';
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import type { SwarmServicesPaginatedResponse } from '#lib/types/ui/swarm.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { getSwarmServiceModeLabel, getSwarmServiceModeVariant, isSwarmServiceModeScalable } from '#lib/utils/docker.js';
 	import { environmentHref, type EnvironmentPage, type EnvironmentRow } from '#lib/utils/environments.js';
+	import { formatDateTimeShort } from '#lib/utils/formatting.js';
 	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
@@ -57,21 +58,6 @@
 
 	type ServiceRow = EnvironmentRow<SwarmServiceSummary>;
 	type ServicePage = EnvironmentPage<SwarmServicesPaginatedResponse>;
-
-	const MAX_OVERFLOW_ITEMS = 3;
-
-	function formatPort(port: SwarmServicePort): string {
-		const protocol = port.protocol || 'tcp';
-		if (port.publishedPort) {
-			return `${port.publishedPort}:${port.targetPort}/${protocol}`;
-		}
-		return `${port.targetPort}/${protocol}`;
-	}
-
-	function formatPortsList(ports?: SwarmServicePort[]): string[] {
-		if (!ports || ports.length === 0) return [];
-		return ports.map(formatPort);
-	}
 
 	function getShortName(name: string, stackName?: string | null): string {
 		if (stackName && name.startsWith(`${stackName}_`)) {
@@ -131,32 +117,20 @@
 	const columns = $derived([
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
 		...(showEnvironment ? environmentColumns<ServiceRow>() : []),
-		{ accessorKey: 'stackName', title: m.swarm_stack(), sortable: true, cell: StackCell },
 		{ accessorKey: 'name', title: m.swarm_service(), sortable: true, cell: NameCell },
+		{ accessorKey: 'stackName', title: m.swarm_stack(), cell: StackCell },
 		{ accessorKey: 'mode', title: m.swarm_mode(), sortable: true, cell: ModeCell },
 		{ accessorKey: 'replicas', title: m.swarm_replicas(), sortable: true, cell: ReplicasCell },
-		{
-			id: 'nodes',
-			accessorFn: (item: ServiceRow) => item.nodes,
-			title: m.nodes(),
-			cell: NodesCell
-		},
-		{
-			id: 'networks',
-			accessorFn: (item: ServiceRow) => item.networks,
-			title: m.resource_networks_cap(),
-			cell: NetworksCell
-		},
-		{ accessorKey: 'ports', title: m.common_ports(), cell: PortsCell }
+		{ accessorKey: 'image', title: m.common_image(), sortable: true, cell: ImageCell },
+		{ accessorKey: 'updatedAt', id: 'updated', title: m.common_updated(), sortable: true, cell: UpdatedCell }
 	] satisfies ColumnSpec<ServiceRow>[]);
 
 	const mobileFields = [
 		{ id: 'stackName', label: m.swarm_stack(), defaultVisible: true },
 		{ id: 'mode', label: m.swarm_mode(), defaultVisible: true },
 		{ id: 'replicas', label: m.swarm_replicas(), defaultVisible: true },
-		{ id: 'nodes', label: m.nodes(), defaultVisible: true },
-		{ id: 'networks', label: m.resource_networks_cap(), defaultVisible: false },
-		{ id: 'ports', label: m.common_ports(), defaultVisible: false }
+		{ id: 'image', label: m.common_image(), defaultVisible: true },
+		{ id: 'updated', label: m.common_updated(), defaultVisible: true }
 	];
 
 	let mobileFieldVisibility = $state<Record<string, boolean>>({});
@@ -168,7 +142,8 @@
 			environmentHref(resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.id }), item.environmentId),
 			requestOptions.pagination?.page
 		)}
-		class="text-sm font-medium text-primary-text hover:underline"
+		class="block max-w-56 truncate text-sm font-medium text-primary-text hover:underline"
+		title={item.name}
 	>
 		{getShortName(item.name, item.stackName)}
 	</a>
@@ -183,14 +158,17 @@
 {#snippet StackCell({ item }: { item: ServiceRow })}
 	{#if item.stackName && hasPermission('swarm-stacks:read', item.environmentId)}
 		<a
-			class="text-sm text-primary hover:underline"
+			class="block max-w-40 truncate text-sm text-primary hover:underline"
+			title={item.stackName}
 			href={resourceTableHref(
 				environmentHref(resolve('/(app)/swarm/stacks/[name]', { name: item.stackName }), item.environmentId),
 				requestOptions.pagination?.page
 			)}>{item.stackName}</a
 		>
 	{:else}
-		<span class="text-sm text-muted-foreground">{item.stackName || m.common_na()}</span>
+		<span class="block max-w-40 truncate text-sm text-muted-foreground" title={item.stackName}
+			>{item.stackName || m.common_na()}</span
+		>
 	{/if}
 {/snippet}
 
@@ -199,36 +177,15 @@
 {/snippet}
 
 {#snippet ReplicasCell({ item }: { item: ServiceRow })}
-	<span class="font-mono text-sm">{item.runningReplicas} / {item.replicas}</span>
+	<span class="font-mono text-sm whitespace-nowrap">{item.runningReplicas} / {item.replicas}</span>
 {/snippet}
 
-{#snippet OverflowCell({ items }: { items: string[] })}
-	{#if !items || items.length === 0}
-		<span class="text-sm text-muted-foreground">{m.common_na()}</span>
-	{:else}
-		<div class="flex flex-col gap-0.5">
-			{#each items.slice(0, MAX_OVERFLOW_ITEMS) as item (item)}
-				<span class="max-w-45 truncate font-mono text-sm">{item}</span>
-			{/each}
-			{#if items.length > MAX_OVERFLOW_ITEMS}
-				<span class="text-xs font-medium text-muted-foreground">
-					{m.count_more({ count: items.length - MAX_OVERFLOW_ITEMS })}
-				</span>
-			{/if}
-		</div>
-	{/if}
+{#snippet ImageCell({ item }: { item: ServiceRow })}
+	<span class="block max-w-80 truncate font-mono text-xs" title={item.image}>{item.image || m.common_na()}</span>
 {/snippet}
 
-{#snippet NodesCell({ item }: { item: ServiceRow })}
-	{@render OverflowCell({ items: item.nodes })}
-{/snippet}
-
-{#snippet NetworksCell({ item }: { item: ServiceRow })}
-	{@render OverflowCell({ items: item.networks })}
-{/snippet}
-
-{#snippet PortsCell({ item }: { item: ServiceRow })}
-	{@render OverflowCell({ items: formatPortsList(item.ports) })}
+{#snippet UpdatedCell({ item }: { item: ServiceRow })}
+	<span class="whitespace-nowrap">{formatDateTimeShort(item.updatedAt) || m.common_na()}</span>
 {/snippet}
 
 {#snippet ServiceMobileCardSnippet({
@@ -267,28 +224,15 @@
 				show: mobileFieldVisibility['replicas'] ?? true
 			},
 			{
-				label: m.nodes(),
-				getValue: (item: ServiceRow) =>
-					item.nodes?.length
-						? item.nodes.slice(0, 3).join(', ') + (item.nodes.length > 3 ? ` +${item.nodes.length - 3}` : '')
-						: m.common_na(),
-				icon: NetworksIcon,
-				iconVariant: 'gray' as const,
-				show: mobileFieldVisibility['nodes'] ?? true
+				label: m.common_image(),
+				getValue: (item: ServiceRow) => item.image || m.common_na(),
+				type: 'mono',
+				show: mobileFieldVisibility['image'] ?? true
 			},
 			{
-				label: m.resource_networks_cap(),
-				getValue: (item: ServiceRow) => (item.networks?.length ? item.networks.join(', ') : m.common_na()),
-				icon: NetworksIcon,
-				iconVariant: 'gray' as const,
-				show: mobileFieldVisibility['networks'] ?? false
-			},
-			{
-				label: m.common_ports(),
-				getValue: (item: ServiceRow) => formatPortsList(item.ports).join(', ') || m.common_na(),
-				icon: GlobeIcon,
-				iconVariant: 'gray' as const,
-				show: mobileFieldVisibility['ports'] ?? false
+				label: m.common_updated(),
+				getValue: (item: ServiceRow) => formatDateTimeShort(item.updatedAt) || m.common_na(),
+				show: mobileFieldVisibility['updated'] ?? true
 			}
 		]}
 		rowActions={RowActions}

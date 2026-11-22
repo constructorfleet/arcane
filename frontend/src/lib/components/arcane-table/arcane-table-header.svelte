@@ -47,10 +47,10 @@
 			aria-label={`${m.common_sort_by()} ${title}`}
 			onclick={() => column.toggleSorting()}
 			class={cn(
-				'h-8 gap-1.5 px-2.5 text-xs-plus leading-5 has-[svg]:px-2.5',
+				'h-8 gap-1.5 px-2.5 text-sm leading-5 font-semibold has-[svg]:px-2.5',
 				(align === undefined || align === 'left') && '-ml-3',
 				align === 'right' && '-mr-3',
-				column.getIsSorted() ? 'text-foreground!' : 'text-muted-foreground!'
+				column.getIsSorted() ? 'text-foreground!' : 'text-foreground/85!'
 			)}
 		>
 			{#if column.getIsSorted() === 'desc'}

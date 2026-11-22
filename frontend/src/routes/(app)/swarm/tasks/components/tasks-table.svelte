@@ -47,6 +47,17 @@
 	type TaskRow = EnvironmentRow<SwarmTaskSummary>;
 	type TaskPage = EnvironmentPage<SwarmTasksPaginatedResponse>;
 
+	const namedTasks: TaskPage = $derived({
+		...tasks,
+		data: tasks.data.map((task) => {
+			if (task.name?.trim()) return task;
+			const service = task.serviceName || task.serviceId;
+			const scope = task.slot || task.nodeName || task.nodeId;
+			const name = service ? [service, scope].filter(Boolean).join('.') : task.id.slice(0, 12);
+			return { ...task, name };
+		})
+	});
+
 	const stateFilters = [
 		'new',
 		'allocated',
@@ -162,7 +173,7 @@
 
 {#snippet TaskNameCell({ item }: { item: TaskRow })}
 	<div title={item.id}>
-		{#if item.name}<div class="truncate" title={item.name}>{item.name}</div>{/if}
+		{#if item.name}<div class="truncate font-medium text-foreground" title={item.name}>{item.name}</div>{/if}
 		{#if !item.name || (serviceScoped && item.name !== item.id)}
 			<div class="font-mono text-xs text-muted-foreground">{item.id.slice(0, 12)}</div>
 		{/if}
@@ -278,7 +289,7 @@
 
 <ArcaneTable
 	{persistKey}
-	items={tasks}
+	items={namedTasks}
 	bind:requestOptions
 	bind:mobileFieldVisibility
 	selectionDisabled={true}

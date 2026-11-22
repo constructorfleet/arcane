@@ -1,12 +1,11 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
+	import { untrack } from 'svelte';
 
 	import RelatedResourceTable from '#lib/components/resource-detail/related-resource-table.svelte';
 	import { TabBar } from '#lib/components/tab-bar/index.js';
-	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { useUrlTab } from '#lib/hooks/use-url-tab.svelte.js';
 	import { ContainersIcon, ImagesIcon, JobsIcon, NetworksIcon, VolumesIcon } from '#lib/icons/index.js';
@@ -16,10 +15,11 @@
 	import { networkService } from '#lib/services/network-service.js';
 	import { volumeService } from '#lib/services/volume-service.js';
 	import type { NetworkSummary } from '#lib/types/network.js';
-	import { hasPermission, isInAppPath } from '#lib/utils/auth.js';
+	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
+	import { hasPermission } from '#lib/utils/auth.js';
 	import { environmentHref } from '#lib/utils/environments.js';
 	import { bytes } from '#lib/utils/formatting.js';
-	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
+	import { resourceTableHref, resourceTablePage } from '#lib/utils/resource-navigation.js';
 
 	import ScopedTasksPanel from '../../tasks/components/scoped-tasks-panel.svelte';
 
@@ -46,15 +46,23 @@
 		ready: () => available.length > 0
 	});
 	const resource = $derived(tab.value);
-	const pageParam = $derived(`${resource}Page`);
-	const currentUrl = $derived(page.shallow?.url ?? page.url);
-	const pageNumber = $derived(
-		Math.max(1, Math.min(1_000_000, Number.parseInt(currentUrl.searchParams.get(pageParam) ?? '1', 10) || 1))
-	);
+	type LocalResource = Exclude<Resource, 'tasks'>;
 
-	function inspectHref(path: string, id: string): string {
-		return resourceDetailHref(environmentHref(path, id));
+	function initialRequest(kind: LocalResource): SearchPaginationSortRequest {
+		const url = page.shallow?.url ?? page.url;
+		const current = url.searchParams.get('resource') ?? 'networks';
+		const requestedPage = (current === kind ? url.searchParams.get('tablePage') : null) ?? url.searchParams.get(`${kind}Page`);
+		return { pagination: { page: resourceTablePage(requestedPage), limit: 10 } };
 	}
+
+	const requests = $state(
+		untrack(() => ({
+			containers: initialRequest('containers'),
+			networks: initialRequest('networks'),
+			images: initialRequest('images'),
+			volumes: initialRequest('volumes')
+		}))
+	);
 
 	function networkAddresses(network: NetworkSummary) {
 		return network.ipam?.config
@@ -73,11 +81,10 @@
 		kind: Resource,
 		environmentId: string | undefined,
 		expectedNode: string,
-		currentPage: number,
+		options: SearchPaginationSortRequest,
 		signal: AbortSignal
 	) {
 		if (!environmentId || kind === 'tasks') return undefined;
-		const options = { pagination: { page: currentPage, limit: 10 } };
 		switch (kind) {
 			case 'containers': {
 				const { data, pagination } = await containerService.getContainersForEnvironment(environmentId, options, { signal });
@@ -140,7 +147,8 @@
 		volumes: [m.common_driver(), m.common_scope()]
 	};
 	const resources = createQuery(() => {
-		const key = [agentId, nodeId, resource, pageNumber] as const;
+		const options = resource === 'tasks' ? {} : $state.snapshot(requests[resource]);
+		const key = [agentId, nodeId, resource, options] as const;
 		return {
 			queryKey: ['node-local-resources', ...key],
 			queryFn: ({ signal }) => list(key[2], key[0], key[1], key[3], signal),
@@ -148,14 +156,7 @@
 		};
 	});
 	const canInspect = $derived(!!agentId && hasPermission(`${resource}:read`, agentId));
-	const lastPage = $derived(resources.data?.pagination.totalPages ?? 1);
-
-	function changePage(next: number) {
-		const url = new URL(currentUrl.href);
-		url.searchParams.set(pageParam, String(next));
-		const href = url.pathname + url.search + url.hash;
-		if (isInAppPath(href)) void goto(href, { shallow: true, reset: false, state: page.state });
-	}
+	const icons = { containers: ContainersIcon, networks: NetworksIcon, images: ImagesIcon, volumes: VolumesIcon };
 </script>
 
 {#if available.length}
@@ -164,29 +165,25 @@
 		<Tabs.Content value={resource} class="mt-4">
 			{#if resource === 'tasks'}
 				<ScopedTasksPanel environmentId={managerId} resourceId={nodeId} scope="node" />
-			{:else if resources.isPending}
-				<p class="text-sm text-muted-foreground" role="status">{m.common_loading()}</p>
-			{:else if resources.isError}
-				<div class="flex items-center gap-2">
-					<p class="text-sm text-muted-foreground" role="status">{m.swarm_node_local_resources_unavailable()}</p>
-					<Button variant="outline" size="sm" onclick={() => resources.refetch()}>{m.common_retry()}</Button>
-				</div>
-			{:else if resources.data && agentId}
-				<RelatedResourceTable
-					columns={columns[resource]}
-					rows={resources.data.rows.map((row) => ({ ...row, href: canInspect ? inspectHref(row.path, agentId) : undefined }))}
-				/>
-				{#if pageNumber > 1 || lastPage > 1}
-					<div class="mt-3 flex items-center gap-2">
-						<Button variant="outline" size="sm" disabled={pageNumber <= 1} onclick={() => changePage(pageNumber - 1)}
-							>{m.common_previous()}</Button
-						>
-						<span class="text-sm text-muted-foreground">{m.common_page({ page: pageNumber })}</span>
-						<Button variant="outline" size="sm" disabled={pageNumber >= lastPage} onclick={() => changePage(pageNumber + 1)}
-							>{m.common_next()}</Button
-						>
-					</div>
-				{/if}
+			{:else if agentId}
+				{#key resource}
+					<RelatedResourceTable
+						columns={columns[resource]}
+						icon={icons[resource]}
+						persistKey={`arcane-node-local-${resource}-table`}
+						bind:requestOptions={requests[resource]}
+						pagination={resources.data?.pagination ?? { currentPage: 1, itemsPerPage: 10, totalItems: 0, totalPages: 1 }}
+						rows={(resources.data?.rows ?? []).map((row) => ({
+							...row,
+							href: canInspect
+								? resourceTableHref(environmentHref(row.path, agentId), requests[resource].pagination?.page)
+								: undefined
+						}))}
+						loading={resources.isPending}
+						refreshError={resources.error}
+						onRetry={() => resources.refetch()}
+					/>
+				{/key}
 			{/if}
 		</Tabs.Content>
 	</Tabs.Root>
