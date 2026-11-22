@@ -384,3 +384,7 @@ export function getEnvironmentStatusVariant(status: EnvironmentStatus): 'green' 
 			return 'red';
 	}
 }
+
+export function isSwarmGatewayBridge(network: { name: string; driver: string; scope: string }): boolean {
+	return network.name === 'docker_gwbridge' && network.driver === 'bridge' && network.scope === 'local';
+}

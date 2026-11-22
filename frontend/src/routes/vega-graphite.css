@@ -101,7 +101,7 @@
 		box-shadow: inset -1px 0 var(--border);
 	}
 
-	& [data-slot='table-head'][data-pinned] {
+	& [data-slot='table-head']:is([data-pinned], [data-selection]) {
 		box-shadow:
 			inset -1px 0 var(--border),
 			inset 0 -1px var(--border);

@@ -3,8 +3,6 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import { untrack } from 'svelte';
 
-	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
-	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { swarmService } from '#lib/services/swarm-service.js';
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
@@ -64,21 +62,7 @@
 	});
 </script>
 
-<div class="flex flex-col gap-3">
-	<div class="flex flex-wrap items-center justify-between gap-2">
-		<h2 class="text-sm font-semibold">
-			{#if result}
-				{scope === 'service'
-					? m.swarm_service_tasks_count({ count: result.pagination.grandTotalItems ?? result.pagination.totalItems })
-					: m.tasks()}
-			{:else}
-				{m.tasks()}
-			{/if}
-		</h2>
-		<ArcaneButton action="refresh" onclick={() => tasksQuery.refetch()} disabled={tasksQuery.isFetching}>
-			{m.common_refresh()}
-		</ArcaneButton>
-	</div>
+<div class="min-w-0 px-1 sm:px-2">
 	<SwarmTasksTable
 		{tasks}
 		bind:requestOptions

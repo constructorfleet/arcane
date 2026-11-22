@@ -34,6 +34,7 @@
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
+	import { isSwarmGatewayBridge } from '#lib/utils/docker.js';
 	import { collectAcrossEnvironments } from '#lib/utils/environments.js';
 	import { formatDateTimeShort } from '#lib/utils/formatting.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
@@ -110,6 +111,7 @@
 	const removalBlocked = $derived(inUse || observedInUse || observationsIncomplete);
 
 	const swarmScoped = $derived(network?.scope === 'swarm');
+	const swarmGateway = $derived(!!network && isSwarmGatewayBridge(network));
 	const isPredefined = $derived(network?.name === 'bridge' || network?.name === 'host' || network?.name === 'none');
 
 	async function handleSort(column: string) {
@@ -411,7 +413,9 @@
 	{actions}
 >
 	{#snippet badges()}
-		{#if swarmScoped}
+		{#if swarmGateway}
+			<Badge variant="blue" minWidth="20">{m.network_swarm_gateway()}</Badge>
+		{:else if swarmScoped}
 			<Badge variant={inUse ? 'green' : 'amber'} minWidth="20"
 				>{inUse ? m.network_in_use_on_node() : m.network_no_local_containers()}</Badge
 			>

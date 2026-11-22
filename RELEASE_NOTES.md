@@ -1,5 +1,6 @@
-# 3.0.1-cf.84
+# 3.0.1-cf.85
 
-- Show a readable task name even when an older response lacks one. Use the service and task placement data when available. (#192)
-- Put selection checkboxes in a separate first column. Increase table header emphasis and spacing in tables and detail tabs. (#187)
-- Give related resource lists the shared search, pagination, and view controls. Keep Services rows to a uniform height with mode, replicas, image, update time, and stack. (#187)
+- Remove the Nodes column and card field from Networks. Network Details still shows the reporting nodes and their usage. (#187)
+- Use In use, Unused, and Predefined in the overview. Identify the local Docker gateway bridge as Swarm gateway in both overview and details. (#187)
+- Increase table header text to the base font size and extend the Graphite selection divider through the header. (#187)
+- Match Tasks to the other related resource tab layouts. Remove the duplicate heading and Refresh control. (#187)

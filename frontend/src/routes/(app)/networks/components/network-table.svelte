@@ -44,6 +44,7 @@
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { bulkConfirmAndRun } from '#lib/utils/bulk-actions.js';
+	import { isSwarmGatewayBridge } from '#lib/utils/docker.js';
 	import { type EnvironmentPage, type EnvironmentRow, hasShownPermission, rowKey } from '#lib/utils/environments.js';
 	import { capitalizeFirstLetter } from '#lib/utils/formatting.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
@@ -161,16 +162,9 @@
 		visible: boolean
 	): { variant: 'gray' | 'green' | 'amber'; text: string } | null {
 		if (!visible) return null;
-		if ((item.isDefault ?? false) || DEFAULT_NETWORK_NAMES.has(item.name)) {
+		if (isSwarmGatewayBridge(item)) return { variant: 'gray', text: m.network_swarm_gateway() };
+		if (item.isDefault || DEFAULT_NETWORK_NAMES.has(item.name)) {
 			return { variant: 'gray', text: m.networks_predefined() };
-		}
-		if (item.nodes?.length) {
-			if (item.inUse) return { variant: 'green', text: m.network_used_on_observed_nodes() };
-			return { variant: 'amber', text: m.network_no_observed_containers() };
-		}
-		if (item.scope === 'swarm') {
-			if (item.inUse) return { variant: 'green', text: m.network_in_use_on_node() };
-			return { variant: 'amber', text: m.network_no_local_containers() };
 		}
 		if (item.inUse) return { variant: 'green', text: m.common_in_use() };
 		return { variant: 'amber', text: m.common_unused() };
@@ -178,11 +172,6 @@
 
 	const columns = $derived([
 		...(showEnvironment ? environmentColumns<NetworkRow>().map((column) => ({ ...column, title: m.query_agent() })) : []),
-		{
-			id: 'nodes',
-			accessorFn: (item) => item.nodes?.map((node) => node.name).join(', ') ?? item.environmentName,
-			title: m.nodes()
-		},
 		{ accessorKey: 'id', title: m.common_id(), cell: IdCell, hidden: true },
 		{ accessorKey: 'name', title: m.common_name(), sortable: true, cell: NameCell },
 		{ accessorKey: 'inUse', title: m.common_status(), sortable: true, cell: StatusCell },
@@ -206,7 +195,6 @@
 
 	const mobileFields = [
 		{ id: 'id', label: m.common_id(), defaultVisible: false },
-		{ id: 'nodes', label: m.nodes(), defaultVisible: true },
 		{ id: 'inUse', label: m.common_status(), defaultVisible: true },
 		{ id: 'driver', label: m.common_driver(), defaultVisible: true },
 		{ id: 'scope', label: m.common_scope(), defaultVisible: true },
@@ -276,7 +264,11 @@
 
 {#snippet StatusCell({ item }: { item: NetworkRow })}
 	{@const status = getNetworkStatusBadge(item, true)}
-	{#if status}<Badge variant={status.variant} minWidth="20">{status.text}</Badge>{/if}
+	{#if status}<Badge
+			variant={status.variant}
+			minWidth="20"
+			title={item.scope === 'swarm' && !item.isDefault ? m.network_list_usage_scope() : undefined}>{status.text}</Badge
+		>{/if}
 {/snippet}
 
 {#snippet NetworkMobileCardSnippet({ item, mobileFieldVisibility }: { item: NetworkRow; mobileFieldVisibility: FieldVisibility })}
@@ -290,11 +282,6 @@
 		subtitle={(item: NetworkRow) => ((mobileFieldVisibility['id'] ?? true) ? item.id : null)}
 		badges={[(item: NetworkRow) => getNetworkStatusBadge(item, mobileFieldVisibility['inUse'] ?? true)]}
 		fields={[
-			{
-				label: m.nodes(),
-				getValue: (item: NetworkRow) => item.nodes?.map((node) => node.name).join(', ') ?? item.environmentName,
-				show: mobileFieldVisibility['nodes'] ?? true
-			},
 			{
 				label: m.common_driver(),
 				getValue: (item: NetworkRow) => capitalizeFirstLetter(item.driver),
