@@ -29,23 +29,17 @@
 		<Table.Root>
 			<Table.Header>
 				<Table.Row>
+					<Table.Head pinned>{m.common_actions()}</Table.Head>
 					<Table.Head>{m.common_name()}</Table.Head>
 					{#each columns as label, index (index)}
 						<Table.Head>{label}</Table.Head>
 					{/each}
-					<Table.Head pinned>{m.common_actions()}</Table.Head>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
 				{#each rows as row (row.id)}
 					{@const href = row.href}
 					<Table.Row>
-						<Table.Cell class="max-w-64 wrap-anywhere whitespace-normal">
-							{#if href}<a {href} class="text-primary hover:underline">{row.name}</a>{:else}{row.name}{/if}
-						</Table.Cell>
-						{#each row.values as value, index (index)}
-							<Table.Cell class="max-w-80 wrap-anywhere whitespace-normal">{value || m.common_na()}</Table.Cell>
-						{/each}
 						<Table.Cell pinned>
 							{#if href || row.inspect?.length}
 								<RowActionsMenu name={row.name}>
@@ -57,6 +51,12 @@
 								</RowActionsMenu>
 							{/if}
 						</Table.Cell>
+						<Table.Cell class="max-w-64 wrap-anywhere whitespace-normal">
+							{#if href}<a {href} class="text-primary hover:underline">{row.name}</a>{:else}{row.name}{/if}
+						</Table.Cell>
+						{#each row.values as value, index (index)}
+							<Table.Cell class="max-w-80 wrap-anywhere whitespace-normal">{value || m.common_na()}</Table.Cell>
+						{/each}
 					</Table.Row>
 				{/each}
 			</Table.Body>

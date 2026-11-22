@@ -445,6 +445,34 @@
 							selected.includes(tag.name) && 'bg-muted/40'
 						)}
 					>
+						{#if (canDeleteTags || canPullImages) && !selecting}
+							<RowActionsMenu name={tag.name}>
+								{#if canPullImages}
+									<DropdownMenu.Item
+										onclick={() => {
+											pullReference = tagReference(tag.name);
+											pullOpen = true;
+										}}
+									>
+										<DownloadIcon class="size-4" />{m.images_pull_image()}
+									</DropdownMenu.Item>
+								{/if}
+								{#if canDeleteTags}
+									<DropdownMenu.Item
+										variant="destructive"
+										onclick={() => handleDeleteOne(tag.name)}
+										disabled={deletingTag === tag.name}
+									>
+										{#if deletingTag === tag.name}
+											<Spinner class="size-4" />
+										{:else}
+											<TrashIcon class="size-4" />
+										{/if}
+										{m.common_delete()}
+									</DropdownMenu.Item>
+								{/if}
+							</RowActionsMenu>
+						{/if}
 						{#if selecting}
 							<Checkbox
 								checked={selected.includes(tag.name)}
@@ -475,34 +503,6 @@
 									<Badge variant="outline">{platformLabel(platform)}</Badge>
 								{/each}
 							</div>
-						{/if}
-						{#if (canDeleteTags || canPullImages) && !selecting}
-							<RowActionsMenu name={tag.name}>
-								{#if canPullImages}
-									<DropdownMenu.Item
-										onclick={() => {
-											pullReference = tagReference(tag.name);
-											pullOpen = true;
-										}}
-									>
-										<DownloadIcon class="size-4" />{m.images_pull_image()}
-									</DropdownMenu.Item>
-								{/if}
-								{#if canDeleteTags}
-									<DropdownMenu.Item
-										variant="destructive"
-										onclick={() => handleDeleteOne(tag.name)}
-										disabled={deletingTag === tag.name}
-									>
-										{#if deletingTag === tag.name}
-											<Spinner class="size-4" />
-										{:else}
-											<TrashIcon class="size-4" />
-										{/if}
-										{m.common_delete()}
-									</DropdownMenu.Item>
-								{/if}
-							</RowActionsMenu>
 						{/if}
 					</div>
 				{/each}

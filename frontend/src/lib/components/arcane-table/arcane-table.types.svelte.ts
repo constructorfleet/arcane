@@ -35,6 +35,7 @@ export type ColumnSpec<T extends RowData> = {
 	id?: string;
 	title: string;
 	hidden?: boolean;
+	trailing?: boolean;
 	sortable?: boolean;
 	clientSort?: boolean;
 	cell?: Snippet<[{ row: ArcaneRow<T>; item: T; value: unknown; view: TableViewMode }]>;
@@ -53,6 +54,7 @@ export type ColumnSpec<T extends RowData> = {
 
 export type CompactTablePrefs = {
 	v?: string[];
+	visibleColumns?: string[];
 	f?: [string, unknown][];
 	g?: string;
 	s?: SortPreference;
@@ -62,19 +64,19 @@ export type CompactTablePrefs = {
 	c?: Record<string, unknown>;
 };
 
-export function encodeHidden(visibility: ColumnVisibilityState): string[] {
+export function encodeColumnVisibility(visibility: ColumnVisibilityState, defaults: ColumnVisibilityState) {
 	const hidden: string[] = [];
+	const visibleColumns: string[] = [];
 	for (const [id, visible] of Object.entries(visibility)) {
 		if (visible === false) hidden.push(id);
+		else if (visible === true && defaults[id] === false) visibleColumns.push(id);
 	}
-	return hidden;
+	return { v: hidden, visibleColumns };
 }
 
-export function applyHiddenPatch(target: ColumnVisibilityState, hidden?: string[]) {
-	if (!hidden?.length) return;
-	for (const id of hidden) {
-		target[id] = false;
-	}
+export function applyColumnVisibilityPatch(target: ColumnVisibilityState, hidden: string[], visible: string[]) {
+	for (const id of hidden) target[id] = false;
+	for (const id of visible) target[id] = true;
 }
 
 export function encodeFilters(filters: ColumnFiltersState): [string, unknown][] {

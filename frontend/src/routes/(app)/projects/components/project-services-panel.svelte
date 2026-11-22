@@ -166,32 +166,6 @@
 			{@const running = item.status?.toLowerCase() === 'running'}
 			<div class="group rounded-lg px-2 py-1.5 transition-colors hover:bg-foreground/4 has-data-[state=open]:bg-foreground/7">
 				<div class="flex items-center gap-2">
-					<span class={cn('size-2 shrink-0 rounded-full', statusDotClass(item.status))} title={item.status}></span>
-					<IconImage
-						src={getThemedIconUrl(item, mode.current)}
-						alt={item.name}
-						fallback={ContainersIcon}
-						class="size-4"
-						containerClass="size-5 bg-transparent ring-0"
-					/>
-					{#if item.containerId}
-						{@const containerId = item.containerId}
-						<button
-							type="button"
-							class="min-w-0 flex-1 truncate text-left text-sm hover:underline"
-							title={item.containerName || item.name}
-							onclick={() => goto(resolve(`/(app)/containers/[containerId]?${containerQuery}`, { containerId }))}
-						>
-							{item.name}
-						</button>
-					{:else}
-						<span class="min-w-0 flex-1 truncate text-sm text-muted-foreground" title={m.compose_service_not_created()}>
-							{item.name}
-						</span>
-					{/if}
-					{#if item.health}
-						<HealthIcon class={cn('size-3.5 shrink-0', healthClass(item.health))} />
-					{/if}
 					{#if item.containerId}
 						{@const containerId = item.containerId}
 						<RowActionsMenu name={item.name}>
@@ -243,10 +217,38 @@
 								/>
 							{/if}
 						</RowActionsMenu>
+					{:else}
+						<span class="size-9 shrink-0" aria-hidden="true"></span>
+					{/if}
+					<span class={cn('size-2 shrink-0 rounded-full', statusDotClass(item.status))} title={item.status}></span>
+					<IconImage
+						src={getThemedIconUrl(item, mode.current)}
+						alt={item.name}
+						fallback={ContainersIcon}
+						class="size-4"
+						containerClass="size-5 bg-transparent ring-0"
+					/>
+					{#if item.containerId}
+						{@const containerId = item.containerId}
+						<button
+							type="button"
+							class="min-w-0 flex-1 truncate text-left text-sm hover:underline"
+							title={item.containerName || item.name}
+							onclick={() => goto(resolve(`/(app)/containers/[containerId]?${containerQuery}`, { containerId }))}
+						>
+							{item.name}
+						</button>
+					{:else}
+						<span class="min-w-0 flex-1 truncate text-sm text-muted-foreground" title={m.compose_service_not_created()}>
+							{item.name}
+						</span>
+					{/if}
+					{#if item.health}
+						<HealthIcon class={cn('size-3.5 shrink-0', healthClass(item.health))} />
 					{/if}
 				</div>
 				{#if serviceImageRef(item) || item.serviceConfig?.ports?.length || item.ports?.length}
-					<div class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-11">
+					<div class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-22">
 						{#if serviceImageRef(item)}
 							{@const imageRef = serviceImageRef(item)}
 							{@const parsed = parseImageRef(imageRef)}

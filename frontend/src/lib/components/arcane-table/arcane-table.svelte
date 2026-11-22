@@ -40,8 +40,8 @@
 		type SelectionModifiers,
 		type SortState,
 		type TableViewMode,
-		encodeHidden,
-		applyHiddenPatch,
+		encodeColumnVisibility,
+		applyColumnVisibilityPatch,
 		encodeFilters,
 		encodeSort,
 		encodeMobileVisibility,
@@ -312,7 +312,7 @@
 		}
 
 		const patchedVisibility = { ...columnVisibility };
-		applyHiddenPatch(patchedVisibility, snapshot.hiddenColumns);
+		applyColumnVisibilityPatch(patchedVisibility, snapshot.hiddenColumns, snapshot.visibleColumns);
 		columnVisibility = patchedVisibility;
 
 		const effectiveSearch = (requestOptions?.search ?? '').trim() || snapshot.search;
@@ -414,6 +414,17 @@
 
 	function buildColumns(specs: ColumnSpec<TData>[], isSelectionDisabled: boolean): ArcaneColumnDef<TData>[] {
 		const cols: ArcaneColumnDef<TData>[] = [];
+		const trailing: ArcaneColumnDef<TData>[] = [];
+
+		if (rowActions) {
+			cols.push({
+				id: 'actions',
+				header: m.common_actions(),
+				enableHiding: false,
+				cell: ({ row }) =>
+					rowActions ? renderSnippet(rowActions, { row, item: row.original as TData, view: viewMode }) : undefined
+			});
+		}
 
 		if (!isSelectionDisabled) {
 			cols.push({
@@ -452,7 +463,7 @@
 			const accessorFn = spec.accessorFn;
 			const id = spec.id ?? (accessorKey as string) ?? `col_${i}`;
 
-			cols.push({
+			(spec.trailing ? trailing : cols).push({
 				id,
 				...(accessorKey ? { accessorKey } : {}),
 				...(accessorFn ? { accessorFn } : {}),
@@ -487,17 +498,7 @@
 			});
 		});
 
-		if (rowActions) {
-			cols.push({
-				id: 'actions',
-				header: m.common_actions(),
-				enableHiding: false,
-				cell: ({ row }) =>
-					rowActions ? renderSnippet(rowActions, { row, item: row.original as TData, view: viewMode }) : undefined
-			});
-		}
-
-		return cols;
+		return [...cols, ...trailing];
 	}
 
 	function getInitialHiddenColumns(specs: ColumnSpec<TData>[]): Record<string, boolean> {
@@ -606,7 +607,7 @@
 			else nextVisibility = updater;
 			columnVisibility = nextVisibility;
 			if (enablePersist && prefs) {
-				prefs.current = { ...prefs.current, v: encodeHidden(columnVisibility) };
+				prefs.current = { ...prefs.current, ...encodeColumnVisibility(columnVisibility, defaultColumnVisibility) };
 			}
 
 			const activeSort = requestOptions?.sort;

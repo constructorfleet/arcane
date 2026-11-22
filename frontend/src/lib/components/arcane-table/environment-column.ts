@@ -14,6 +14,8 @@ export function environmentColumns<T extends { environmentId?: string }>(): Colu
 			accessorFn: (row) => row.environmentId,
 			title: dots ? m.environment_column_short() : m.resource_environment_cap(),
 			sortable: true,
+			hidden: true,
+			trailing: true,
 			width: 'min',
 			cellComponent: EnvironmentCell
 		}

@@ -49,6 +49,11 @@
 	<div class="flex min-w-0 flex-1 flex-col divide-y divide-border/40 px-3.5">
 		<header class="flex min-w-0 flex-col gap-2 py-2">
 			<div class="flex min-w-0 items-start gap-3">
+				{#if actions}
+					<div class="flex shrink-0 items-center" data-row-select-ignore>
+						{@render actions()}
+					</div>
+				{/if}
 				{#if select}
 					<div class="flex h-8 shrink-0 items-center" data-row-select-ignore>
 						{@render select()}
@@ -62,11 +67,6 @@
 				<div class="min-w-0 flex-1 text-sm font-medium">
 					{@render title()}
 				</div>
-				{#if actions}
-					<div class="-mr-1.5 flex shrink-0 items-center" data-row-select-ignore>
-						{@render actions()}
-					</div>
-				{/if}
 			</div>
 			{#if context || badges}
 				<div class="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5">

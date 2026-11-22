@@ -105,6 +105,7 @@ export function extractPersistedPreferences(
 
 	return {
 		hiddenColumns: prefs.v ?? [],
+		visibleColumns: prefs.visibleColumns ?? [],
 		restoredFilters,
 		filtersMap,
 		search,

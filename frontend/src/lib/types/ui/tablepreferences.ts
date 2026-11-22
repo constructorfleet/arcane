@@ -4,6 +4,7 @@ import type { FilterMap } from './pagination';
 
 export type PersistedPreferencesSnapshot = {
 	hiddenColumns: string[];
+	visibleColumns: string[];
 	restoredFilters: ColumnFiltersState;
 	filtersMap: FilterMap;
 	search: string;

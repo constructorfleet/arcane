@@ -80,6 +80,9 @@
 	const columns = [
 		{
 			id: 'environment',
+			accessorFn: (event) => event.environmentId,
+			hidden: true,
+			trailing: true,
 			title: m.resource_environment_cap(),
 			width: 'min',
 			cell: EnvironmentCell
@@ -128,7 +131,7 @@
 		{ id: 'timestamp', label: m.events_col_time(), defaultVisible: true },
 		{ id: 'severity', label: m.events_col_severity(), defaultVisible: true },
 		{ id: 'type', label: m.common_type(), defaultVisible: true },
-		{ id: 'environment', label: m.resource_environment_cap(), defaultVisible: true },
+		{ id: 'environment', label: m.resource_environment_cap(), defaultVisible: false },
 		{ id: 'resource', label: m.resource(), defaultVisible: true },
 		{ id: 'username', label: m.common_user(), defaultVisible: true }
 	];
@@ -241,7 +244,7 @@
 				getValue: (item: Event) => (item.environmentId ? environmentName(item.environmentId) : null),
 				icon: EnvironmentsIcon,
 				iconVariant: 'gray' as const,
-				show: (mobileFieldVisibility['environment'] ?? true) && !!item.environmentId
+				show: (mobileFieldVisibility['environment'] ?? false) && !!item.environmentId
 			},
 			{
 				label: m.common_user(),

@@ -44,25 +44,7 @@
 	class="group relative flex h-full flex-col gap-3 rounded-xl border border-border/70 bg-card/10 p-4 transition-colors hover:bg-muted/40"
 >
 	<div class="flex items-start gap-3">
-		<IconImage
-			src={getThemedIconUrl(template.metadata, mode.current) ?? template.metadata?.iconUrl}
-			alt={template.name}
-			fallback={template.isRemote ? GlobeIcon : FolderOpenIcon}
-			class="size-5"
-			containerClass="size-9"
-		/>
-		<div class="min-w-0 flex-1">
-			<a
-				href={resolve('/(app)/projects/templates/[id]', { id: template.id })}
-				class="block truncate font-medium after:absolute after:inset-0 hover:underline"
-			>
-				{template.name}
-			</a>
-			<p class="truncate text-xs text-muted-foreground">
-				{template.isRemote ? m.templates_remote() : m.local()} · {registryName}
-			</p>
-		</div>
-		<div class="relative z-10 -mt-1 -mr-1 shrink-0">
+		<div class="relative z-10 shrink-0">
 			<RowActionsMenu name={template.name}>
 				<DropdownMenu.Item onclick={() => goto(resolve('/(app)/projects/templates/[id]', { id: template.id }))}>
 					<InspectIcon class="size-4" />
@@ -100,6 +82,24 @@
 					</DropdownMenu.Item>
 				{/if}
 			</RowActionsMenu>
+		</div>
+		<IconImage
+			src={getThemedIconUrl(template.metadata, mode.current) ?? template.metadata?.iconUrl}
+			alt={template.name}
+			fallback={template.isRemote ? GlobeIcon : FolderOpenIcon}
+			class="size-5"
+			containerClass="size-9"
+		/>
+		<div class="min-w-0 flex-1">
+			<a
+				href={resolve('/(app)/projects/templates/[id]', { id: template.id })}
+				class="block truncate font-medium after:absolute after:inset-0 hover:underline"
+			>
+				{template.name}
+			</a>
+			<p class="truncate text-xs text-muted-foreground">
+				{template.isRemote ? m.templates_remote() : m.local()} · {registryName}
+			</p>
 		</div>
 	</div>
 

@@ -29,7 +29,7 @@
 		variant === 'expander' && 'w-8 px-2',
 		variant === 'flush' && 'p-0',
 		indent && 'pl-10',
-		pinned && 'sticky right-0 z-(--arcane-z-sticky) w-24 min-w-24 bg-background px-3 py-1 text-center',
+		pinned && 'sticky left-0 z-(--arcane-z-sticky) w-24 min-w-24 bg-background px-3 py-1 text-center first:pl-3 last:pr-3',
 		className
 	)}
 	{...restProps}

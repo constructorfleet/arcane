@@ -1,5 +1,5 @@
-# 3.0.1-cf.79
+# 3.0.1-cf.80
 
-- Give Swarm Nodes distinct Agent ID and Agent Connection columns. Put editable Swarm labels and read-only engine labels on Node Details → Docker, and add Tasks under Local Resources. (#187)
-- Keep row-action buttons visible without hovering and reserve space for them in tables. Improve detail title size and alignment across shared resource layouts. (#187)
-- Align related-resource tables, offer scoped Inspect for verified service volume attachments, and remove redundant View service from tasks inside their own service. (#187)
+- Put Actions first in main and related resource tables. Keep the column pinned to the left when scrolling horizontally. (#187)
+- Put action buttons first in mobile and grid cards, project service rows, template cards, and registry tag rows. (#187)
+- Put optional Agent columns last and hide them by default. Show them from the column picker and keep that choice after reload. (#187)

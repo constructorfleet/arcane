@@ -283,12 +283,16 @@
 		{ accessorKey: 'availability', title: m.swarm_availability(), sortable: true, cell: AvailabilityCell },
 		{
 			id: 'agentId',
+			hidden: true,
+			trailing: true,
 			title: m.swarm_node_agent_environment_id(),
 			accessorFn: (node) => node.agent?.environmentId,
 			cell: AgentIdCell
 		},
 		{
 			id: 'agent',
+			hidden: true,
+			trailing: true,
 			title: m.swarm_node_agent_connection(),
 			accessorFn: (node) => node.agent?.state ?? 'none',
 			cell: AgentConnectionCell
@@ -300,8 +304,8 @@
 		{ id: 'role', label: m.common_role(), defaultVisible: true },
 		{ id: 'status', label: m.common_status(), defaultVisible: true },
 		{ id: 'availability', label: m.swarm_availability(), defaultVisible: true },
-		{ id: 'agentId', label: m.swarm_node_agent_environment_id(), defaultVisible: true },
-		{ id: 'agent', label: m.swarm_node_agent_connection(), defaultVisible: true },
+		{ id: 'agentId', label: m.swarm_node_agent_environment_id(), defaultVisible: false },
+		{ id: 'agent', label: m.swarm_node_agent_connection(), defaultVisible: false },
 		{ id: 'engineVersion', label: m.swarm_engine_version(), defaultVisible: false }
 	];
 
@@ -363,7 +367,7 @@
 			(item: NodeRow) =>
 				(mobileFieldVisibility['status'] ?? true) ? { variant: statusVariant(item.status), text: item.status } : null,
 			(item: NodeRow) =>
-				(mobileFieldVisibility['agent'] ?? true)
+				(mobileFieldVisibility['agent'] ?? false)
 					? {
 							variant: getSwarmNodeAgentVariant(item.agent?.state),
 							text: getSwarmNodeAgentLabel(item.agent?.state)
@@ -390,7 +394,7 @@
 				getValue: (item: NodeRow) => item.agent?.environmentId,
 				icon: AgentConnectionIcon,
 				iconVariant: 'gray' as const,
-				show: mobileFieldVisibility['agentId'] ?? true
+				show: mobileFieldVisibility['agentId'] ?? false
 			}
 		]}
 		rowActions={RowActions}

@@ -70,7 +70,8 @@
 
 	const tableId = $props.id();
 	const hasExpand = $derived(!!expandedRowContent);
-	const expanderIndex = $derived(selectionDisabled ? 0 : 1);
+	const hasActions = $derived(table.getVisibleLeafColumns().some((column) => column.id === 'actions'));
+	const expanderIndex = $derived(Number(hasActions) + Number(!selectionDisabled));
 
 	// Pin FlexRender's generics; they can't be inferred from its union-shaped props.
 	const FlexRender = FlexRenderBase<ArcaneFeatures, TData, unknown>;
@@ -157,7 +158,7 @@
 					{
 						pinned: column.id === 'actions',
 						variant: column.id === 'select' ? ('checkbox' as const) : ('default' as const),
-						firstData: column.id !== 'select' && index === (selectionDisabled ? 0 : 1),
+						firstData: index === expanderIndex,
 						shrink: meta?.width === 'min',
 						grow: meta?.width === 'max',
 						align: meta?.align,
@@ -432,6 +433,7 @@
 		variant={unstyled ? 'static' : 'default'}
 		data-state={hasSelection ? 'selected' : undefined}
 	>
+		{#if hasActions}<Table.Cell pinned aria-hidden="true" />{/if}
 		{#if !selectionDisabled}
 			<Table.Cell variant="checkbox">
 				<TableCheckbox
@@ -442,7 +444,7 @@
 				/>
 			</Table.Cell>
 		{/if}
-		<Table.Cell colspan={columnsCount - (selectionDisabled ? 0 : 1)}>
+		<Table.Cell colspan={columnsCount - expanderIndex}>
 			<button
 				type="button"
 				class="flex w-full cursor-pointer items-center gap-2 text-left font-medium"
