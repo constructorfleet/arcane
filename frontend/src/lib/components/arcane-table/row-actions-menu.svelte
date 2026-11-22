@@ -14,7 +14,7 @@
 		{#snippet child({ props })}
 			<ArcaneButton {...props} action="base" tone="outline" size="icon">
 				<span class="sr-only">{name ? m.actions_for_name({ name }) : m.common_open_menu()}</span>
-				<EllipsisIcon class="size-5" />
+				<span data-slot="row-action-icon"><EllipsisIcon class="size-5" /></span>
 			</ArcaneButton>
 		{/snippet}
 	</DropdownMenu.Trigger>

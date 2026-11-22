@@ -86,6 +86,7 @@
 	<a
 		bind:this={ref}
 		data-slot="button"
+		data-size={size}
 		class={cn(buttonVariants({ variant, size, hoverEffect }), className)}
 		href={disabled ? undefined : href}
 		aria-disabled={disabled}
@@ -99,6 +100,7 @@
 	<button
 		bind:this={ref}
 		data-slot="button"
+		data-size={size}
 		class={cn(buttonVariants({ variant, size, hoverEffect }), className)}
 		{type}
 		{disabled}

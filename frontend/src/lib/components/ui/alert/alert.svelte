@@ -60,7 +60,14 @@
 	} = $props();
 </script>
 
-<div bind:this={ref} class={cn(alertVariants({ variant, size }), className)} data-size={size} {...restProps} role="alert">
+<div
+	bind:this={ref}
+	class={cn(alertVariants({ variant, size }), className)}
+	data-slot="alert"
+	data-size={size}
+	{...restProps}
+	role="alert"
+>
 	{#if Icon}<Icon class="size-4" />{/if}
 	{#if heading}<Title>{heading}</Title>{/if}
 	{#if description}<Description>{description}</Description>{/if}

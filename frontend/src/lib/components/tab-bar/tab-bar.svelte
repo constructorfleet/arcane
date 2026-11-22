@@ -29,6 +29,7 @@
 			{item.label}
 			{#if item.badge !== undefined}
 				<span
+					data-slot="tab-count"
 					class="ml-0.5 inline-flex min-w-4.5 items-center justify-center rounded-full bg-primary/15 px-1.5 text-2xs font-semibold text-primary-text tabular-nums"
 				>
 					{item.badge}

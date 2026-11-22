@@ -40,6 +40,7 @@
 	data-slot="card"
 	data-size={size}
 	data-variant={variant}
+	data-selected={selected || undefined}
 	class={cn(
 		'group relative isolate gap-0 overflow-hidden rounded-xl border border-border/70 bg-card/10 p-0 text-card-foreground shadow-none transition-colors duration-200',
 		variant === 'glass' && 'bg-card/60 shadow-xs backdrop-blur-md dark:bg-surface/40',

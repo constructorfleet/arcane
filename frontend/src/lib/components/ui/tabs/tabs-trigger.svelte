@@ -17,6 +17,7 @@
 
 <TabsPrimitive.Trigger
 	bind:ref
+	data-variant={variant}
 	class={cn(
 		'inline-flex items-center justify-center gap-1.5 text-sm font-medium whitespace-nowrap text-muted-foreground ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
 		variant !== 'underline' &&

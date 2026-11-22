@@ -1,5 +1,4 @@
-# 3.0.1-cf.80
+# 3.0.1-cf.81
 
-- Put Actions first in main and related resource tables. Keep the column pinned to the left when scrolling horizontally. (#187)
-- Put action buttons first in mobile and grid cards, project service rows, template cards, and registry tag rows. (#187)
-- Put optional Agent columns last and hide them by default. Show them from the column picker and keep that choice after reload. (#187)
+- Add the opt-in Vega Graphite appearance and apply its component styling to the existing Vega Graphite Preview import. (#190)
+- Tighten desktop tables and controls, reduce corner rounding, and give cards, menus, dialogs, and notifications clearer borders and solid surfaces. (#190)

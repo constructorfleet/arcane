@@ -64,6 +64,7 @@
 	{/if}
 {:else}
 	<div
+		data-slot="stat-card"
 		class={cn(
 			'hover-lift group relative overflow-hidden rounded-xl border border-border/70 bg-card/10 p-4 transition-colors',
 			iconColor,
@@ -84,6 +85,7 @@
 			</div>
 
 			<div
+				data-slot="stat-card-icon"
 				class={cn(
 					'flex size-9 shrink-0 items-center justify-center rounded-lg ring-1 ring-foreground/5 transition-transform duration-200 ring-inset group-hover:scale-105',
 					bgColor
