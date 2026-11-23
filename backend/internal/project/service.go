@@ -75,6 +75,11 @@ import (
 )
 
 type (
+	RedeployOptions struct {
+		Deploy                  *types.ProjectDeployOptions
+		UseConfiguredPullPolicy bool
+	}
+
 	ProjectService struct {
 		composeCoordinator types.ComposeCoordinator
 
@@ -1745,7 +1750,7 @@ func (s *ProjectService) DestroyProject(ctx context.Context, projectID string, o
 	return nil
 }
 
-func (s *ProjectService) RedeployProject(ctx context.Context, projectID string, user types.Actor, options *types.ProjectDeployOptions) error {
+func (s *ProjectService) RedeployProject(ctx context.Context, projectID string, user types.Actor, options RedeployOptions) error {
 	unlock, err := s.LockProject(ctx, "redeploy project", projectID)
 	if err != nil {
 		return err
@@ -1779,19 +1784,21 @@ func (s *ProjectService) RedeployProject(ctx context.Context, projectID string, 
 		}
 	}
 
-	progressWriter, _ := ctx.Value(dockertypes.ProgressWriterKey{}).(io.Writer)
-	credentials, cerr := s.ResolveRegistryCredentials(ctx)
-	if cerr != nil {
-		slog.WarnContext(ctx, "failed to resolve registry credentials for redeploy pull", "error", cerr)
-	}
-	if pullProjectImagesErr := s.PullProjectImages(ctx, projectID, kit.Ternary(progressWriter == nil, io.Discard, progressWriter), user, credentials); pullProjectImagesErr != nil {
-		slog.WarnContext(ctx, "failed to pull project images", "error", pullProjectImagesErr)
-		logWriter := docker.NewLogLineWriter(progressWriter)
-		_, _ = io.WriteString(logWriter, "WARNING: failed to pull project images; deploying with local images:\n"+pullProjectImagesErr.Error()+"\n")
-		_ = logWriter.Close()
+	if !options.UseConfiguredPullPolicy {
+		progressWriter, _ := ctx.Value(dockertypes.ProgressWriterKey{}).(io.Writer)
+		credentials, cerr := s.ResolveRegistryCredentials(ctx)
+		if cerr != nil {
+			slog.WarnContext(ctx, "failed to resolve registry credentials for redeploy pull", "error", cerr)
+		}
+		if pullProjectImagesErr := s.PullProjectImages(ctx, projectID, kit.Ternary(progressWriter == nil, io.Discard, progressWriter), user, credentials); pullProjectImagesErr != nil {
+			slog.WarnContext(ctx, "failed to pull project images", "error", pullProjectImagesErr)
+			logWriter := docker.NewLogLineWriter(progressWriter)
+			_, _ = io.WriteString(logWriter, "WARNING: failed to pull project images; deploying with local images:\n"+pullProjectImagesErr.Error()+"\n")
+			_ = logWriter.Close()
+		}
 	}
 
-	return s.deployProject(ctx, projectID, user, options)
+	return s.deployProject(ctx, projectID, user, options.Deploy)
 }
 
 func (s *ProjectService) PullProjectImages(ctx context.Context, projectID string, progressWriter io.Writer, user types.Actor, credentials []types.ContainerRegistryCredential) error {

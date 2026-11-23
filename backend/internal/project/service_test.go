@@ -5452,6 +5452,71 @@ func TestProjectService_ListProjects_WithDerivedStatusFilter_AllowsAllPageSizeSe
 	assert.Equal(t, "stopped-24", items[len(items)-1].Name)
 }
 
+func TestProjectService_RedeployConfiguredImagePolicy(t *testing.T) {
+	const imageRef = "registry.example.com/team/app:1.2.3"
+	for _, tc := range []struct {
+		policy  string
+		present bool
+		pulls   int32
+	}{
+		{policy: "always", present: true, pulls: 1},
+		{policy: "missing", present: true},
+		{policy: "missing", pulls: 1},
+		{policy: "never", present: true},
+		{policy: "never"},
+	} {
+		t.Run(fmt.Sprintf("%s/present=%t", tc.policy, tc.present), func(t *testing.T) {
+			ctx := t.Context()
+			db := setupProjectTestDB(t)
+			settingsService, err := newSettingsServiceForTest(t, ctx, db)
+			require.NoError(t, err)
+			root := t.TempDir()
+			t.Setenv("ARCANE_PROJECTS_DIRECTORY", root)
+			require.NoError(t, settingsService.UpdateSetting(ctx, "projectsDirectory", root))
+			require.NoError(t, settingsService.UpdateSetting(ctx, "defaultDeployPullPolicy", tc.policy))
+			projectPath := createComposeProjectDir(t, root, "demo")
+			require.NoError(t, os.WriteFile(filepath.Join(projectPath, "compose.yaml"), []byte("services:\n  app:\n    image: "+imageRef+"\n"), 0o644))
+			require.NoError(t, db.Create(&Project{ID: "p1", Name: "demo", Path: projectPath, Status: ProjectStatusStopped}).Error)
+
+			localImages := map[string]dockertypesimage.InspectResponse{}
+			if tc.present {
+				localImages[imageRef] = dockertypesimage.InspectResponse{ID: "sha256:local", RepoTags: []string{imageRef}}
+			}
+			var pulls atomic.Int32
+			server := newImagePullServerWithObserver(t, localImages, func(_, _ string) { pulls.Add(1) })
+			dockerService := newSettingsDockerService(t, newTestDockerClient(t, server))
+			registryService := newProjectTestRegistryService(db, dockerService, settingsService)
+			eventService := event.NewEventService(db, &config.Config{}, nil)
+			imageUpdateService := imageupdate.NewImageUpdateService(imageupdate.ImageUpdateServiceParams{
+				DB: db, EventService: eventService, DockerService: dockerService,
+				ActivityService: activity.NewActivityService(db, settingsService),
+			})
+			imageService := image.NewImageService(image.ImageServiceParams{
+				DB: db, DockerService: dockerService, RegistryService: registryService,
+				EventService: eventService, SettingsService: settingsService, ImageUpdateService: imageUpdateService,
+			})
+			svc := NewProjectService(ProjectServiceParams{
+				DB: db, SettingsService: settingsService, EventService: eventService,
+				ImageService: imageService, DockerService: dockerService, BuildService: testBuildBuilder{},
+				Config: loadTestConfig(t), KVService: kv.NewKVService(db),
+				ContainerRegistryService: registryService, RegistryCredentialsProvider: testRegistryCredentials,
+			})
+			up := errors.New("compose up reached")
+			svc.composeCoordinator = projects.NewCoordinator(types.ComposeCommands{
+				Up: func(context.Context, types.ComposeUpOptions) error { return up },
+			})
+
+			err = svc.RedeployProject(ctx, "p1", types.SystemUser, RedeployOptions{UseConfiguredPullPolicy: true})
+			if tc.policy == "never" && !tc.present {
+				require.ErrorContains(t, err, "not available locally")
+			} else {
+				require.ErrorIs(t, err, up)
+			}
+			require.Equal(t, tc.pulls, pulls.Load())
+		})
+	}
+}
+
 func TestProjectService_DeployProject_StopsOnBuildPreparationError(t *testing.T) {
 	db := setupProjectTestDB(t)
 	ctx := t.Context()

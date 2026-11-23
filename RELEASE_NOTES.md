@@ -1,4 +1,4 @@
-# 3.0.1-cf.89
+# 3.0.1-cf.90
 
-- Apply the existing URL secret redactor to query strings and referrers in debug request logs. (#169)
-- Verify URL-encoded query values are redacted while unrelated parameters remain available for diagnostics. (#169)
+- Use the target's configured pull policy for project redeploy webhooks. (#153)
+- Read the terminal result of remote project deploy operations before recording webhook success. (#153)

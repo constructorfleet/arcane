@@ -513,7 +513,7 @@ func (s *Service) redeployIfRunningAfterSync(ctx context.Context, sync *projectp
 	switch {
 	case running || sync.RedeployAfterSync || sync.PendingRedeploy:
 		slog.InfoContext(ctx, "Redeploying project after Git sync", "projectName", project.Name, "projectId", project.ID, "wasRunning", running, "pending", sync.PendingRedeploy)
-		if redeployErr := s.projectService.RedeployProject(ctx, project.ID, actor, &types.ProjectDeployOptions{Build: true}); redeployErr != nil {
+		if redeployErr := s.projectService.RedeployProject(ctx, project.ID, actor, projectpkg.RedeployOptions{Deploy: &types.ProjectDeployOptions{Build: true}}); redeployErr != nil {
 			slog.ErrorContext(ctx, "Failed to redeploy project after Git sync", "error", redeployErr, "projectId", project.ID)
 			return common.Classify(common.ErrRedeployAfterSyncFailed, fmt.Errorf("redeploy failed: %w", redeployErr))
 		}

@@ -27,6 +27,7 @@ import (
 	"getarcane.dev/arcane/v3/internal/database"
 	"getarcane.dev/arcane/v3/internal/event"
 	"getarcane.dev/arcane/v3/internal/middleware"
+	"getarcane.dev/arcane/v3/pkg/agent"
 	"getarcane.dev/arcane/v3/pkg/authz"
 	"getarcane.dev/arcane/v3/pkg/httpx"
 	"getarcane.dev/types/v3"
@@ -739,6 +740,13 @@ func TestRemoteWebhookRequest(t *testing.T) {
 			wantPath:   "/api/agents/0/projects/p1?action=updateservices",
 		},
 		{
+			name:       "project redeploy uses the target's policy",
+			wh:         Webhook{TargetType: WebhookTargetTypeProject, TargetID: "p1"},
+			actionType: WebhookActionTypeRedeploy,
+			wantMethod: "POST",
+			wantPath:   "/api/agents/0/projects/p1/deploy?action=redeploy&useConfiguredPullPolicy=true",
+		},
+		{
 			name:       "gitops sync",
 			wh:         Webhook{TargetType: WebhookTargetTypeGitOps, TargetID: "sync-1"},
 			actionType: WebhookActionTypeSync,
@@ -772,6 +780,26 @@ func TestRemoteWebhookRequest(t *testing.T) {
 			assert.Equal(t, tt.wantMethod, method)
 			assert.Equal(t, tt.wantPath, path)
 			assert.Equal(t, tt.wantResult, wantResult)
+		})
+	}
+
+	for _, tt := range []struct {
+		name, body, wantError string
+		status                int
+	}{
+		{name: "terminal success", status: http.StatusOK, body: "{\"type\":\"activity\"}\n{\"log\":\"pulling\"}\n{\"done\":true}\n"},
+		{name: "terminal deploy error", status: http.StatusOK, body: "{\"type\":\"activity\"}\n{\"error\":\"image pull failed\"}\n", wantError: "image pull failed"},
+		{name: "missing terminal result", status: http.StatusOK, body: "{\"type\":\"activity\"}\n", wantError: "without a completion result"},
+		{name: "malformed progress", status: http.StatusOK, body: "{\"done\":", wantError: "decode project deployment progress"},
+		{name: "http failure", status: http.StatusForbidden, body: "{\"detail\":\"permission denied\"}", wantError: "permission denied"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := projectWebhookDeploymentResult(agent.RemoteResponse{Body: []byte(tt.body), StatusCode: tt.status})
+			if tt.wantError != "" {
+				require.ErrorContains(t, err, tt.wantError)
+				return
+			}
+			require.NoError(t, err)
 		})
 	}
 }

@@ -61,10 +61,11 @@ type (
 	}
 
 	DeployProjectInput struct {
-		Body          *types.ProjectDeployOptions
-		EnvironmentID string `path:"id" doc:"Environment ID"`
-		ProjectID     string `path:"projectId" doc:"Project ID"`
-		Action        string `query:"action" required:"true" enum:"up,redeploy,pull" doc:"Deploy action"`
+		Body                    *types.ProjectDeployOptions
+		EnvironmentID           string `path:"id" doc:"Environment ID"`
+		ProjectID               string `path:"projectId" doc:"Project ID"`
+		Action                  string `query:"action" required:"true" enum:"up,redeploy,pull" doc:"Deploy action"`
+		UseConfiguredPullPolicy bool   `query:"useConfiguredPullPolicy" doc:"For redeploy, use the configured deploy pull policy"`
 	}
 
 	ProjectActionInput struct {
@@ -382,7 +383,7 @@ func (h *ProjectHandler) DeployProject(ctx context.Context, input *DeployProject
 			FailureMessage: "Project redeploy failed",
 			SuccessMessage: "Project redeploy completed",
 			Action: func(opCtx context.Context, _ io.Writer) error {
-				return h.projectService.RedeployProject(opCtx, input.ProjectID, *user, input.Body)
+				return h.projectService.RedeployProject(opCtx, input.ProjectID, *user, RedeployOptions{Deploy: input.Body, UseConfiguredPullPolicy: input.UseConfiguredPullPolicy})
 			},
 		},
 		"pull": {

@@ -1,11 +1,13 @@
 package webhook
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -33,6 +35,7 @@ import (
 	"getarcane.dev/arcane/v3/internal/gitops"
 	"getarcane.dev/arcane/v3/internal/project"
 	"getarcane.dev/arcane/v3/internal/updater"
+	"getarcane.dev/arcane/v3/pkg/agent"
 	"getarcane.dev/arcane/v3/pkg/authz"
 	"getarcane.dev/arcane/v3/pkg/httpx"
 	"getarcane.dev/types/v3"
@@ -724,8 +727,10 @@ func remoteWebhookRequest(wh *Webhook, actionType string) (method, path string, 
 			return http.MethodPost, projectPath + "?action=updateservices", false, nil
 		case WebhookActionTypeDown, WebhookActionTypeRestart:
 			return http.MethodPost, projectPath + "?action=" + actionType, false, nil
-		case WebhookActionTypeUp, WebhookActionTypeRedeploy:
-			return http.MethodPost, projectPath + "/deploy?action=" + actionType, false, nil
+		case WebhookActionTypeUp:
+			return http.MethodPost, projectPath + "/deploy?action=up", false, nil
+		case WebhookActionTypeRedeploy:
+			return http.MethodPost, projectPath + "/deploy?action=redeploy&useConfiguredPullPolicy=true", false, nil
 		}
 		return "", "", false, ErrWebhookInvalidAction
 	case WebhookTargetTypeUpdater:
@@ -749,6 +754,17 @@ func (s *WebhookService) executeRemoteWebhookAction(ctx context.Context, wh *Web
 		return nil, err
 	}
 
+	if wh.TargetType == WebhookTargetTypeProject && (actionType == WebhookActionTypeUp || actionType == WebhookActionTypeRedeploy) {
+		body, status, deployErr := s.environmentService.ProxyRequest(ctx, wh.EnvironmentID, method, path, nil)
+		if deployErr == nil {
+			deployErr = projectWebhookDeploymentResult(agent.RemoteResponse{Body: body, StatusCode: status})
+		}
+		if deployErr != nil {
+			return nil, s.wrapWebhookActionError(ctx, wh, wh.TargetType, actionType, deployErr)
+		}
+		return nil, nil
+	}
+
 	var result *types.UpdaterResult
 	if wantResult {
 		var out types.ApiResponse[*types.UpdaterResult]
@@ -764,6 +780,32 @@ func (s *WebhookService) executeRemoteWebhookAction(ctx context.Context, wh *Web
 	}
 
 	return result, nil
+}
+
+func projectWebhookDeploymentResult(response agent.RemoteResponse) error {
+	if err := response.RequireSuccess(); err != nil {
+		return err
+	}
+	for line := range bytes.Lines(response.Body) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		var progress struct {
+			Error string `json:"error"`
+			Done  bool   `json:"done"`
+		}
+		if err := json.Unmarshal(line, &progress); err != nil {
+			return fmt.Errorf("decode project deployment progress: %w", err)
+		}
+		if progress.Error != "" {
+			return errors.New(progress.Error)
+		}
+		if progress.Done {
+			return nil
+		}
+	}
+	return errors.New("project deployment ended without a completion result")
 }
 
 func (s *WebhookService) executeContainerWebhookAction(ctx context.Context, wh *Webhook, actionType string) (*types.UpdaterResult, error) {
@@ -884,7 +926,7 @@ func (s *WebhookService) executeProjectWebhookAction(ctx context.Context, wh *We
 		}
 		return nil, nil
 	case WebhookActionTypeRedeploy:
-		if err := s.projectService.RedeployProject(ctx, wh.TargetID, types.SystemUser, nil); err != nil {
+		if err := s.projectService.RedeployProject(ctx, wh.TargetID, types.SystemUser, project.RedeployOptions{UseConfiguredPullPolicy: true}); err != nil {
 			return nil, s.wrapWebhookActionError(ctx, wh, "project", actionType, err)
 		}
 		return nil, nil
