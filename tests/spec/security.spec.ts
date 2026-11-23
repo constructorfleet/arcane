@@ -467,7 +467,8 @@ test.describe('Security Page', () => {
 	test('starts a valid image patch and explains disabled patch actions', async ({ page }) => {
 		const now = new Date().toISOString();
 		let patchPayload: unknown;
-		let patchStarted = false;
+		let patchStatus: 'patching' | 'completed' | undefined;
+		let containerdImageStore = false;
 		const targets = () => [
 			{
 				imageId: 'remote-image',
@@ -475,7 +476,7 @@ test.describe('Security Page', () => {
 				fixableCount: 2,
 				totalCount: 4,
 				scanTime: now,
-				...(patchStarted
+				...(patchStatus
 					? {
 							lastPatch: {
 								id: 'patch-record',
@@ -483,8 +484,8 @@ test.describe('Security Page', () => {
 								originalImageId: 'remote-image',
 								originalRef: 'example/remote:latest',
 								patchedRef: 'example/remote:arcane-patched',
-								mode: 'buildkit',
-								status: 'running',
+								mode: 'report',
+								status: patchStatus,
 								activityId: 'patch-activity',
 								createdAt: now
 							}
@@ -512,8 +513,15 @@ test.describe('Security Page', () => {
 			await route.fulfill({ json: paginated(targets()) });
 		});
 		await page.route(/\/api\/agents\/0\/images\/remote-image\/patch$/, async (route) => {
+			if (!containerdImageStore) {
+				await route.fulfill({
+					status: 400,
+					json: { detail: "image patching requires Docker's containerd image store" }
+				});
+				return;
+			}
 			patchPayload = route.request().postDataJSON();
-			patchStarted = true;
+			patchStatus = 'patching';
 			await route.fulfill({
 				json: {
 					success: true,
@@ -523,8 +531,8 @@ test.describe('Security Page', () => {
 						originalImageId: 'remote-image',
 						originalRef: 'example/remote:latest',
 						patchedRef: 'example/remote:arcane-patched',
-						mode: 'buildkit',
-						status: 'running',
+						mode: 'report',
+						status: patchStatus,
 						activityId: 'patch-activity',
 						createdAt: now
 					}
@@ -552,7 +560,13 @@ test.describe('Security Page', () => {
 		const remoteRow = page.getByRole('row').filter({ hasText: 'example/remote:latest' });
 		menu = await openRowActionsMenu(page, remoteRow);
 		await menu.getByRole('menuitem', { name: 'Patch', exact: true }).click();
+		await expect(
+			page.getByText("image patching requires Docker's containerd image store", { exact: true })
+		).toBeVisible();
 
+		containerdImageStore = true;
+		menu = await openRowActionsMenu(page, remoteRow);
+		await menu.getByRole('menuitem', { name: 'Patch', exact: true }).click();
 		await expect(
 			page.getByText('Patching image; the result will be tagged example/remote:arcane-patched', {
 				exact: true
@@ -560,6 +574,11 @@ test.describe('Security Page', () => {
 		).toBeVisible();
 		expect(patchPayload).toEqual({ scanId: 'remote-image' });
 		await expect(remoteRow.getByText('Running', { exact: true })).toBeVisible();
+
+		patchStatus = 'completed';
+		await navigateToSecurity(page, 'patches');
+		await expect(remoteRow.getByText('Patch completed', { exact: true })).toBeVisible();
+		await expect(remoteRow.getByTitle(/No verification scan recorded/)).toBeVisible();
 	});
 });
 

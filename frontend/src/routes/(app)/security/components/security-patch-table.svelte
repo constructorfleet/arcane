@@ -63,7 +63,8 @@
 		if (patch.status === 'failed') return { label: m.common_failed(), variant: 'red' };
 		if (patch.status !== 'completed') return { label: m.common_running(), variant: 'blue' };
 		const scan = item.lastPatchScan;
-		if (!scan || scan.status === 'pending' || scan.status === 'scanning') {
+		if (!scan) return { label: m.security_patch_completed(), variant: 'green' };
+		if (scan.status === 'pending' || scan.status === 'scanning') {
 			return { label: m.security_verify_scan_pending(), variant: 'blue' };
 		}
 		if (scan.status === 'failed') return { label: m.security_verify_failed(), variant: 'amber' };
@@ -78,6 +79,9 @@
 		}
 		if (patch.status === 'completed' && item.lastPatchScan?.status === 'completed') {
 			return `${m.security_fixable_after_patch({ count: item.lastPatchScan.fixableCount })} · ${formatDateTimeShort(patch.createdAt)}`;
+		}
+		if (patch.status === 'completed' && !item.lastPatchScan) {
+			return `${m.security_patch_verification_unavailable()} · ${formatDateTimeShort(patch.createdAt)}`;
 		}
 		return formatDateTimeShort(patch.createdAt);
 	}

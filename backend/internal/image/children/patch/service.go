@@ -437,6 +437,7 @@ func (s *Service) verifyPatchedImage(ctx context.Context, record *ImagePatchReco
 		s.appendPatchActivity(ctx, activityID, 95, "Re-scanning patched image to verify the patch")
 		if _, scanErr := s.vulnerabilityService.ScanImage(context.WithoutCancel(ctx), record.EnvironmentID, patchedInspect.ID, scheduledPatchUser); scanErr != nil {
 			slog.WarnContext(ctx, "failed to start verification scan of patched image", "patchedRef", record.PatchedRef, "error", scanErr)
+			s.appendPatchActivity(ctx, activityID, 95, "Could not start the verification scan: "+scanErr.Error())
 		}
 	}
 }

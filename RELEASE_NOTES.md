@@ -1,4 +1,4 @@
-# 3.0.1-cf.90
+# 3.0.1-cf.91
 
-- Use the target's configured pull policy for project redeploy webhooks. (#153)
-- Read the terminal result of remote project deploy operations before recording webhook success. (#153)
+- Report a completed image patch even when no verification scan was recorded. (#151)
+- Include verification scan startup errors in the image patch activity. (#151)

@@ -950,6 +950,8 @@
   "vuln_bulk_restore_failed": "Failed to restore vulnerabilities",
   "security_patched_ref": "Patched Tag",
   "security_fixable_after_patch": "{count} fixable",
+  "security_patch_completed": "Patch completed",
+  "security_patch_verification_unavailable": "No verification scan recorded",
   "security_verify_scan_pending": "Verifying…",
   "security_verify_failed": "Verify failed",
   "images_patch_started": "Patching image; the result will be tagged {patchedRef}",
