@@ -81,16 +81,16 @@ type (
 		Hardened          *HardenedImageInfo        `json:"hardened,omitempty"`
 
 		EnvironmentTag
-		RepositoryGroup    *ImageRepositoryGroup `json:"repositoryGroup,omitempty"`
-		LogicalID          string                `json:"logicalId,omitempty"`
-		ID                 string                `json:"id" sortable:"true"`
-		Repo               string                `json:"repo" sortable:"true"`
-		Tag                string                `json:"tag" sortable:"true"`
-		RepoTags           []string              `json:"repoTags"`
-		RepoDigests        []string              `json:"repoDigests"`
-		UsedBy             []ImageUsedBy         `json:"usedBy,omitempty"`
-		ActiveRepositories []string              `json:"activeRepositories,omitempty"`
-		PinnedReferences   []string              `json:"pinnedReferences,omitempty"`
+		RepositoryGroup  *ImageRepositoryGroup `json:"repositoryGroup,omitempty"`
+		LogicalID        string                `json:"logicalId,omitempty"`
+		ID               string                `json:"id" sortable:"true"`
+		Repo             string                `json:"repo" sortable:"true"`
+		Tag              string                `json:"tag" sortable:"true"`
+		RepoTags         []string              `json:"repoTags"`
+		RepoDigests      []string              `json:"repoDigests"`
+		UsedBy           []ImageUsedBy         `json:"usedBy,omitempty"`
+		ActiveReferences []string              `json:"activeReferences,omitempty"`
+		PinnedReferences []string              `json:"pinnedReferences,omitempty"`
 
 		Created     int64 `json:"created" sortable:"true"`
 		Size        int64 `json:"size" sortable:"true"`

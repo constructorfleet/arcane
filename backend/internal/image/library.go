@@ -2,15 +2,73 @@ package image
 
 import (
 	"cmp"
+	"context"
+	"log/slog"
 	"maps"
 	"slices"
 	"strings"
 
 	"github.com/distribution/reference"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 
 	"getarcane.dev/arcane/v3/pkg/pagination"
 	"getarcane.dev/types/v3"
 )
+
+const swarmTaskIDLabel = "com.docker.swarm.task.id"
+
+func (s *ImageService) runningImageConsumers(ctx context.Context, containers []container.Summary) []container.Summary {
+	hasRunningTask := slices.ContainsFunc(containers, func(c container.Summary) bool {
+		return c.State == container.StateRunning && c.Labels[swarmTaskIDLabel] != ""
+	})
+	var tasks []swarm.Task
+	if hasRunningTask {
+		var taskErr error
+		tasks, taskErr = s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) ([]swarm.Task, error) {
+			info, err := dockerClient.Info(ctx, client.InfoOptions{})
+			if err != nil || !info.Info.Swarm.ControlAvailable {
+				return nil, err
+			}
+			filters := make(client.Filters).Add("node", info.Info.Swarm.NodeID).Add("desired-state", string(swarm.TaskStateRunning))
+			result, err := dockerClient.TaskList(ctx, client.TaskListOptions{Filters: filters})
+			return append([]swarm.Task{}, result.Items...), err
+		})
+		if taskErr != nil {
+			slog.DebugContext(ctx, "Using local container states for image inventory", "error", taskErr)
+			tasks = nil
+		}
+	}
+	return runningImageContainers(containers, tasks)
+}
+
+func runningImageContainers(containers []container.Summary, tasks []swarm.Task) []container.Summary {
+	active := make(map[string]string, len(tasks))
+	for _, task := range tasks {
+		if task.DesiredState == swarm.TaskStateRunning && task.Status.State == swarm.TaskStateRunning {
+			active[task.ID] = ""
+			if task.Spec.ContainerSpec != nil {
+				active[task.ID] = task.Spec.ContainerSpec.Image
+			}
+		}
+	}
+	var consumers []container.Summary
+	for _, c := range containers {
+		if c.State != container.StateRunning {
+			continue
+		}
+		if taskID := c.Labels[swarmTaskIDLabel]; taskID != "" && tasks != nil {
+			ref, running := active[taskID]
+			if !running {
+				continue
+			}
+			c.Image = cmp.Or(ref, c.Image)
+		}
+		consumers = append(consumers, c)
+	}
+	return consumers
+}
 
 func (s *ImageService) libraryPage(pages []pagination.EnvironmentPage[types.ImageSummary], params pagination.QueryParams) ([]types.ImageSummary, pagination.Response) {
 	items := groupImageRepositories(pages, params.Filters["repository"])
@@ -50,7 +108,7 @@ func groupImageRepositories(pages []pagination.EnvironmentPage[types.ImageSummar
 func imageCopiesByRepository(image types.ImageSummary, onlyRepository string) map[string]types.ImageSummary {
 	byRepository := map[string]types.ImageSummary{}
 	primary := imageRepositoryName(image.Repo)
-	for _, ref := range slices.Concat(image.RepoTags, image.RepoDigests, image.PinnedReferences) {
+	for _, ref := range slices.Concat(image.RepoTags, image.RepoDigests, image.PinnedReferences, image.ActiveReferences) {
 		repo := imageRepositoryName(ref)
 		if repo == "" || onlyRepository != "" && onlyRepository != repo {
 			continue
@@ -58,9 +116,10 @@ func imageCopiesByRepository(image types.ImageSummary, onlyRepository string) ma
 		observation, exists := byRepository[repo]
 		if !exists {
 			observation = image
-			if len(image.ActiveRepositories) > 0 {
-				observation.InUse = slices.Contains(image.ActiveRepositories, repo)
-			}
+			observation.InUse = slices.ContainsFunc(image.ActiveReferences, func(active string) bool {
+				activeRepo := imageRepositoryName(active)
+				return activeRepo == repo || activeRepo == "" && repo == primary
+			})
 			observation.Repo, observation.Tag = repo, "<none>"
 			observation.RepoTags, observation.RepoDigests, observation.PinnedReferences = nil, nil, nil
 			if repo != primary {
@@ -125,24 +184,24 @@ func mergeImageRepository(copies []types.ImageSummary) types.ImageSummary {
 	scanned := map[string]struct{}{}
 	checked := map[string]struct{}{}
 	row.VulnerabilityScan = nil
-	for _, observation := range copies {
+	for i, observation := range copies {
 		group.Copies = append(group.Copies, types.ImageRepositoryCopy{
 			EnvironmentTag: observation.EnvironmentTag, ID: observation.ID, Tags: observation.RepoTags, InUse: observation.InUse,
 		})
 		row.RepoTags = append(row.RepoTags, observation.RepoTags...)
 		row.RepoDigests = append(row.RepoDigests, observation.RepoDigests...)
-		if row.InUse && !observation.InUse {
+		if !observation.InUse && (row.InUse || i > 0) {
 			continue
 		}
-		observed[observation.ID] = struct{}{}
+		key, digest := imageVariant(observation)
+		observed[key] = struct{}{}
 		group.MinSize = min(group.MinSize, observation.Size)
 		group.MaxSize = max(group.MaxSize, observation.Size)
-		for _, ref := range observation.RepoDigests {
-			_, digest, _ := strings.Cut(ref, "@")
+		if digest != "" {
 			group.Digests = append(group.Digests, digest)
 		}
 		if row.InUse && observation.UpdateInfo != nil && observation.Tag != "<none>" {
-			checked[observation.ID] = struct{}{}
+			checked[key] = struct{}{}
 			if observation.UpdateInfo.HasUpdate && (row.UpdateInfo == nil || !row.UpdateInfo.HasUpdate) {
 				row.UpdateInfo = observation.UpdateInfo
 			}
@@ -153,7 +212,7 @@ func mergeImageRepository(copies []types.ImageSummary) types.ImageSummary {
 		if report := observation.VulnerabilityScan; report != nil {
 			group.SawScanError = group.SawScanError || report.Status == types.VulnerabilityScanStatusFailed
 			if report.Status == types.VulnerabilityScanStatusCompleted && report.Summary != nil {
-				scanned[observation.ID] = struct{}{}
+				scanned[key] = struct{}{}
 				if row.VulnerabilityScan == nil || compareImageScans(report.Summary, row.VulnerabilityScan.Summary) > 0 {
 					row.VulnerabilityScan = report
 				}
@@ -170,6 +229,23 @@ func mergeImageRepository(copies []types.ImageSummary) types.ImageSummary {
 	group.ScannedVariants = len(scanned)
 	row.RepositoryGroup = group
 	return row
+}
+
+func imageVariant(observation types.ImageSummary) (string, string) {
+	var pins []string
+	for _, ref := range observation.ActiveReferences {
+		if _, digest, pinned := strings.Cut(ref, "@"); pinned && imageRepositoryName(ref) == observation.Repo {
+			pins = append(pins, digest)
+		}
+	}
+	if pins = sortedUnique(pins); len(pins) == 1 {
+		return pins[0], pins[0]
+	}
+	if len(observation.RepoDigests) == 1 {
+		_, digest, _ := strings.Cut(observation.RepoDigests[0], "@")
+		return digest, digest
+	}
+	return observation.ID, ""
 }
 
 func compareImageScans(a, b *types.VulnerabilitySeveritySummary) int {

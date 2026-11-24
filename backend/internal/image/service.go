@@ -1235,6 +1235,7 @@ func (s *ImageService) ListImagesPaginated(ctx context.Context, environmentID st
 	items := MapDockerImagesToDTOs(
 		dockerImages,
 		containers,
+		s.runningImageConsumers(ctx, containers),
 		BuildVolumeUsageMap(containers, s.BuildProjectIDMap(ctx, containers)),
 		buildUpdateMap(updateRecords),
 		vulnerabilityMap,
@@ -1468,16 +1469,15 @@ func collectPinnedReferencesByImageID(containers []container.Summary) map[string
 func MapDockerImagesToDTOs(
 	dockerImages []image.Summary,
 	containers []container.Summary,
+	runningConsumers []container.Summary,
 	usageMap map[string][]types.ImageUsedBy,
 	updateMap map[string]*imageupdate.ImageUpdateRecord,
 	vulnerabilityMap map[string]*types.VulnerabilityScanSummary,
 ) []types.ImageSummary {
 	pinnedRefsByImageID := collectPinnedReferencesByImageID(containers)
-	activeReposByImageID := map[string][]string{}
-	for _, workload := range containers {
-		if repo := imageRepositoryName(workload.Image); repo != "" {
-			activeReposByImageID[workload.ImageID] = append(activeReposByImageID[workload.ImageID], repo)
-		}
+	activeRefsByImageID := map[string][]string{}
+	for _, workload := range runningConsumers {
+		activeRefsByImageID[workload.ImageID] = append(activeRefsByImageID[workload.ImageID], workload.Image)
 	}
 	now := time.Now()
 	items := make([]types.ImageSummary, 0, len(dockerImages))
@@ -1504,16 +1504,16 @@ func MapDockerImagesToDTOs(
 
 		usedBy := usageMap[di.ID]
 		items = append(items, types.ImageSummary{
-			ID:                 di.ID,
-			Repo:               repo,
-			Tag:                tag,
-			RepoTags:           repoTags,
-			RepoDigests:        repoDigests,
-			PinnedReferences:   pinnedRefsByImageID[di.ID],
-			ActiveRepositories: sortedUnique(activeReposByImageID[di.ID]),
-			Created:            di.Created,
-			Size:               di.Size,
-			VirtualSize:        di.SharedSize,
+			ID:               di.ID,
+			Repo:             repo,
+			Tag:              tag,
+			RepoTags:         repoTags,
+			RepoDigests:      repoDigests,
+			PinnedReferences: pinnedRefsByImageID[di.ID],
+			ActiveReferences: sortedUnique(activeRefsByImageID[di.ID]),
+			Created:          di.Created,
+			Size:             di.Size,
+			VirtualSize:      di.SharedSize,
 			Labels: func() map[string]any {
 				if di.Labels == nil {
 					return nil

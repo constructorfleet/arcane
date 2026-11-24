@@ -160,17 +160,19 @@ func TestMapDockerImagesToDTOs_PopulatesPinnedReferences(t *testing.T) {
 			ImageID: "sha256:pinned-image",
 			Image:   pinnedRef,
 			Names:   []string{"/syncthing"},
+			State:   container.StateRunning,
 		},
 		{
 			ID:      "c-regular",
 			ImageID: "sha256:regular-image",
 			Image:   "nginx:alpine",
 			Names:   []string{"/nginx"},
+			State:   container.StateExited,
 		},
 	}
 
 	usageMap := BuildVolumeUsageMap(containers, nil)
-	items := MapDockerImagesToDTOs(dockerImages, containers, usageMap, nil, nil)
+	items := MapDockerImagesToDTOs(dockerImages, containers, runningImageContainers(containers, nil), usageMap, nil, nil)
 
 	require.Len(t, items, 2)
 
@@ -180,6 +182,7 @@ func TestMapDockerImagesToDTOs_PopulatesPinnedReferences(t *testing.T) {
 	assert.Empty(t, items[0].RepoTags)
 	assert.Equal(t, []string{pinnedDigest}, items[0].RepoDigests)
 	assert.Equal(t, []string{pinnedRef}, items[0].PinnedReferences)
+	assert.Equal(t, []string{pinnedRef}, items[0].ActiveReferences)
 	assert.True(t, items[0].InUse)
 
 	assert.Equal(t, "sha256:regular-image", items[1].ID)
@@ -188,6 +191,7 @@ func TestMapDockerImagesToDTOs_PopulatesPinnedReferences(t *testing.T) {
 	assert.Equal(t, []string{"nginx:alpine"}, items[1].RepoTags)
 	assert.Equal(t, []string{regularDigest}, items[1].RepoDigests)
 	assert.Nil(t, items[1].PinnedReferences)
+	assert.Empty(t, items[1].ActiveReferences)
 	assert.True(t, items[1].InUse)
 }
 

@@ -3,6 +3,8 @@ package image
 import (
 	"testing"
 
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/swarm"
 	"github.com/stretchr/testify/require"
 
 	"getarcane.dev/arcane/v3/pkg/pagination"
@@ -16,7 +18,7 @@ func TestImageLibraryGroupsBeforeSearchAndPagination(t *testing.T) {
 			Environment: types.EnvironmentRef{ID: "one", Name: "swarm01"},
 			Items: []types.ImageSummary{
 				{
-					ID: "active", Repo: "alpine", Tag: "latest", ActiveRepositories: []string{"docker.io/library/alpine"},
+					ID: "active", Repo: "alpine", Tag: "latest", ActiveReferences: []string{"alpine:latest"},
 					RepoTags:    []string{"alpine:latest", "registry.example/project/base:current"},
 					RepoDigests: []string{"alpine@" + digest}, InUse: true, Size: 10, Created: 10,
 					UpdateInfo: &types.ImageUpdateInfo{CurrentDigest: digest},
@@ -32,7 +34,7 @@ func TestImageLibraryGroupsBeforeSearchAndPagination(t *testing.T) {
 			Items: []types.ImageSummary{
 				{
 					ID: "cached", Repo: "alpine", Tag: "old", RepoTags: []string{"docker.io/library/alpine:old"},
-					Size: 500, Created: 20, UpdateInfo: &types.ImageUpdateInfo{HasUpdate: true, Error: "idle cached copy"},
+					Size: 500, Created: 20, InUse: true, UpdateInfo: &types.ImageUpdateInfo{HasUpdate: true, Error: "old task"},
 				},
 				{ID: "pinned", Repo: "registry.example/library/alpine", RepoDigests: []string{"registry.example/library/alpine@" + digest}},
 			},
@@ -61,6 +63,7 @@ func TestImageLibraryGroupsBeforeSearchAndPagination(t *testing.T) {
 	require.Equal(t, 1, row.RepositoryGroup.ScannedVariants)
 	require.Len(t, row.RepositoryGroup.Copies, 2)
 	require.Equal(t, "two", row.RepositoryGroup.Copies[1].EnvironmentID)
+	require.False(t, row.RepositoryGroup.Copies[1].InUse)
 
 	all := groupImageRepositories(pages, "")
 	require.Len(t, all, 4)
@@ -74,16 +77,37 @@ func TestImageLibraryGroupsBeforeSearchAndPagination(t *testing.T) {
 }
 
 func TestImageLibrarySurfacesActiveCheckFailures(t *testing.T) {
+	const ref = "example.com/project/image:latest@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	containers := []container.Summary{
+		{ID: "old-task", State: container.StateExited, Labels: map[string]string{swarmTaskIDLabel: "old"}},
+		{ID: "retiring-task", State: container.StateRunning, Labels: map[string]string{swarmTaskIDLabel: "retiring"}},
+		{ID: "current-task", State: container.StateRunning, Labels: map[string]string{swarmTaskIDLabel: "current"}},
+		{ID: "standalone", State: container.StateRunning},
+	}
+	tasks := []swarm.Task{
+		{ID: "retiring", DesiredState: swarm.TaskStateShutdown, Status: swarm.TaskStatus{State: swarm.TaskStateRunning}},
+		{
+			ID: "current", DesiredState: swarm.TaskStateRunning, Status: swarm.TaskStatus{State: swarm.TaskStateRunning},
+			Spec: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{Image: ref}},
+		},
+	}
+	running := runningImageContainers(containers, tasks)
+	require.Len(t, running, 2)
+	require.Equal(t, "current-task", running[0].ID)
+	require.Equal(t, ref, running[0].Image)
+	require.Equal(t, "standalone", running[1].ID)
+
 	grouped := mergeImageRepository([]types.ImageSummary{
 		{
 			ID: "v1", Repo: "example.com/project/image", Tag: "latest", InUse: true, Size: 10,
-			UpdateInfo: &types.ImageUpdateInfo{HasUpdate: true},
+			ActiveReferences: []string{ref},
+			UpdateInfo:       &types.ImageUpdateInfo{HasUpdate: true},
 		},
 		{
 			ID: "v2", Repo: "example.com/project/image", Tag: "edge", InUse: true, Size: 20,
 			UpdateInfo: &types.ImageUpdateInfo{Error: "registry check failed"},
 		},
-		{ID: "v2", Repo: "example.com/project/image", Tag: "edge", InUse: true, Size: 20},
+		{ID: "another-node-id", Repo: "example.com/project/image", Tag: "latest", InUse: true, Size: 10, ActiveReferences: []string{ref}},
 	})
 	require.True(t, grouped.UpdateInfo.HasUpdate)
 	require.Equal(t, "example.com/project/image:edge", grouped.RepositoryGroup.CheckErrorRef)
