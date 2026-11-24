@@ -4778,7 +4778,7 @@
   "network_has_observed_consumers": "This network has observed container consumers. Detach its consumers before deleting it.",
   "no_observed_container_use": "No observed container use",
   "volume_helper": "Arcane volume helper",
-  "volume_helpers_hold_mounts": "Volume helpers can keep this node’s volume mounted without an application consumer. They still count as real consumers and do not establish that attachment on another node is safe.",
+  "volume_helpers_hold_mounts": "A helper container can keep this volume mounted here even when no app is using it. Check whether it’s still mounted before attaching it on another node.",
   "repository_list_unavailable": "Repository list unavailable",
   "repository_list_unavailable_description": "The registry did not return a repository list. Catalog permission or catalog support may be required. You can still open a known repository by name.",
   "repository_list_showing_configured": "The repository list could not be retrieved. Showing the names configured for this registry.",
