@@ -58,10 +58,10 @@
 </script>
 
 <div class="space-y-6 pb-5 md:space-y-8 md:pb-5">
-	<header class="space-y-4 pt-3 sm:space-y-6 md:pt-5">
+	<header class="space-y-4 sm:space-y-6">
 		<div class="flex items-start justify-between gap-4">
 			<div class="min-w-0">
-				<h1 class="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
+				<h1 class="text-2xl font-bold sm:text-3xl">{title}</h1>
 				<p class="mt-1 text-sm text-muted-foreground">{subtitle}</p>
 			</div>
 			<SettingLock />
