@@ -1,4 +1,5 @@
-# 3.0.1-cf.92
+# 3.0.1-cf.93
 
-- Use a shared detail-header row that keeps navigation and actions aligned and lets long titles yield to resource metadata. (#222)
-- Show the contextual return destination beside the back arrow, standardize stack header tags, and show a shared local driver and scope label once. (#222)
+- Style the contextual return link as an outlined button, matching neutral detail actions. (#222)
+- Display the network ID and any stack namespace in the detail header badge row. (#222)
+- Add a table view to Projects → Templates with search, sorting, source filters, configurable columns, and pagination. The table and card views are selectable at sidebar widths. (#224)

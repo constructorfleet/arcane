@@ -217,10 +217,28 @@ func (s *TemplateService) GetAllTemplatesPaginated(ctx context.Context, params p
 			func(t types.Template) (string, error) { return t.Name, nil },
 			func(t types.Template) (string, error) { return t.Description, nil },
 			func(t types.Template) (string, error) {
-				if t.Metadata != nil && len(t.Metadata.Tags) > 0 {
-					return strings.Join(t.Metadata.Tags, " "), nil
+				if t.Metadata == nil {
+					return "", nil
 				}
-				return "", nil
+				return strings.Join(t.Metadata.Tags, " "), nil
+			},
+			func(t types.Template) (string, error) {
+				if t.Metadata == nil {
+					return "", nil
+				}
+				return kit.FromPtr(t.Metadata.Author), nil
+			},
+			func(t types.Template) (string, error) {
+				if t.Metadata == nil {
+					return "", nil
+				}
+				return kit.FromPtr(t.Metadata.Version), nil
+			},
+			func(t types.Template) (string, error) {
+				if t.Registry == nil {
+					return "", nil
+				}
+				return t.Registry.Name, nil
 			},
 		},
 		SortBindings: []pagination.SortBinding[types.Template]{

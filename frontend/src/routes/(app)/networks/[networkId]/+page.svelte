@@ -410,10 +410,13 @@
 	backLabel={m.resource_networks_cap()}
 	environmentId={data.envId}
 	title={network?.name ?? m.common_details_title({ resource: m.resource_network_cap() })}
-	subtitle={`${m.common_id()}: ${shortId}`}
 	{actions}
 >
 	{#snippet badges()}
+		<Badge variant="secondary" mono title={network?.id}>{m.common_id()}: {shortId}</Badge>
+		{#if network?.labels?.['com.docker.stack.namespace']}
+			<Badge variant="secondary">{m.swarm_stack_namespace({ namespace: network.labels['com.docker.stack.namespace'] })}</Badge>
+		{/if}
 		{#if swarmGateway}
 			<Badge variant="blue" minWidth="20">{m.network_swarm_gateway()}</Badge>
 		{:else if swarmScoped}

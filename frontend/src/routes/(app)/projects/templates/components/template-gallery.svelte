@@ -1,17 +1,30 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { useQueryClient } from '@tanstack/svelte-query';
-	import { PersistedState } from 'runed';
-	import { onMount, untrack } from 'svelte';
+	import { mode } from 'mode-watcher';
 	import { toast } from 'svelte-sonner';
 
-	import ArcaneTablePagination from '#lib/components/arcane-table/arcane-table-pagination.svelte';
-	import type { CompactTablePrefs } from '#lib/components/arcane-table/arcane-table.types.svelte.js';
+	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
+	import type { ColumnSpec, TableViewMode } from '#lib/components/arcane-table/arcane-table.types.svelte.js';
 	import { templateTypeFilters } from '#lib/components/arcane-table/data.js';
+	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
+	import IconImage from '#lib/components/icon-image.svelte';
+	import IfPermitted from '#lib/components/if-permitted.svelte';
 	import EmptyState from '#lib/components/states/empty-state.svelte';
-	import * as InputGroup from '#lib/components/ui/input-group/index.js';
-	import * as Select from '#lib/components/ui/select/index.js';
-	import { SearchIcon, TemplateIcon } from '#lib/icons/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import {
+		TemplateIcon,
+		InspectIcon,
+		FolderOpenIcon,
+		GlobeIcon,
+		TrashIcon,
+		DownloadIcon,
+		MoveToFolderIcon
+	} from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { templateService } from '#lib/services/template-service.js';
@@ -19,9 +32,11 @@
 	import type { Template } from '#lib/types/template.js';
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
+	import { getThemedIconUrl } from '#lib/utils/docker.js';
 	import { hasShownPermission } from '#lib/utils/environments.js';
+	import { withOccurrenceKeys } from '#lib/utils/formatting.js';
+	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
-	import { debounced } from '#lib/utils/ws.js';
 
 	import TemplateCard from './template-card.svelte';
 
@@ -37,61 +52,27 @@
 
 	let deletingId = $state<string | null>(null);
 	let downloadingId = $state<string | null>(null);
-	let searchValue = $state(untrack(() => requestOptions.search ?? ''));
-	let typeFilter = $state(untrack(() => (requestOptions.filters?.['type'] as string) ?? 'all'));
 
-	let prefs = $state<PersistedState<CompactTablePrefs> | null>(null);
-
-	const currentPage = $derived(templates.pagination?.currentPage ?? requestOptions.pagination?.page ?? 1);
-	const totalPages = $derived(templates.pagination?.totalPages ?? 1);
-	const totalItems = $derived(templates.pagination?.totalItems ?? 0);
-	const pageSize = $derived(requestOptions.pagination?.limit ?? templates.pagination?.itemsPerPage ?? 20);
-	const hasActiveQuery = $derived(!!requestOptions.search || requestOptions.filters?.['type'] !== undefined);
+	let viewMode = $state<TableViewMode>('grid');
 	const canCreateTemplate = $derived(hasShownPermission('templates:create'));
+	const canDeleteTemplate = $derived(hasShownPermission('templates:delete'));
 
-	const typeFilterLabel = $derived(templateTypeFilters.find((f) => f.value === typeFilter)?.label ?? m.common_all());
-
-	onMount(() => {
-		prefs = new PersistedState<CompactTablePrefs>(
-			'arcane-template-gallery',
-			{ v: [], f: [], g: '', l: pageSize },
-			{ syncTabs: false }
-		);
-	});
-
-	function applySearch(value: string) {
-		const search = value.trim();
-		requestOptions = {
-			...requestOptions,
-			search: search || undefined,
-			pagination: { page: 1, limit: pageSize }
-		};
-		if (prefs) prefs.current = { ...prefs.current, g: search };
-	}
-
-	const debouncedSearch = debounced(applySearch, 300);
-
-	function applyTypeFilter(value: string) {
-		typeFilter = value;
-		const filters = { ...requestOptions.filters };
-		if (value === 'all') {
-			delete filters['type'];
-		} else {
-			filters['type'] = value;
-		}
-		requestOptions = {
-			...requestOptions,
-			filters,
-			pagination: { page: 1, limit: pageSize }
-		};
-		if (prefs) prefs.current = { ...prefs.current, f: value === 'all' ? [] : [['type', value]] };
-	}
-
-	function setPage(page: number) {
-		if (page < 1) page = 1;
-		if (totalPages > 0 && page > totalPages) page = totalPages;
-		requestOptions = { ...requestOptions, pagination: { page, limit: pageSize } };
-	}
+	const columns = $derived([
+		{ accessorKey: 'name', title: m.common_name(), sortable: true, card: 'title', cell: TemplateName },
+		{ accessorKey: 'description', title: m.common_description(), sortable: true, card: 'field' },
+		{
+			id: 'type',
+			accessorFn: (item) => item.isRemote,
+			title: m.common_type(),
+			filterOptions: templateTypeFilters,
+			card: 'badge',
+			cell: TemplateSource
+		},
+		{ id: 'registry', accessorFn: (item) => item.registry?.name, title: m.common_registry(), card: 'context' },
+		{ id: 'tags', accessorFn: (item) => item.metadata?.tags, title: m.common_tags(), card: 'badge', cell: TemplateTags },
+		{ id: 'author', accessorFn: (item) => item.metadata?.author, title: m.common_author(), card: 'hidden', hidden: true },
+		{ id: 'version', accessorFn: (item) => item.metadata?.version, title: m.common_version(), card: 'hidden', hidden: true }
+	] satisfies ColumnSpec<Template>[]);
 
 	async function handleDeleteTemplate(template: Template) {
 		openConfirmDialog({
@@ -136,69 +117,94 @@
 	}
 </script>
 
-<div class="space-y-4">
-	<div class="flex flex-wrap items-center gap-2">
-		<InputGroup.Root class="min-w-0 flex-1 md:w-64 md:flex-none">
-			<InputGroup.Addon>
-				<SearchIcon aria-hidden="true" />
-			</InputGroup.Addon>
-			<InputGroup.Input
-				placeholder={m.templates_search_placeholder()}
-				bind:value={searchValue}
-				oninput={(e) => debouncedSearch(e.currentTarget.value)}
-				onchange={(e) => applySearch(e.currentTarget.value)}
-				onkeydown={(e) => {
-					if (e.key === 'Enter') applySearch((e.currentTarget as HTMLInputElement).value);
-				}}
-			/>
-		</InputGroup.Root>
+{#snippet TemplateName({ item }: { item: Template })}
+	<a
+		class="flex min-w-0 items-center gap-2 font-medium hover:underline"
+		href={resourceDetailHref(resolve('/(app)/projects/templates/[id]', { id: item.id }))}
+	>
+		<IconImage
+			src={getThemedIconUrl(item.metadata, mode.current) ?? item.metadata?.iconUrl}
+			fallback={item.isRemote ? GlobeIcon : FolderOpenIcon}
+			class="size-4"
+			containerClass="size-7 shrink-0"
+		/>
+		<span class="truncate" title={item.name}>{item.name}</span>
+	</a>
+{/snippet}
 
-		<Select.Root allowDeselect={false} type="single" value={typeFilter} onValueChange={applyTypeFilter}>
-			<Select.Trigger class="h-9 w-35">
-				{typeFilterLabel}
-			</Select.Trigger>
-			<Select.Content>
-				<Select.Item value="all">{m.common_all()}</Select.Item>
-				{#each templateTypeFilters as option (String(option.value))}
-					<Select.Item value={String(option.value)}>{option.label}</Select.Item>
-				{/each}
-			</Select.Content>
-		</Select.Root>
+{#snippet TemplateSource({ item }: { item: Template })}
+	<Badge variant={item.isRemote ? 'blue' : 'gray'}>{item.isRemote ? m.templates_remote() : m.local()}</Badge>
+{/snippet}
+
+{#snippet TemplateTags({ item }: { item: Template })}
+	<div class="flex flex-wrap gap-1">
+		{#each withOccurrenceKeys(item.metadata?.tags ?? []) as tag (tag.key)}
+			<Badge variant="outline">{tag.value}</Badge>
+		{/each}
 	</div>
+{/snippet}
 
-	{#if templates.data.length > 0}
-		<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-			{#each templates.data as template (template.id)}
-				<TemplateCard
-					{template}
-					downloading={downloadingId === template.id}
-					deleting={deletingId === template.id}
-					onDownload={handleDownloadTemplate}
-					onDelete={handleDeleteTemplate}
-				/>
-			{/each}
-		</div>
+{#snippet TemplateActions({ item }: { item: Template })}
+	<RowActionsMenu name={item.name}>
+		<DropdownMenu.Item onclick={() => goto(resourceDetailHref(resolve('/(app)/projects/templates/[id]', { id: item.id })))}>
+			<InspectIcon class="size-4" />
+			{m.common_view_details()}
+		</DropdownMenu.Item>
 
-		<div class="flex justify-end">
-			<ArcaneTablePagination
-				shown={templates.data.length}
-				{currentPage}
-				{totalPages}
-				{totalItems}
-				{pageSize}
-				canPrev={currentPage > 1}
-				canNext={currentPage < totalPages}
-				{setPage}
-			/>
-		</div>
-	{:else if hasActiveQuery}
-		<EmptyState icon={SearchIcon} title={m.common_no_results_found()} description={m.common_no_results_hint()} />
-	{:else}
+		<IfPermitted perm="projects:create">
+			<DropdownMenu.Item onclick={() => goto(resolve(`/(app)/projects/new?templateId=${encodeURIComponent(item.id)}`))}>
+				<MoveToFolderIcon class="size-4" />
+				{m.compose_create_project()}
+			</DropdownMenu.Item>
+		</IfPermitted>
+
+		{#if (item.isRemote && canCreateTemplate) || (!item.isRemote && canDeleteTemplate)}
+			<DropdownMenu.Separator />
+		{/if}
+
+		{#if item.isRemote && canCreateTemplate}
+			<DropdownMenu.Item onclick={() => handleDownloadTemplate(item)} disabled={downloadingId === item.id}>
+				{#if downloadingId === item.id}
+					<Spinner class="size-4" />
+				{:else}
+					<DownloadIcon class="size-4" />
+				{/if}
+				{m.templates_download()}
+			</DropdownMenu.Item>
+		{:else if !item.isRemote && canDeleteTemplate}
+			<DropdownMenu.Item variant="destructive" onclick={() => handleDeleteTemplate(item)} disabled={deletingId === item.id}>
+				{#if deletingId === item.id}
+					<Spinner class="size-4" />
+				{:else}
+					<TrashIcon class="size-4" />
+				{/if}
+				{m.templates_delete_template()}
+			</DropdownMenu.Item>
+		{/if}
+	</RowActionsMenu>
+{/snippet}
+
+<ArcaneTable
+	items={templates}
+	{columns}
+	selectionDisabled
+	allowMobileList
+	persistKey="arcane-template-gallery"
+	bind:requestOptions
+	bind:viewMode
+	rowActions={TemplateActions}
+>
+	{#snippet mobileCard({ item })}
+		<TemplateCard template={item}>
+			{#snippet actions()}{@render TemplateActions({ item })}{/snippet}
+		</TemplateCard>
+	{/snippet}
+	{#snippet emptyState()}
 		<EmptyState
 			icon={TemplateIcon}
 			title={m.templates_no_templates()}
 			actionLabel={canCreateTemplate ? m.templates_create_template() : undefined}
 			actionHref={canCreateTemplate ? '/projects/templates/create' : undefined}
 		/>
-	{/if}
-</div>
+	{/snippet}
+</ArcaneTable>

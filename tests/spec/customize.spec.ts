@@ -261,6 +261,18 @@ test.describe('Templates', () => {
 				description: 'Updated customization template'
 			});
 
+			await page.setViewportSize({ width: 606, height: 900 });
+			await page.goto('/projects/templates');
+			await page.getByRole('button', { name: 'List view', exact: true }).click();
+			const search = page.getByPlaceholder('Search…', { exact: true });
+			await search.fill(updatedTemplateName);
+			await search.press('Enter');
+			const templateRow = page.getByRole('row').filter({ hasText: updatedTemplateName });
+			await expect(templateRow).toContainText('Updated customization template');
+			await templateRow.getByRole('link', { name: updatedTemplateName, exact: true }).click();
+			await expect(page).toHaveURL((url) => url.pathname === `/projects/templates/${template.id}`);
+			await page.setViewportSize({ width: 1440, height: 900 });
+
 			await page.getByRole('button', { name: 'Open menu', exact: true }).click();
 			await page.getByRole('menuitem', { name: 'Create Project', exact: true }).click();
 			await expect(page).toHaveURL(`/projects/new?templateId=${template.id}`);

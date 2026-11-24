@@ -31,7 +31,7 @@
 
 <ArcaneButton
 	action="base"
-	tone="ghost"
+	tone="outline"
 	{href}
 	class="shrink-0"
 	aria-label={label ? m.resource_back_to({ destination: label }) : m.resource_previous()}

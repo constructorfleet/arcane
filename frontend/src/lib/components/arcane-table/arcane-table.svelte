@@ -87,6 +87,7 @@
 		preferencesReady = $bindable(false),
 		viewMode = $bindable<TableViewMode>('list'),
 		listOnly = false,
+		allowMobileList = false,
 		hiddenSortFallback,
 		groupedRows = null,
 		groupBy,
@@ -136,6 +137,7 @@
 		preferencesReady?: boolean;
 		viewMode?: TableViewMode;
 		listOnly?: boolean;
+		allowMobileList?: boolean;
 		hiddenSortFallback?: SortState;
 		groupedRows?: GroupedData<TData>[] | null;
 		groupBy?: (item: TData) => string;
@@ -743,7 +745,8 @@
 	onDestroy(() => clearTimeout(persistTimeout));
 
 	const mobileVirtualized = $derived(table.getRowModel().rows.length > 100);
-	const mobilePageScroll = $derived(isMobile.current && isNarrowViewport.current && !mobileVirtualized);
+	const showMobileCards = $derived(isMobile.current && (!allowMobileList || viewMode === 'grid'));
+	const mobilePageScroll = $derived(showMobileCards && isNarrowViewport.current && !mobileVirtualized);
 
 	const isFiltered = $derived(
 		!!table.atoms.globalFilter.get() || (!withoutFilters && table.atoms.columnFilters.get().length > 0)
@@ -822,7 +825,7 @@
 					{selectionDisabled}
 					{bulkActions}
 					{withoutFilters}
-					mobileFields={mobileFieldsForOptions}
+					mobileFields={showMobileCards ? mobileFieldsForOptions : []}
 					{onToggleMobileField}
 					{customViewOptions}
 					{customToolbarActions}
@@ -830,7 +833,7 @@
 					{wrapText}
 					onToggleWrapText={toggleWrapText}
 					{viewMode}
-					onViewModeChange={isMobile.current || listOnly ? undefined : setViewMode}
+					onViewModeChange={listOnly || (isMobile.current && !allowMobileList) ? undefined : setViewMode}
 					{isFiltered}
 					onResetFilters={resetFilters}
 					pagination={withoutPagination || emptyFirstPage ? undefined : PaginationSnippet}
@@ -916,7 +919,7 @@
 					empty={EmptySnippet}
 				/>
 			</div>
-		{:else if !isMobile.current}
+		{:else if !showMobileCards}
 			<div
 				{@attach (node) => restoreScroll(node, 'desktop')}
 				{@attach trackOverflow((value) => (overflow = value))}

@@ -1,39 +1,21 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { mode } from 'mode-watcher';
+	import type { Snippet } from 'svelte';
 
-	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
 	import IconImage from '#lib/components/icon-image.svelte';
-	import IfPermitted from '#lib/components/if-permitted.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
-	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
-	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import { InspectIcon, FolderOpenIcon, GlobeIcon, TrashIcon, DownloadIcon, MoveToFolderIcon } from '#lib/icons/index.js';
+	import { FolderOpenIcon, GlobeIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { Template } from '#lib/types/template.js';
 	import { getThemedIconUrl } from '#lib/utils/docker.js';
-	import { hasShownPermission } from '#lib/utils/environments.js';
 	import { withOccurrenceKeys } from '#lib/utils/formatting.js';
+	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 
-	let {
-		template,
-		downloading = false,
-		deleting = false,
-		onDownload,
-		onDelete
-	}: {
-		template: Template;
-		downloading?: boolean;
-		deleting?: boolean;
-		onDownload: (template: Template) => void;
-		onDelete: (template: Template) => void;
-	} = $props();
+	let { template, actions }: { template: Template; actions: Snippet } = $props();
 
 	const MAX_TAGS = 4;
 
-	const canCreateTemplate = $derived(hasShownPermission('templates:create'));
-	const canDeleteTemplate = $derived(hasShownPermission('templates:delete'));
 	const registryName = $derived(
 		template.registry?.name ?? (template.isRemote ? m.templates_unknown_registry() : m.templates_local_templates())
 	);
@@ -45,43 +27,7 @@
 >
 	<div class="flex items-start gap-3">
 		<div class="relative z-10 shrink-0">
-			<RowActionsMenu name={template.name}>
-				<DropdownMenu.Item onclick={() => goto(resolve('/(app)/projects/templates/[id]', { id: template.id }))}>
-					<InspectIcon class="size-4" />
-					{m.common_view_details()}
-				</DropdownMenu.Item>
-
-				<IfPermitted perm="projects:create">
-					<DropdownMenu.Item onclick={() => goto(resolve(`/(app)/projects/new?templateId=${encodeURIComponent(template.id)}`))}>
-						<MoveToFolderIcon class="size-4" />
-						{m.compose_create_project()}
-					</DropdownMenu.Item>
-				</IfPermitted>
-
-				{#if (template.isRemote && canCreateTemplate) || (!template.isRemote && canDeleteTemplate)}
-					<DropdownMenu.Separator />
-				{/if}
-
-				{#if template.isRemote && canCreateTemplate}
-					<DropdownMenu.Item onclick={() => onDownload(template)} disabled={downloading}>
-						{#if downloading}
-							<Spinner class="size-4" />
-						{:else}
-							<DownloadIcon class="size-4" />
-						{/if}
-						{m.templates_download()}
-					</DropdownMenu.Item>
-				{:else if !template.isRemote && canDeleteTemplate}
-					<DropdownMenu.Item variant="destructive" onclick={() => onDelete(template)} disabled={deleting}>
-						{#if deleting}
-							<Spinner class="size-4" />
-						{:else}
-							<TrashIcon class="size-4" />
-						{/if}
-						{m.templates_delete_template()}
-					</DropdownMenu.Item>
-				{/if}
-			</RowActionsMenu>
+			{@render actions()}
 		</div>
 		<IconImage
 			src={getThemedIconUrl(template.metadata, mode.current) ?? template.metadata?.iconUrl}
@@ -92,7 +38,7 @@
 		/>
 		<div class="min-w-0 flex-1">
 			<a
-				href={resolve('/(app)/projects/templates/[id]', { id: template.id })}
+				href={resourceDetailHref(resolve('/(app)/projects/templates/[id]', { id: template.id }))}
 				class="block truncate font-medium after:absolute after:inset-0 hover:underline"
 			>
 				{template.name}

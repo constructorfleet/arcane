@@ -326,7 +326,7 @@
 		{/if}
 
 		{#if onViewModeChange}
-			<ButtonGroup.Root class="hidden shrink-0 md:flex">
+			<ButtonGroup.Root class="order-3 flex shrink-0 md:order-none">
 				{@render viewModeButton('list', LayoutListIcon, m.table_view_list())}
 				{@render viewModeButton('grid', LayoutGridIcon, m.table_view_grid())}
 			</ButtonGroup.Root>
