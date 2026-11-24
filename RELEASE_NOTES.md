@@ -1,4 +1,5 @@
-# 3.0.1-cf.94
+# 3.0.1-cf.95
 
-- Align the System and Settings landing page titles with the standard resource page heading size, weight, and top spacing. (#226)
-- Verified the title placement and typography against the Networks page at 606 px and 1440 px in a local production build.
+- Give network details an Overview and use the shared Services and Tasks tables for Swarm networks. Scope both queries to the exact network and allow node filtering on Tasks. (#228)
+- Move resource metadata into overview fields and reuse the shared panel and table layouts across resource tabs. (#229)
+- Keep container CPU and memory metrics on the Metrics tab and skip the metrics subscription while Logs is open. (#230)

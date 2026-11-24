@@ -6,30 +6,20 @@
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	import type { ActionButton } from '#lib/components/action-button-group/types.js';
+	import { ActionButtonGroup, type ActionButton } from '#lib/components/action-button-group/index.js';
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import ImageReleaseNotesDialog from '#lib/components/dialogs/image-release-notes-dialog.svelte';
+	import EnvironmentDestinationSelect from '#lib/components/form/environment-destination-select.svelte';
 	import ImageUpdateItem from '#lib/components/image-update-item.svelte';
-	import { DetailMetaStrip, DetailSection, KeyValueCard } from '#lib/components/resource-detail/index.js';
-	import { TabBar } from '#lib/components/tab-bar/index.js';
+	import { DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { CopyButton } from '#lib/components/ui/copy-button/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import VulnerabilityScanPanel from '#lib/components/vulnerability/vulnerability-scan-panel.svelte';
 	import { useUrlTab } from '#lib/hooks/use-url-tab.svelte.js';
-	import {
-		VolumesIcon,
-		ClockIcon,
-		TagIcon,
-		CpuIcon,
-		ImagesIcon,
-		LayersIcon,
-		ShieldCheckIcon,
-		InspectIcon,
-		FileTextIcon
-	} from '#lib/icons/index.js';
-	import { ResourceDetailLayout } from '#lib/layouts/index.js';
+	import { TagIcon, ImagesIcon, LayersIcon, ShieldCheckIcon, InspectIcon, FileTextIcon } from '#lib/icons/index.js';
+	import TabbedPageLayout from '#lib/layouts/tabbed-page-layout.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { imageDetailQuery } from '#lib/query/images.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
@@ -396,146 +386,145 @@
 	});
 </script>
 
-<ResourceDetailLayout
-	icon={ImagesIcon}
-	backUrl="/images"
-	backLabel={m.images()}
-	environmentId={currentEnvId}
-	title={detailTitle}
-	{actions}
->
-	{#if image}
-		{#snippet kvTile(label: string, value: string, wide = false)}
-			<KeyValueCard {label} class={wide ? 'sm:col-span-2 lg:col-span-3' : undefined} valueTitle={value}>
-				{value}
-			</KeyValueCard>
+{#if image}
+	<TabbedPageLayout backUrl="/images" tabItems={urlTab.items} selectedTab={activeTab} onTabChange={urlTab.select}>
+		{#snippet headerInfo()}
+			<div class="flex min-h-9 min-w-0 items-center gap-2">
+				<ImagesIcon class="size-5 shrink-0 text-primary" />
+				<EnvironmentDestinationSelect value={currentEnvId} variant="prefix" readonly />
+				<h1 class="min-w-0 truncate font-semibold" title={detailTitle}>{detailTitle}</h1>
+			</div>
 		{/snippet}
+		{#snippet headerActions()}<ActionButtonGroup buttons={actions} />{/snippet}
+		{#snippet tabContent()}
+			{#snippet kvTile(label: string, value: string, wide = false)}
+				<KeyValueCard {label} class={wide ? 'sm:col-span-2 lg:col-span-3' : undefined} valueTitle={value}>
+					{value}
+				</KeyValueCard>
+			{/snippet}
 
-		<Tabs.Root value={activeTab}>
-			<div class="space-y-6">
-				<TabBar items={urlTab.items} onValueChange={(value) => urlTab.select(value)} />
-
-				<Tabs.Content value="overview">
-					<div class="space-y-6">
-						<DetailMetaStrip
-							items={[
-								{ icon: VolumesIcon, value: imageSize },
-								{ icon: ClockIcon, value: createdDate },
-								{ icon: CpuIcon, value: `${architecture} · ${osName}` }
-							]}
-						>
+			<Tabs.Content value="overview" layout="panel">
+				<div class="space-y-6">
+					<DetailSection title={m.common_details_title({ resource: m.common_image() })} class="border-t-0 pt-0">
+						<KeyValueGrid>
+							<KeyValueCard label={m.common_size()} valueFormat="text">{imageSize}</KeyValueCard>
+							<KeyValueCard label={m.common_created()} valueFormat="text">{createdDate}</KeyValueCard>
+							<KeyValueCard label={m.common_architecture()} valueFormat="text">{architecture}</KeyValueCard>
+							<KeyValueCard label={m.docker_info_os_label()} valueFormat="text">{osName}</KeyValueCard>
 							{#if hasTags}
-								<ImageUpdateItem
-									updateInfo={image.updateInfo}
-									imageId={image.id}
-									environmentId={currentEnvId}
-									repo={image.repo}
-									tag={image.tag}
-									isLocal={(image.repoDigests?.length ?? 0) === 0}
-									onUpdated={() =>
-										queryClient.invalidateQueries({ queryKey: queryKeys.images.detail(currentEnvId, data.imageId) })}
-								/>
+								<KeyValueCard label={m.common_status()} valueFormat="custom">
+									<ImageUpdateItem
+										updateInfo={image.updateInfo}
+										imageId={image.id}
+										environmentId={currentEnvId}
+										repo={image.repo}
+										tag={image.tag}
+										isLocal={(image.repoDigests?.length ?? 0) === 0}
+										onUpdated={() =>
+											queryClient.invalidateQueries({ queryKey: queryKeys.images.detail(currentEnvId, data.imageId) })}
+									/>
+								</KeyValueCard>
 							{/if}
-						</DetailMetaStrip>
+						</KeyValueGrid>
+					</DetailSection>
 
-						{#if hasPinnedRefs}
-							<div class="space-y-2">
-								<span class="inline-flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-									<TagIcon class="size-4" />
-									{m.images_pinned_references()}
-								</span>
-								<div class="flex flex-col gap-2">
-									{#each pinnedRefs as pin (pin)}
-										<div
-											class="flex max-w-2xl items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/40 p-2.5"
-										>
-											<span class="font-mono text-xs break-all text-foreground select-all" title={m.common_click_to_select()}>
-												{pin}
-											</span>
-											<CopyButton text={pin} size="icon" class="size-7 shrink-0" />
-										</div>
-									{/each}
-								</div>
-							</div>
-						{/if}
-
-						{#if hasTags}
-							<div class="flex flex-wrap items-center gap-2">
-								<span class="inline-flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-									<TagIcon class="size-4" />
-									{m.common_tags()}
-								</span>
-								{#each repoTags as tag (tag)}
-									<Badge variant="secondary" class="cursor-pointer select-all" title={m.common_click_to_select()}>
-										{tag}
-									</Badge>
+					{#if hasPinnedRefs}
+						<div class="space-y-2">
+							<span class="inline-flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+								<TagIcon class="size-4" />
+								{m.images_pinned_references()}
+							</span>
+							<div class="flex flex-col gap-2">
+								{#each pinnedRefs as pin (pin)}
+									<div
+										class="flex max-w-2xl items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/40 p-2.5"
+									>
+										<span class="font-mono text-xs break-all text-foreground select-all" title={m.common_click_to_select()}>
+											{pin}
+										</span>
+										<CopyButton text={pin} size="icon" class="size-7 shrink-0" />
+									</div>
 								{/each}
 							</div>
-						{/if}
-
-						<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-							{@render kvTile(m.common_id(), image?.id || m.common_na(), true)}
-							{#if image?.author}
-								{@render kvTile(m.common_author(), image.author)}
-							{/if}
-							{#if image.config?.workingDir}
-								{@render kvTile(m.common_working_dir(), image.config.workingDir)}
-							{/if}
 						</div>
+					{/if}
 
-						{#if hasEnv}
-							<DetailSection title={m.common_environment_variables()}>
-								<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-									{#each envVars as env (env)}
-										{#if env.includes('=')}
-											{@const [key, ...valueParts] = env.split('=')}
-											{@render kvTile(key ?? '', valueParts.join('='))}
-										{:else}
-											{@render kvTile('ENV_VAR', env)}
-										{/if}
-									{/each}
-								</div>
-							</DetailSection>
+					{#if hasTags}
+						<div class="flex flex-wrap items-center gap-2">
+							<span class="inline-flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+								<TagIcon class="size-4" />
+								{m.common_tags()}
+							</span>
+							{#each repoTags as tag (tag)}
+								<Badge variant="secondary" class="cursor-pointer select-all" title={m.common_click_to_select()}>
+									{tag}
+								</Badge>
+							{/each}
+						</div>
+					{/if}
+
+					<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+						{@render kvTile(m.common_id(), image?.id || m.common_na(), true)}
+						{#if image?.author}
+							{@render kvTile(m.common_author(), image.author)}
+						{/if}
+						{#if image.config?.workingDir}
+							{@render kvTile(m.common_working_dir(), image.config.workingDir)}
 						{/if}
 					</div>
-				</Tabs.Content>
 
-				<Tabs.Content value="history">
-					<ImageHistoryPanel imageId={image.id} environmentId={currentEnvId} />
+					{#if hasEnv}
+						<DetailSection title={m.common_environment_variables()}>
+							<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+								{#each envVars as env (env)}
+									{#if env.includes('=')}
+										{@const [key, ...valueParts] = env.split('=')}
+										{@render kvTile(key ?? '', valueParts.join('='))}
+									{:else}
+										{@render kvTile('ENV_VAR', env)}
+									{/if}
+								{/each}
+							</div>
+						</DetailSection>
+					{/if}
+				</div>
+			</Tabs.Content>
+
+			<Tabs.Content value="history" layout="table">
+				<ImageHistoryPanel imageId={image.id} environmentId={currentEnvId} />
+			</Tabs.Content>
+			<Tabs.Content value="attestations" layout="panel">
+				<ImageAttestationsPanel {image} environmentId={currentEnvId} />
+			</Tabs.Content>
+			{#if image.hardened}
+				<Tabs.Content value="hardened" layout="panel">
+					<HardenedImagePanel info={image.hardened} />
 				</Tabs.Content>
-				<Tabs.Content value="attestations">
-					<ImageAttestationsPanel {image} environmentId={currentEnvId} />
+			{/if}
+			{#if vulnerabilityManagementEnabled}
+				<Tabs.Content value="vulnerabilities" layout="table">
+					<VulnerabilityScanPanel
+						environmentId={currentEnvId}
+						scan={vulnerabilityScan}
+						reportError={scanReportError}
+						isScanning={scanMutation.isPending}
+						onScan={handleScanImage}
+					/>
 				</Tabs.Content>
-				{#if image.hardened}
-					<Tabs.Content value="hardened">
-						<HardenedImagePanel info={image.hardened} />
-					</Tabs.Content>
-				{/if}
-				{#if vulnerabilityManagementEnabled}
-					<Tabs.Content value="vulnerabilities">
-						<VulnerabilityScanPanel
-							environmentId={currentEnvId}
-							scan={vulnerabilityScan}
-							reportError={scanReportError}
-							isScanning={scanMutation.isPending}
-							onScan={handleScanImage}
-						/>
-					</Tabs.Content>
-				{/if}
-			</div>
-		</Tabs.Root>
-	{:else}
-		<div class="py-12 text-center">
-			<p class="text-lg font-medium text-muted-foreground">{m.common_not_found_title({ resource: m.images() })}</p>
-			<ArcaneButton
-				action="cancel"
-				customLabel={m.common_back_to({ resource: m.images() })}
-				onclick={() => goto(resolve('/(app)/images'))}
-				class="mt-4"
-			/>
-		</div>
-	{/if}
-</ResourceDetailLayout>
+			{/if}
+		{/snippet}
+	</TabbedPageLayout>
+{:else}
+	<div class="py-12 text-center">
+		<p class="text-lg font-medium text-muted-foreground">{m.common_not_found_title({ resource: m.images() })}</p>
+		<ArcaneButton
+			action="cancel"
+			customLabel={m.common_back_to({ resource: m.images() })}
+			onclick={() => goto(resolve('/(app)/images'))}
+			class="mt-4"
+		/>
+	</div>
+{/if}
 
 {#if image && tagDialogOpen}
 	<ImageTagDialog

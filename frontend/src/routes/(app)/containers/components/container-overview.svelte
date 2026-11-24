@@ -3,18 +3,17 @@
 	import { toast } from 'svelte-sonner';
 
 	import { HardenedImageBadge } from '#lib/components/badges/index.js';
-	import { DetailMetaStrip, DetailSection, KeyValueCard, type DetailMetaItem } from '#lib/components/resource-detail/index.js';
+	import { DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
-	import { PlayIcon, StopIcon, NetworksIcon, VolumesIcon, HealthIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { containerService } from '#lib/services/container-service.js';
 	import type { ContainerDetails } from '#lib/types/container.js';
 	import { extractApiErrorMessage } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { environmentHref } from '#lib/utils/environments.js';
-	import { formatDateTimeShort, formatElapsedTime, formatRelativeTime, parseInstant } from '#lib/utils/formatting.js';
+	import { formatDateTimeShort, formatRelativeTime, parseInstant } from '#lib/utils/formatting.js';
 	import { hardenedSupportSummary } from '#lib/utils/hardened-images.js';
 	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
@@ -92,17 +91,6 @@
 	const mountCount = $derived(container.mounts?.length || 0);
 	const networkCount = $derived(container.networkSettings?.networks ? Object.keys(container.networkSettings.networks).length : 0);
 
-	const metaItems = $derived.by(() => {
-		const items: DetailMetaItem[] = [{ icon: VolumesIcon, value: container.image || m.common_na(), mono: true }];
-		if (container.state?.running) {
-			items.push({ icon: PlayIcon, label: m.common_uptime(), value: formatElapsedTime(startedInstant) || m.common_na() });
-		} else {
-			items.push({ icon: StopIcon, value: container.state?.status || m.common_stopped() });
-		}
-		items.push({ icon: NetworksIcon, value: primaryIpAddress, mono: true });
-		return items;
-	});
-
 	const hasExecutionDetails = $derived(
 		!!(
 			container.config?.cmd?.length ||
@@ -125,20 +113,17 @@
 </script>
 
 <div class="space-y-6">
-	<DetailMetaStrip items={metaItems}>
-		{#if container.state?.health}
-			<div class="flex items-center gap-1.5">
-				<HealthIcon class="size-4 shrink-0 text-muted-foreground" />
-				<Badge variant={getHealthStatusVariant(container.state.health.status)} minWidth="20"
-					>{container.state.health.status}</Badge
-				>
-			</div>
-		{/if}
-	</DetailMetaStrip>
-
-	<DetailSection title={m.runtime()}>
-		<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+	<DetailSection title={m.runtime()} class="border-t-0 pt-0">
+		<KeyValueGrid>
 			<KeyValueCard label={m.common_id()} valueTitle={m.common_click_to_select()}>{container.id}</KeyValueCard>
+
+			<KeyValueCard label={m.common_image()}>{container.image || m.common_na()}</KeyValueCard>
+			<KeyValueCard label={m.containers_ip_address()}>{primaryIpAddress}</KeyValueCard>
+			{#if container.state?.health}
+				<KeyValueCard label={m.common_health_status()} valueFormat="custom">
+					<Badge variant={getHealthStatusVariant(container.state.health.status)}>{container.state.health.status}</Badge>
+				</KeyValueCard>
+			{/if}
 
 			{#if container.imageId && hasPermission('images:read', environmentId)}
 				<KeyValueCard label={m.common_image_id()} valueFormat="custom">
@@ -256,7 +241,7 @@
 					{networkCount === 1 ? m.resource_network() : m.resource_networks()}
 				{/if}
 			</KeyValueCard>
-		</div>
+		</KeyValueGrid>
 	</DetailSection>
 
 	{#if hasExecutionDetails}

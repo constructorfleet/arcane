@@ -69,7 +69,7 @@
 		</div>
 	{/snippet}
 	{#snippet tabContent()}
-		<Tabs.Content value="overview">
+		<Tabs.Content value="overview" layout="panel">
 			<div class={contentClass}>
 				<div class={fieldClass}>
 					<KeyValueCard label={m.common_role()} valueFormat="text">{capitalizeFirstLetter(node.role)}</KeyValueCard>
@@ -90,7 +90,7 @@
 				</div>
 			</div>
 		</Tabs.Content>
-		<Tabs.Content value="host">
+		<Tabs.Content value="host" layout="panel">
 			<div class={contentClass}>
 				<div class={fieldClass}>
 					<KeyValueCard label={m.platform()}>{node.platform || m.common_unknown()}</KeyValueCard>
@@ -108,7 +108,7 @@
 				{/if}
 			</div>
 		</Tabs.Content>
-		<Tabs.Content value="docker">
+		<Tabs.Content value="docker" layout="panel">
 			<div class={contentClass}>
 				<KeyValueCard label={m.swarm_engine_version()}>{node.engineVersion || m.common_unknown()}</KeyValueCard>
 				{#if docker && agentId}
@@ -119,7 +119,7 @@
 				{#key `${data.envId}:${node.id}`}<NodeLabels {node} environmentId={data.envId} />{/key}
 			</div>
 		</Tabs.Content>
-		<Tabs.Content value="resources">
+		<Tabs.Content value="resources" layout="table">
 			<div class={contentClass}>
 				{#if selectedTab === 'resources'}
 					{#key `${data.envId}:${node.id}`}<NodeLocalResources
@@ -132,7 +132,7 @@
 				{/if}
 			</div>
 		</Tabs.Content>
-		<Tabs.Content value="agent">
+		<Tabs.Content value="agent" layout="panel">
 			<div class={contentClass}>
 				<div class={fieldClass}>
 					<KeyValueCard label={m.common_status()} valueFormat="custom">

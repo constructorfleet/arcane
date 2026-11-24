@@ -334,7 +334,7 @@
 				</Card.Root>
 			{/if}
 
-			<Tabs.Content value="services" class="min-h-0 flex-1">
+			<Tabs.Content value="services" layout="table">
 				<SwarmServicesTable
 					{services}
 					invalidateKey={queryKeys.swarm.stack(envId, data.stackName)}
@@ -344,7 +344,7 @@
 					showEnvironment={false}
 				/>
 			</Tabs.Content>
-			<Tabs.Content value="tasks" class="min-h-0 flex-1">
+			<Tabs.Content value="tasks" layout="table">
 				<SwarmTasksTable
 					{tasks}
 					bind:requestOptions={tasksRequestOptions}

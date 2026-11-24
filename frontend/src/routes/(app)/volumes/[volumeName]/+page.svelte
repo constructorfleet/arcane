@@ -16,7 +16,7 @@
 	import EditorTabStrip from '#lib/components/editor-tab-strip.svelte';
 	import EnvironmentDestinationSelect from '#lib/components/form/environment-destination-select.svelte';
 	import ResizableSplit from '#lib/components/resizable-split.svelte';
-	import { DetailMetaStrip, DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
+	import { DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	// fallow-ignore-file code-duplication -- useUrlTab initialization is the hook's intended per-page integration surface
@@ -25,21 +25,12 @@
 	import { ResponsiveDialog } from '#lib/components/ui/responsive-dialog/index.js';
 	import * as Select from '#lib/components/ui/select/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import WorkspaceFileTreePanel from '#lib/components/workspace-file-tree-panel.svelte';
 	import { useEnvironmentSettings } from '#lib/hooks/use-environment-settings.svelte.js';
 	import { useUrlTab } from '#lib/hooks/use-url-tab.svelte.js';
 	import { useWorkspaceFolders } from '#lib/hooks/use-workspace-folders.svelte.js';
-	import {
-		VolumesIcon,
-		ClockIcon,
-		TagIcon,
-		LayersIcon,
-		InfoIcon,
-		GlobeIcon,
-		ContainersIcon,
-		FileTextIcon,
-		AlertIcon
-	} from '#lib/icons/index.js';
+	import { VolumesIcon, TagIcon, InfoIcon, ContainersIcon, FileTextIcon, AlertIcon } from '#lib/icons/index.js';
 	import TabbedPageLayout from '#lib/layouts/tabbed-page-layout.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
@@ -1178,14 +1169,12 @@
 {/snippet}
 
 {#snippet volumeOverview(volume: Volume)}
-	<DetailMetaStrip
-		items={[
-			{ icon: VolumesIcon, label: m.common_driver(), value: volume.driver ?? m.common_unknown() },
-			{ icon: GlobeIcon, label: m.common_scope(), value: volume.scope ?? m.common_unknown() },
-			{ icon: ClockIcon, value: createdDate },
-			{ icon: LayersIcon, label: m.common_mountpoint(), value: volume.mountpoint ?? m.common_unknown(), mono: true }
-		]}
-	/>
+	<DetailSection title={m.common_details_title({ resource: m.resource_volume_cap() })} class="border-t-0 pt-0">
+		<KeyValueGrid>
+			<KeyValueCard label={m.common_created()} valueFormat="text">{createdDate}</KeyValueCard>
+			<KeyValueCard label={m.common_mountpoint()}>{volume.mountpoint ?? m.common_unknown()}</KeyValueCard>
+		</KeyValueGrid>
+	</DetailSection>
 
 	{@render volumeContainers(volume)}
 	<VolumeAgentRecords volume={logicalVolume ?? volume} environmentId={currentEnvId} {hasWorkspaceChanges} />
@@ -1263,7 +1252,9 @@
 					</Alert.Root>
 				{/if}
 				{#if tab === 'overview'}
-					{@render volumeOverview(volume)}
+					<Tabs.Content value="overview" layout="panel">
+						<div class="space-y-6">{@render volumeOverview(volume)}</div>
+					</Tabs.Content>
 				{:else if tab === 'workspace'}
 					{#if logicalVolume && logicalVolume.workspaceState !== 'active'}
 						<Alert.Root variant="warning-subtle" icon={AlertIcon}>

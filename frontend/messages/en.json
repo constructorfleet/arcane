@@ -4767,6 +4767,7 @@
   "network_in_use_on_node": "In use on this node",
   "network_no_local_containers": "No containers on this node",
   "network_query_agent_target": "Query agent: {agent} ({agentId}).",
+  "network_remove_swarm_warning": "Removing this network affects the Swarm. Other nodes can still have attached services or containers.",
   "swarm_network_usage_warning": "This is a Swarm-scoped network. Containers and usage shown here belong to the selected node; services or containers on other nodes may still use it. Deleting this network affects the Swarm. Local absence of containers does not establish that it is unused cluster-wide.",
   "network_list_usage_scope": "Confirmed shared overlays are grouped by cluster and network ID. Usage reflects the reporting agents; missing or unobserved nodes may still have consumers.",
   "network_swarm_gateway": "Swarm gateway",

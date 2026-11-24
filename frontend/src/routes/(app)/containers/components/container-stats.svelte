@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { DetailMetaStrip, DetailSection, type DetailMetaItem } from '#lib/components/resource-detail/index.js';
+	import { DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
 	import { Progress } from '#lib/components/ui/progress/index.js';
 	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
 	import { m } from '#lib/paraglide/messages.js';
@@ -75,7 +75,7 @@
 	const hasBlockIo = $derived(!!stats?.blkio_stats?.io_service_bytes_recursive?.length);
 
 	const statItems = $derived.by(() => {
-		const items: DetailMetaItem[] = [];
+		const items: { label: string; value: string }[] = [];
 		if (stats?.pids_stats?.current !== undefined) {
 			let value = String(stats.pids_stats.current);
 			if (stats.pids_stats.limit && stats.pids_stats.limit < Number.MAX_SAFE_INTEGER) {
@@ -156,7 +156,11 @@
 	</div>
 {:else if stats && container.state?.running}
 	<div class="space-y-6">
-		<DetailMetaStrip items={statItems} />
+		<KeyValueGrid>
+			{#each statItems as item (item.label)}
+				<KeyValueCard label={item.label} valueFormat="text">{item.value}</KeyValueCard>
+			{/each}
+		</KeyValueGrid>
 
 		<DetailSection title={m.cpu_usage()}>
 			<div class="space-y-3">

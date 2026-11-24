@@ -123,6 +123,17 @@ func TestServiceTaskPaginationFiltersBeforeSlicing(t *testing.T) {
 	require.Equal(t, "task-115", page.Items[1].ID)
 }
 
+func TestTaskUsesNetwork(t *testing.T) {
+	running := swarm.Task{NetworksAttachments: []swarm.NetworkAttachment{{Network: swarm.Network{ID: "overlay"}}}}
+	pending := swarm.Task{Spec: swarm.TaskSpec{Networks: []swarm.NetworkAttachmentConfig{{Target: "overlay"}}}}
+	unrelated := swarm.Task{NetworksAttachments: []swarm.NetworkAttachment{{Network: swarm.Network{ID: "other-overlay"}}}}
+
+	require.True(t, taskUsesNetwork(running, "overlay"))
+	require.True(t, taskUsesNetwork(pending, "overlay"))
+	require.False(t, taskUsesNetwork(unrelated, "overlay"))
+	require.False(t, taskUsesNetwork(swarm.Task{}, "overlay"))
+}
+
 func TestAggregateStatusReportsEachEnvironment(t *testing.T) {
 	ctx := swarmScopeContext(t, "/api/agents/a,b,c/swarm/status", map[string]any{
 		"a": types.ApiResponse[types.SwarmRuntimeStatus]{

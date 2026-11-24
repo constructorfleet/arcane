@@ -62,16 +62,14 @@
 	});
 </script>
 
-<div class="min-w-0 px-1 sm:px-2">
-	<SwarmTasksTable
-		{tasks}
-		bind:requestOptions
-		showEnvironment={false}
-		serviceScoped={scope === 'service'}
-		{nodeFilters}
-		persistKey={`arcane-swarm-${scope}-tasks-table`}
-		loading={tasksQuery.isFetching && !result}
-		refreshError={tasksQuery.error}
-		onRetry={() => tasksQuery.refetch()}
-	/>
-</div>
+<SwarmTasksTable
+	{tasks}
+	bind:requestOptions
+	showEnvironment={false}
+	serviceScoped={scope === 'service'}
+	{nodeFilters}
+	persistKey={`arcane-swarm-${scope}-tasks-table`}
+	loading={tasksQuery.isFetching && !result}
+	refreshError={tasksQuery.error}
+	onRetry={() => tasksQuery.refetch()}
+/>

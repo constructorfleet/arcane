@@ -654,7 +654,7 @@
 		</Tabs.Content>
 
 		{#if showEngineTab}
-			<Tabs.Content value="engine">
+			<Tabs.Content value="engine" layout="panel">
 				{#if isCurrentlyOnline}
 					<EngineInfoTab environmentId={environment.id} {podmanStatus} {podmanUnavailableReason} />
 				{:else}
@@ -664,13 +664,13 @@
 		{/if}
 
 		{#if showHistoryTab}
-			<Tabs.Content value="history">
+			<Tabs.Content value="history" layout="table">
 				<EnvironmentJobHistoryTab environmentId={environment.id} />
 			</Tabs.Content>
 		{/if}
 
 		{#if runtimeEnvironment.id !== '0'}
-			<Tabs.Content value="connection">
+			<Tabs.Content value="connection" layout="panel">
 				<ConnectionAgentTab
 					environment={runtimeEnvironment}
 					{currentStatus}

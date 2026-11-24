@@ -388,7 +388,7 @@
 		{/snippet}
 
 		{#snippet tabContent(_activeTab)}
-			<Tabs.Content value="overview" class="h-full">
+			<Tabs.Content value="overview">
 				<ServiceOverview {service} {serviceName} {serviceImage} {serviceMode} {desiredReplicas} {labels} />
 			</Tabs.Content>
 
@@ -398,7 +398,7 @@
 				{/if}
 			</Tabs.Content>
 
-			<Tabs.Content value="tasks" class="h-full">
+			<Tabs.Content value="tasks" layout="table">
 				{#if selectedTab === 'tasks'}
 					{#key JSON.stringify([envId, service.id])}
 						<ScopedTasksPanel environmentId={envId} resourceId={service.id} scope="service" />
@@ -407,7 +407,7 @@
 			</Tabs.Content>
 
 			{#if showConfiguration}
-				<Tabs.Content value="config" class="h-full">
+				<Tabs.Content value="config">
 					<ServiceConfiguration
 						{envVars}
 						{labels}
@@ -423,11 +423,11 @@
 				</Tabs.Content>
 			{/if}
 
-			<Tabs.Content value="network" class="h-full">
+			<Tabs.Content value="network" layout="table">
 				<ServiceNetwork ports={endpointPorts} networks={specNetworks} {virtualIPs} {networkDetails} environmentId={envId} />
 			</Tabs.Content>
 
-			<Tabs.Content value="storage" class="h-full">
+			<Tabs.Content value="storage" layout="table">
 				<ServiceStorage {mounts} environmentId={envId} serviceId={service.id} />
 			</Tabs.Content>
 		{/snippet}

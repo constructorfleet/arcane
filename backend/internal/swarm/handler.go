@@ -32,6 +32,8 @@ type (
 		Search        string `query:"search" doc:"Search query"`
 		Sort          string `query:"sort" doc:"Column to sort by"`
 		Order         string `query:"order" default:"asc" doc:"Sort direction (asc or desc)"`
+		NetworkID     string `query:"networkId" doc:"Filter tasks by Swarm network ID"`
+		NodeName      string `query:"nodeName" doc:"Node hostnames (comma-separated)"`
 		Start         int    `query:"start" default:"0" doc:"Start index for pagination"`
 		Limit         int    `query:"limit" default:"20" doc:"Number of items per page"`
 	}
@@ -74,6 +76,13 @@ func NewHandler(swarmService *SwarmService, eventService *event.EventService) *S
 
 func (h *SwarmHandler) ListTasks(ctx context.Context, input *ListSwarmTasksInput) (*handlerutil.Page[types.SwarmTaskSummary], error) {
 	params := handlerutil.PaginationParams(input.Start, input.Limit, input.Sort, input.Order, input.Search)
+	params.Filters = map[string]string{}
+	if input.NetworkID != "" {
+		params.Filters["networkId"] = input.NetworkID
+	}
+	if input.NodeName != "" {
+		params.Filters["nodeName"] = input.NodeName
+	}
 	if _, ok := httpx.EnvironmentScopeFromContext(ctx); ok {
 		body, err := h.swarmService.AggregateTasks(ctx, params)
 		if err != nil {

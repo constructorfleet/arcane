@@ -1,15 +1,9 @@
 <script lang="ts">
-	import {
-		DetailMetaStrip,
-		DetailSection,
-		KeyValueCard,
-		KeyValueGrid,
-		type DetailMetaItem
-	} from '#lib/components/resource-detail/index.js';
+	import { DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as CodeBlock from '#lib/components/ui/code-block/index.js';
 	import { useHighlightedCode } from '#lib/hooks/use-highlighted-code.svelte.js';
-	import { ClockIcon, ContainersIcon, InfoIcon, RestartIcon, TagIcon, TerminalIcon } from '#lib/icons/index.js';
+	import { InfoIcon, TagIcon, TerminalIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { PodInspect } from '#lib/types/podman.js';
 	import { formatDateTime } from '#lib/utils/formatting.js';
@@ -21,11 +15,11 @@
 
 	let { pod }: Props = $props();
 
-	const metaItems = $derived<DetailMetaItem[]>([
-		{ icon: ClockIcon, label: m.common_created(), value: formatDateTime(pod.created) || pod.created },
-		{ icon: ContainersIcon, label: m.containers(), value: String(pod.numContainers) },
-		{ icon: ContainersIcon, label: m.podman_pod_infra(), value: pod.createInfra ? m.common_yes() : m.common_no() },
-		...(pod.restartPolicy ? [{ icon: RestartIcon, label: m.common_restart_policy(), value: pod.restartPolicy }] : [])
+	const metaItems = $derived([
+		{ label: m.common_created(), value: formatDateTime(pod.created) || pod.created },
+		{ label: m.containers(), value: String(pod.numContainers) },
+		{ label: m.podman_pod_infra(), value: pod.createInfra ? m.common_yes() : m.common_no() },
+		...(pod.restartPolicy ? [{ label: m.common_restart_policy(), value: pod.restartPolicy }] : [])
 	]);
 
 	const details = $derived(
@@ -53,12 +47,14 @@
 </script>
 
 <div class="space-y-6">
-	<DetailMetaStrip items={metaItems}>
-		<Badge variant={podmanStateVariant(pod.state)} minWidth="20">{pod.state}</Badge>
-	</DetailMetaStrip>
-
-	<DetailSection title={m.common_overview()} icon={InfoIcon}>
+	<DetailSection title={m.common_overview()} icon={InfoIcon} class="border-t-0 pt-0">
 		<KeyValueGrid>
+			<KeyValueCard label={m.common_status()} valueFormat="custom">
+				<Badge variant={podmanStateVariant(pod.state)}>{pod.state}</Badge>
+			</KeyValueCard>
+			{#each metaItems as entry (entry.label)}
+				<KeyValueCard label={entry.label} valueFormat="text">{entry.value}</KeyValueCard>
+			{/each}
 			{#each details as entry (entry.label)}
 				<KeyValueCard label={entry.label} valueTitle={m.common_click_to_select()}>{entry.value}</KeyValueCard>
 			{/each}

@@ -121,21 +121,31 @@ test.describe('Management', () => {
 			await expect(page.getByRole('heading', { name: 'Runtime', exact: true })).toBeVisible();
 		});
 
-		test('should show live CPU and memory monitors on the logs tab for running containers', async ({
-			page
-		}) => {
+		test('keeps running-container metrics on the Metrics tab', async ({ page }) => {
 			const running = containersData.data.find((c) => c.state === 'running');
 			expect(running, 'No running container available').toBeDefined();
+
+			const statsPath = `/api/agents/0/ws/containers/${running!.id}/stats`;
+			const isStatsSocket = (socket: { url(): string }) =>
+				new URL(socket.url()).pathname === statsPath;
+			const statsConnections: string[] = [];
+			page.on('websocket', (socket) => {
+				if (isStatsSocket(socket)) statsConnections.push(socket.url());
+			});
 
 			await page.goto(`/containers/${running!.id}?env=0`);
 			await page.waitForLoadState('load');
 
 			await page.getByRole('tab', { name: 'Logs' }).click();
 
-			await expect(page.getByTestId('container-log-cpu-monitor')).toBeVisible();
-			await expect(page.getByTestId('container-log-memory-monitor')).toBeVisible();
-			await expect(page.getByTestId('container-log-cpu-monitor')).not.toContainText('N/A');
-			await expect(page.getByTestId('container-log-memory-monitor')).not.toContainText('N/A');
+			await expect(page.getByRole('tabpanel', { name: 'Logs' })).toBeVisible();
+			await expect(page.getByTestId('container-log-stats')).toHaveCount(0);
+			expect(statsConnections).toHaveLength(0);
+			const metricsSocket = page.waitForEvent('websocket', { predicate: isStatsSocket });
+			await page.getByRole('tab', { name: 'Metrics', exact: true }).click();
+			await metricsSocket;
+			await expect(page.getByRole('tabpanel', { name: 'Metrics' })).toBeVisible();
+			await expect(page.getByText('CPU Usage', { exact: true })).toBeVisible();
 		});
 
 		test('keeps the parsed log toggle synchronized when structured logs are detected', async ({
@@ -170,9 +180,7 @@ test.describe('Management', () => {
 				.toBe('false');
 		});
 
-		test('should show non-live fallback monitors on the logs tab for stopped containers', async ({
-			page
-		}) => {
+		test('shows stopped-container logs without metrics', async ({ page }) => {
 			const stopped = containersData.data.find((c) => c.state !== 'running');
 			expect(stopped, 'No stopped container available').toBeDefined();
 
@@ -181,10 +189,9 @@ test.describe('Management', () => {
 
 			await page.getByRole('tab', { name: 'Logs' }).click();
 
-			await expect(page.getByTestId('container-log-cpu-monitor')).toBeVisible();
-			await expect(page.getByTestId('container-log-memory-monitor')).toBeVisible();
-			await expect(page.getByTestId('container-log-cpu-monitor')).toContainText('N/A');
-			await expect(page.getByTestId('container-log-memory-monitor')).toContainText('N/A');
+			await expect(page.getByRole('tabpanel', { name: 'Logs' })).toBeVisible();
+			await expect(page.getByTestId('container-log-stats')).toHaveCount(0);
+			await expect(page.getByRole('tab', { name: 'Metrics', exact: true })).toHaveCount(0);
 		});
 
 		test('downloads the full log history from the logs tab', async ({ page }, testInfo) => {

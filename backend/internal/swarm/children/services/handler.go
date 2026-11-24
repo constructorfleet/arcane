@@ -23,6 +23,7 @@ type (
 		Search        string `query:"search" doc:"Search query"`
 		Sort          string `query:"sort" doc:"Column to sort by"`
 		Order         string `query:"order" default:"asc" doc:"Sort direction (asc or desc)"`
+		NetworkID     string `query:"networkId" doc:"Filter services by Swarm network ID"`
 		Start         int    `query:"start" default:"0" doc:"Start index for pagination"`
 		Limit         int    `query:"limit" default:"20" doc:"Number of items per page"`
 	}
@@ -84,6 +85,10 @@ func NewHandler(
 
 func (h *Handler) ListServices(ctx context.Context, input *ListSwarmServicesInput) (*handlerutil.Page[types.SwarmServiceSummary], error) {
 	params := handlerutil.PaginationParams(input.Start, input.Limit, input.Sort, input.Order, input.Search)
+	params.Filters = map[string]string{}
+	if input.NetworkID != "" {
+		params.Filters["networkId"] = input.NetworkID
+	}
 	if _, ok := httpx.EnvironmentScopeFromContext(ctx); ok {
 		body, err := h.service.Aggregate(ctx, params)
 		if err != nil {

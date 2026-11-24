@@ -142,29 +142,29 @@
 		{/snippet}
 
 		{#snippet tabContent(activeTab)}
-			<Tabs.Content value="overview" class="h-full">
+			<Tabs.Content value="overview" layout="panel">
 				<PodOverview {pod} />
 			</Tabs.Content>
 
-			<Tabs.Content value="containers" class="h-full">
+			<Tabs.Content value="containers" layout="table">
 				<PodContainers {pod} {envId} />
 			</Tabs.Content>
 
-			<Tabs.Content value="network" class="h-full">
+			<Tabs.Content value="network" layout="panel">
 				<PodNetwork infraConfig={pod.infraConfig} />
 			</Tabs.Content>
 
-			<Tabs.Content value="resources" class="h-full">
+			<Tabs.Content value="resources" layout="panel">
 				<PodResources {pod} />
 			</Tabs.Content>
 
-			<Tabs.Content value="stats" class="h-full">
+			<Tabs.Content value="stats">
 				{#if activeTab === 'stats'}
 					<PodStats containers={pod.containers ?? []} {envId} {isRunning} />
 				{/if}
 			</Tabs.Content>
 
-			<Tabs.Content value="processes" class="h-full">
+			<Tabs.Content value="processes" layout="table">
 				{#if activeTab === 'processes'}
 					<PodProcesses podId={pod.id} {envId} {isRunning} />
 				{/if}

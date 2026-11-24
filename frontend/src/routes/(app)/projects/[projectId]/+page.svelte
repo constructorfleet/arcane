@@ -2052,7 +2052,7 @@
 {/snippet}
 
 {#snippet projectServicesTab(project: Project)}
-	<Tabs.Content value="services" class="h-full min-h-0">
+	<Tabs.Content value="services" layout="table">
 		<div class="flex h-full min-h-0 flex-col">
 			{@render configurationErrorNotice()}
 			{#if canViewProjectLogs}

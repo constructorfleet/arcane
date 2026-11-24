@@ -229,6 +229,45 @@ func servicesScopeContext(t *testing.T, target string, bodies map[string]any) co
 	})
 }
 
+func TestListServicesFiltersByNetworkBeforePagination(t *testing.T) {
+	services := []swarm.Service{
+		{ID: "unrelated", Spec: swarm.ServiceSpec{Annotations: swarm.Annotations{Name: "aaa-unrelated"}}},
+		{ID: "dnsrr", Spec: swarm.ServiceSpec{
+			Annotations:  swarm.Annotations{Name: "dnsrr"},
+			TaskTemplate: swarm.TaskSpec{Networks: []swarm.NetworkAttachmentConfig{{Target: "overlay"}}},
+		}},
+		{
+			ID: "vip", Spec: swarm.ServiceSpec{Annotations: swarm.Annotations{Name: "vip"}},
+			Endpoint: swarm.Endpoint{VirtualIPs: []swarm.EndpointVirtualIP{{NetworkID: "overlay"}}},
+		},
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1.41/services":
+			assert.NoError(t, stdjson.NewEncoder(w).Encode(services))
+		case "/v1.41/tasks", "/v1.41/nodes", "/v1.41/networks":
+			_, _ = w.Write([]byte("[]"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	service := NewService(newSettingsDockerService(t, newSwarmTestDockerClient(t, server)), func(context.Context) error { return nil }, nil)
+	params := pagination.QueryParams{
+		Params:     pagination.Params{Start: 1, Limit: 1},
+		Filters:    map[string]string{"networkId": "overlay"},
+		SortParams: pagination.SortParams{Sort: "name", Order: pagination.SortAsc},
+	}
+
+	items, page, err := service.ListServicesPaginated(t.Context(), params)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, "vip", items[0].ID)
+	require.EqualValues(t, 2, page.TotalItems)
+	require.Equal(t, "overlay", params.Filters["networkId"])
+}
+
 func TestAggregateMergesEnvironments(t *testing.T) {
 	ctx := servicesScopeContext(t, "/api/agents/a,b,c/swarm/services", map[string]any{
 		"a": types.Paginated[types.SwarmServiceSummary]{

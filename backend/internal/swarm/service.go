@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/netip"
 	"net/url"
@@ -520,7 +521,15 @@ func (s *SwarmService) listTasksPaginatedWithFilters(ctx context.Context, filter
 	}
 
 	items := make([]types.SwarmTaskSummary, 0, len(tasksResult.Items))
+	networkID := params.Filters["networkId"]
+	if networkID != "" {
+		params.Filters = maps.Clone(params.Filters)
+		delete(params.Filters, "networkId")
+	}
 	for _, task := range tasksResult.Items {
+		if networkID != "" && !taskUsesNetwork(task, networkID) {
+			continue
+		}
 		items = append(items, types.NewSwarmTaskSummary(task, serviceNameByID[task.ServiceID], nodeNameByID[task.NodeID]))
 	}
 
@@ -529,8 +538,22 @@ func (s *SwarmService) listTasksPaginatedWithFilters(ctx context.Context, filter
 	return result.Items, paginationResp, nil
 }
 
+func taskUsesNetwork(task swarm.Task, networkID string) bool {
+	return slices.ContainsFunc(task.NetworksAttachments, func(attachment swarm.NetworkAttachment) bool {
+		return attachment.Network.ID == networkID
+	}) || slices.ContainsFunc(task.Spec.Networks, func(attachment swarm.NetworkAttachmentConfig) bool {
+		return attachment.Target == networkID
+	})
+}
+
 func (s *SwarmService) AggregateTasks(ctx context.Context, params pagination.QueryParams) (types.Paginated[types.SwarmTaskSummary], error) {
-	collection, err := httpx.CollectEnvironments[types.Paginated[types.SwarmTaskSummary]](ctx, url.Values{"start": {"0"}, "limit": {"-1"}})
+	values := url.Values{"start": {"0"}, "limit": {"-1"}}
+	if networkID := params.Filters["networkId"]; networkID != "" {
+		values.Set("networkId", networkID)
+		params.Filters = maps.Clone(params.Filters)
+		delete(params.Filters, "networkId")
+	}
+	collection, err := httpx.CollectEnvironments[types.Paginated[types.SwarmTaskSummary]](ctx, values)
 	if err != nil {
 		return types.Paginated[types.SwarmTaskSummary]{}, err
 	}

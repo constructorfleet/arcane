@@ -84,7 +84,23 @@ func (s *Service) ListServicesPaginated(ctx context.Context, params pagination.Q
 		return nil, pagination.Response{}, fmt.Errorf("failed to list swarm services: %w", err)
 	}
 
-	return s.PaginateSummaries(ctx, servicesResult.Items, params)
+	items := servicesResult.Items
+	if networkID := params.Filters["networkId"]; networkID != "" {
+		params.Filters = maps.Clone(params.Filters)
+		delete(params.Filters, "networkId")
+		items = slices.DeleteFunc(items, func(service swarm.Service) bool {
+			return !serviceUsesNetwork(service, networkID)
+		})
+	}
+	return s.PaginateSummaries(ctx, items, params)
+}
+
+func serviceUsesNetwork(service swarm.Service, networkID string) bool {
+	return slices.ContainsFunc(service.Spec.TaskTemplate.Networks, func(attachment swarm.NetworkAttachmentConfig) bool {
+		return attachment.Target == networkID
+	}) || slices.ContainsFunc(service.Endpoint.VirtualIPs, func(vip swarm.EndpointVirtualIP) bool {
+		return vip.NetworkID == networkID
+	})
 }
 
 func (s *Service) PaginateSummaries(
@@ -102,7 +118,13 @@ func (s *Service) PaginateSummaries(
 }
 
 func (s *Service) Aggregate(ctx context.Context, params pagination.QueryParams) (types.Paginated[types.SwarmServiceSummary], error) {
-	collection, err := httpx.CollectEnvironments[types.Paginated[types.SwarmServiceSummary]](ctx, url.Values{"start": {"0"}, "limit": {"-1"}})
+	values := url.Values{"start": {"0"}, "limit": {"-1"}}
+	if networkID := params.Filters["networkId"]; networkID != "" {
+		params.Filters = maps.Clone(params.Filters)
+		delete(params.Filters, "networkId")
+		values.Set("networkId", networkID)
+	}
+	collection, err := httpx.CollectEnvironments[types.Paginated[types.SwarmServiceSummary]](ctx, values)
 	if err != nil {
 		return types.Paginated[types.SwarmServiceSummary]{}, err
 	}

@@ -596,7 +596,7 @@
 {/snippet}
 
 {#snippet containerTabs(container: ContainerDetails, activeTab: string)}
-	<Tabs.Content value="overview" class="h-full">
+	<Tabs.Content value="overview" layout="panel">
 		<ContainerOverview
 			{container}
 			environmentId={currentEnvId}
@@ -612,7 +612,7 @@
 	</Tabs.Content>
 
 	{#if showStats}
-		<Tabs.Content value="stats" class="h-full">
+		<Tabs.Content value="stats" layout="panel">
 			{#if activeTab === 'stats'}
 				<ContainerStats
 					{container}
@@ -629,7 +629,7 @@
 		</Tabs.Content>
 	{/if}
 
-	<Tabs.Content value="processes" class="h-full">
+	<Tabs.Content value="processes" layout="table">
 		{#if activeTab === 'processes'}
 			<ContainerProcesses containerId={container.id} environmentId={currentEnvId} status={containerStatus} />
 		{/if}
@@ -638,15 +638,7 @@
 	<Tabs.Content value="logs" class="h-full">
 		{#if activeTab === 'logs'}
 			{#key `${currentEnvId}:${container?.id}`}
-				<ContainerLogsPanel
-					containerId={container?.id}
-					environmentId={currentEnvId}
-					{stats}
-					{hasInitialStatsLoaded}
-					isRunning={!!container.state?.running}
-					{cpuLimit}
-					bind:autoScroll={autoScrollLogs}
-				/>
+				<ContainerLogsPanel containerId={container?.id} environmentId={currentEnvId} bind:autoScroll={autoScrollLogs} />
 			{/key}
 		{/if}
 	</Tabs.Content>
@@ -667,25 +659,25 @@
 	{/if}
 
 	{#if hasHealthcheck}
-		<Tabs.Content value="healthcheck" class="h-full">
+		<Tabs.Content value="healthcheck">
 			<ContainerHealthcheck {container} />
 		</Tabs.Content>
 	{/if}
 
 	{#if showConfiguration}
-		<Tabs.Content value="config" class="h-full">
+		<Tabs.Content value="config">
 			<ContainerConfiguration {container} {hasEnvVars} {hasLabels} />
 		</Tabs.Content>
 	{/if}
 
 	{#if showNetworkTab}
-		<Tabs.Content value="network" class="h-full">
+		<Tabs.Content value="network">
 			<ContainerNetwork {container} environmentId={currentEnvId} />
 		</Tabs.Content>
 	{/if}
 
 	{#if hasMounts}
-		<Tabs.Content value="storage" class="h-full">
+		<Tabs.Content value="storage">
 			<ContainerStorage {container} environmentId={currentEnvId} />
 		</Tabs.Content>
 	{/if}
@@ -702,7 +694,7 @@
 		<ContainerDetailStatsSync
 			containerId={container.id}
 			environmentId={currentEnvId}
-			enabled={(activeTab === 'stats' || activeTab === 'logs') && !!container.state?.running}
+			enabled={activeTab === 'stats' && !!container.state?.running}
 			bind:stats
 			bind:hasInitialStatsLoaded
 			bind:statsError

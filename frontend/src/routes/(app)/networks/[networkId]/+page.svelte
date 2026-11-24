@@ -5,27 +5,16 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
 
-	import type { ActionButton } from '#lib/components/action-button-group/types.js';
+	import { ActionButtonGroup, type ActionButton } from '#lib/components/action-button-group/index.js';
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
-	import { DetailMetaStrip, DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
+	import { DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
-	import {
-		AlertIcon,
-		VolumesIcon,
-		ClockIcon,
-		TagIcon,
-		LayersIcon,
-		NetworksIcon,
-		GlobeIcon,
-		SettingsIcon,
-		ContainersIcon,
-		ArrowUpIcon,
-		ArrowDownIcon,
-		type IconType
-	} from '#lib/icons/index.js';
-	import { ResourceDetailLayout } from '#lib/layouts/index.js';
+	import * as Tabs from '#lib/components/ui/tabs/index.js';
+	import { useUrlTab } from '#lib/hooks/use-url-tab.svelte.js';
+	import { AlertIcon, JobsIcon, LayersIcon, NetworksIcon, SettingsIcon, TagIcon, type IconType } from '#lib/icons/index.js';
+	import TabbedPageLayout from '#lib/layouts/tabbed-page-layout.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { networkService } from '#lib/services/network-service.js';
@@ -39,23 +28,20 @@
 	import { formatDateTimeShort } from '#lib/utils/formatting.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
-	import NetworkNodeUsage from '../components/network-node-usage.svelte';
+	import NetworkSwarmResources from '../components/network-swarm-resources.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 	let errorMessage = $state('');
 
 	let isRemoving = $state(false);
-	let sortCol = $state('name');
-	let sortDir = $state<'asc' | 'desc'>('asc');
 
-	let network = $derived(data.network);
+	const network = $derived(data.network);
 	const shortId = $derived(network?.id?.substring(0, 12) ?? m.common_unknown());
 	const createdDate = $derived(network?.created ? formatDateTimeShort(network.created) : m.common_unknown());
 
-	const connectedContainers = $derived(network?.containersList ?? []);
-
-	const inUse = $derived(connectedContainers.length > 0);
+	const localContainerCount = $derived(network?.containersList.length ?? 0);
+	const inUse = $derived(localContainerCount > 0);
 	const observationAgents = $derived((page.url.searchParams.get('agents') ?? '').split(',').filter(Boolean));
 	const observationCluster = $derived(page.url.searchParams.get('cluster') ?? '');
 	const requested = $derived([...new Set(observationAgents)]);
@@ -114,36 +100,15 @@
 	const swarmGateway = $derived(!!network && isSwarmGatewayBridge(network));
 	const isPredefined = $derived(network?.name === 'bridge' || network?.name === 'host' || network?.name === 'none');
 
-	async function handleSort(column: string) {
-		const newSortDir: 'asc' | 'desc' = sortCol === column && sortDir === 'asc' ? 'desc' : 'asc';
-		sortCol = column;
-		sortDir = newSortDir;
-
-		if (data.network?.id) {
-			const target = { networkId: data.network.id, environmentId: data.envId, column: sortCol, direction: sortDir };
-			const operationResult = await tryCatch(
-				(async () =>
-					networkService.getNetworkForEnvironment(target.environmentId, target.networkId, {
-						sort: { column: target.column, direction: target.direction }
-					}))()
-			);
-			if (
-				data.envId !== target.environmentId ||
-				data.network.id !== target.networkId ||
-				sortCol !== target.column ||
-				sortDir !== target.direction
-			)
-				return;
-			if (operationResult.error !== null) {
-				const err = operationResult.error;
-
-				console.error('Failed to sort network containers:', err);
-				toast.error(m.common_action_failed());
-			} else {
-				network = operationResult.data;
-			}
-		}
-	}
+	const urlTab = useUrlTab({
+		tabs: () => [
+			{ value: 'overview', label: m.common_overview(), icon: NetworksIcon },
+			{ value: 'services', label: m.services(), icon: LayersIcon, visible: swarmScoped },
+			{ value: 'tasks', label: m.tasks(), icon: JobsIcon, visible: swarmScoped }
+		],
+		defaultTab: () => 'overview',
+		history: true
+	});
 
 	function triggerRemove() {
 		if (inUse || observedInUse) {
@@ -175,7 +140,7 @@
 					agent: environmentStore.available.find((agent) => agent.id === target.environmentId)?.name ?? target.environmentId,
 					agentId: target.environmentId
 				}),
-				...(swarmScoped ? [m.swarm_network_usage_warning()] : [])
+				...(swarmScoped ? [m.network_remove_swarm_warning()] : [])
 			].join('\n\n'),
 			confirm: {
 				label: m.common_remove(),
@@ -218,57 +183,6 @@
 	]);
 </script>
 
-{#snippet networkContainerSorting()}
-	<div class="flex flex-col border-b bg-muted/30 p-3 sm:flex-row sm:items-center">
-		<div
-			class="flex w-full cursor-pointer items-center text-sm font-medium text-muted-foreground hover:text-foreground sm:w-1/3"
-			onclick={() => handleSort('name')}
-			role="button"
-			tabindex="0"
-			onkeydown={(e) => e.key === 'Enter' && handleSort('name')}
-		>
-			{m.common_name()}
-			{#if sortCol === 'name'}
-				{#if sortDir === 'asc'}
-					<ArrowUpIcon class="ml-1 size-3" />
-				{:else}
-					<ArrowDownIcon class="ml-1 size-3" />
-				{/if}
-			{/if}
-		</div>
-		<div
-			class="flex w-full cursor-pointer items-center pl-0 text-sm font-medium text-muted-foreground hover:text-foreground sm:w-2/3 sm:pl-4"
-			onclick={() => handleSort('ip')}
-			role="button"
-			tabindex="0"
-			onkeydown={(e) => e.key === 'Enter' && handleSort('ip')}
-		>
-			{m.containers_ip_address()}
-			{#if sortCol === 'ip'}
-				{#if sortDir === 'asc'}
-					<ArrowUpIcon class="ml-1 size-3" />
-				{:else}
-					<ArrowDownIcon class="ml-1 size-3" />
-				{/if}
-			{/if}
-		</div>
-	</div>
-{/snippet}
-
-{#snippet networkPeers(network: NetworkInspect)}
-	{#if network.peers && network.peers.length > 0}
-		<DetailSection title={m.networks_peers_title()} icon={GlobeIcon}>
-			<KeyValueGrid>
-				{#each network.peers as peer (`${peer.Name ?? ''}:${peer.IP ?? ''}`)}
-					<KeyValueCard label={peer.Name ?? m.common_unknown()} valueTitle={m.common_click_to_select()}>
-						{peer.IP}
-					</KeyValueCard>
-				{/each}
-			</KeyValueGrid>
-		</DetailSection>
-	{/if}
-{/snippet}
-
 {#snippet ipamSubnet(config: NetworkIPAMConfig)}
 	<KeyValueGrid>
 		{#if config.subnet}
@@ -290,41 +204,11 @@
 	</KeyValueGrid>
 {/snippet}
 
-{#snippet networkServices(network: NetworkInspect)}
-	{#if network.services && Object.keys(network.services).length > 0}
-		<DetailSection title={m.services()} icon={LayersIcon}>
-			<div class="divide-y rounded-lg border">
-				{#each Object.entries(network.services) as [name, service] (name)}
-					<div class="flex flex-col gap-2 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
-						<code class="cursor-pointer font-mono text-sm font-medium break-all select-all" title={m.common_click_to_select()}>
-							{name}
-						</code>
-						{#if service.VIP}
-							<span class="flex items-center gap-1.5 text-xs text-muted-foreground">
-								{m.networks_service_vip_label()}
-								<code class="rounded-xl bg-muted px-1.5 py-0.5 font-mono text-xs break-all select-all">{service.VIP}</code>
-							</span>
-						{/if}
-						{#if service.Ports && service.Ports.length > 0}
-							<span class="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-								{m.common_ports()}
-								{#each service.Ports as port (port)}
-									<code class="rounded-xl bg-muted px-1.5 py-0.5 font-mono text-xs">{port}</code>
-								{/each}
-							</span>
-						{/if}
-					</div>
-				{/each}
-			</div>
-		</DetailSection>
-	{/if}
-{/snippet}
-
 {#snippet networkIpam(network: NetworkInspect)}
-	{#if network.ipam?.config && network.ipam.config.length > 0}
+	{#if network.ipam && (network.ipam.driver || network.ipam.config?.length || Object.keys(network.ipam.options ?? {}).length)}
 		<DetailSection title={m.networks_ipam_title()} icon={SettingsIcon}>
 			<div class="space-y-3">
-				{#each network.ipam.config as config (config)}
+				{#each network.ipam.config ?? [] as config (config)}
 					{@render ipamSubnet(config)}
 				{/each}
 			</div>
@@ -353,45 +237,6 @@
 	{/if}
 {/snippet}
 
-{#snippet networkContainers()}
-	{#if connectedContainers.length > 0}
-		<DetailSection title={m.networks_connected_containers_title()} icon={ContainersIcon}>
-			<div class="overflow-hidden rounded-lg border">
-				{@render networkContainerSorting()}
-
-				<div class="divide-y">
-					{#each connectedContainers as container (container.id)}
-						{@const addresses = [container.ipv4Address, container.ipv6Address].filter(Boolean)}
-						<div class="flex flex-col p-3 sm:flex-row sm:items-center">
-							<div class="mb-2 w-full font-medium break-all sm:mb-0 sm:w-1/3">
-								<a
-									href={resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(data.envId)}`, {
-										containerId: container.id
-									})}
-									class="flex items-center text-primary-text hover:underline"
-								>
-									<ContainersIcon class="mr-1.5 size-3.5 text-muted-foreground" />
-									{container.name}
-								</a>
-							</div>
-							<div class="flex w-full flex-wrap gap-1.5 pl-0 sm:w-2/3 sm:pl-4">
-								{#each addresses.length > 0 ? addresses : [m.common_unknown()] as address (address)}
-									<code
-										class="cursor-pointer rounded-xl bg-muted px-1.5 py-0.5 font-mono text-xs break-all text-muted-foreground select-all sm:text-sm"
-										title={m.common_click_to_select()}
-									>
-										{address}
-									</code>
-								{/each}
-							</div>
-						</div>
-					{/each}
-				</div>
-			</div>
-		</DetailSection>
-	{/if}
-{/snippet}
-
 {#snippet keyValueSection(title: string, icon: IconType, values: Record<string, string> | null | undefined)}
 	{#if values && Object.keys(values).length > 0}
 		<DetailSection {title} {icon}>
@@ -404,106 +249,93 @@
 	{/if}
 {/snippet}
 
-<ResourceDetailLayout
-	icon={NetworksIcon}
-	backUrl="/networks"
-	backLabel={m.resource_networks_cap()}
-	environmentId={data.envId}
-	title={network?.name ?? m.common_details_title({ resource: m.resource_network_cap() })}
-	{actions}
->
-	{#snippet badges()}
-		<Badge variant="secondary" mono title={network?.id}>{m.common_id()}: {shortId}</Badge>
-		{#if network?.labels?.['com.docker.stack.namespace']}
-			<Badge variant="secondary">{m.swarm_stack_namespace({ namespace: network.labels['com.docker.stack.namespace'] })}</Badge>
+<TabbedPageLayout backUrl="/networks" tabItems={urlTab.items} selectedTab={urlTab.value} onTabChange={urlTab.select}>
+	{#snippet headerInfo()}
+		<div class="flex min-h-9 min-w-0 items-center gap-2">
+			<NetworksIcon class="size-5 shrink-0 text-primary" />
+			<h1 class="min-w-0 truncate font-semibold" title={network.name}>{network.name}</h1>
+			<Badge variant="secondary" mono title={network.id}>{m.common_id()}: {shortId}</Badge>
+			{#if network.labels?.['com.docker.stack.namespace']}
+				<Badge variant="secondary">{m.swarm_stack_namespace({ namespace: network.labels['com.docker.stack.namespace'] })}</Badge>
+			{/if}
+			{#if swarmGateway}
+				<Badge variant="blue">{m.network_swarm_gateway()}</Badge>
+			{:else if !swarmScoped}
+				<Badge variant={inUse ? 'green' : 'amber'}>
+					{inUse ? m.networks_in_use_count({ count: localContainerCount }) : m.common_unused()}
+				</Badge>
+			{/if}
+			{#if isPredefined}
+				<Badge variant="blue">{m.networks_predefined()}</Badge>
+			{/if}
+			<Badge variant="purple">{network.driver ?? m.common_unknown()}</Badge>
+		</div>
+	{/snippet}
+	{#snippet headerActions()}<ActionButtonGroup buttons={actions} />{/snippet}
+
+	{#snippet subHeader()}
+		{#if errorMessage}
+			<Alert.Root variant="destructive" class="mt-3" icon={AlertIcon}>
+				<Alert.Title>{m.common_action_failed()}</Alert.Title>
+				<Alert.Description>{errorMessage}</Alert.Description>
+			</Alert.Root>
 		{/if}
-		{#if swarmGateway}
-			<Badge variant="blue" minWidth="20">{m.network_swarm_gateway()}</Badge>
-		{:else if swarmScoped}
-			<Badge variant={inUse ? 'green' : 'amber'} minWidth="20"
-				>{inUse ? m.network_in_use_on_node() : m.network_no_local_containers()}</Badge
-			>
-			{#if !inUse && observedInUse}<Badge variant="green" minWidth="20">{m.network_used_on_observed_nodes()}</Badge>{/if}
-		{:else if inUse}
-			<Badge variant="green" minWidth="20">{m.networks_in_use_count({ count: connectedContainers.length })}</Badge>
-		{:else}
-			<Badge variant="amber" minWidth="20">{m.common_unused()}</Badge>
-		{/if}
-		{#if isPredefined}
-			<Badge variant="blue" minWidth="20">{m.networks_predefined()}</Badge>
-		{/if}
-		<Badge variant="purple" minWidth="20">{network?.driver ?? m.common_unknown()}</Badge>
 	{/snippet}
 
-	{#if errorMessage}
-		<Alert.Root variant="destructive">
-			<AlertIcon class="mr-2 size-4" />
-			<Alert.Title>{m.common_action_failed()}</Alert.Title>
-			<Alert.Description>{errorMessage}</Alert.Description>
-		</Alert.Root>
-	{/if}
-
-	{#if network}
-		<div class="space-y-6">
-			{#if observationAgents.length > 0 && observationCluster}
-				<NetworkNodeUsage clusterId={observationCluster} {excluded} {observations} />
-			{/if}
-			{#if swarmScoped}
-				<Alert.Root variant="warning-subtle" size="sm" icon={AlertIcon}>
-					<Alert.Description>{m.swarm_network_usage_warning()}</Alert.Description>
-				</Alert.Root>
-			{/if}
-			<DetailMetaStrip
-				items={[
-					{ icon: VolumesIcon, label: m.common_driver(), value: network.driver ?? m.common_unknown() },
-					{ icon: GlobeIcon, label: m.common_scope(), value: network.scope ?? m.common_unknown() },
-					{ icon: ClockIcon, value: createdDate }
-				]}
-			>
-				{#if network.attachable}
-					<Badge variant="green" minWidth="20">{m.attachable()}</Badge>
+	{#snippet tabContent()}
+		<Tabs.Content value="overview" layout="panel">
+			<div class="space-y-6">
+				{#if hasObservations && !observations.isFetching && observationsIncomplete}
+					<Alert.Root variant="warning-subtle" size="sm" icon={AlertIcon}>
+						<Alert.Description>
+							{m.network_observations_not_ready()}
+							{#if agents.length > 0}
+								<ArcaneButton action="base" size="sm" customLabel={m.common_retry()} onclick={() => observations.refetch()} />
+							{/if}
+						</Alert.Description>
+					</Alert.Root>
 				{/if}
-				{#if network.internal}
-					<Badge variant="blue" minWidth="20">{m.internal()}</Badge>
-				{/if}
-				{#if network.ingress}
-					<Badge variant="cyan" minWidth="20">{m.ingress()}</Badge>
-				{/if}
-				{#if network.enableIPv6}
-					<Badge variant="indigo" minWidth="20">{m.ipv6_enabled()}</Badge>
-				{/if}
-				{#if network.configOnly}
-					<Badge variant="pink" minWidth="20">{m.config_only()}</Badge>
-				{/if}
-			</DetailMetaStrip>
-
-			<KeyValueCard label={m.common_id()} valueTitle={m.common_click_to_select()}>{network.id}</KeyValueCard>
-
-			{@render networkPeers(network)}
-
-			{@render networkServices(network)}
-
-			{@render networkIpam(network)}
-
-			{@render networkContainers()}
-
-			{@render keyValueSection(m.common_labels(), TagIcon, network.labels)}
-			{@render keyValueSection(m.networks_options_title(), SettingsIcon, network.options)}
-		</div>
-	{:else}
-		<div class="flex flex-col items-center justify-center px-4 py-16 text-center">
-			<div class="mb-4 rounded-full bg-muted/30 p-4">
-				<NetworksIcon class="size-10 text-muted-foreground opacity-70" />
+				<DetailSection
+					title={m.common_details_title({ resource: m.resource_network_cap() })}
+					icon={NetworksIcon}
+					class="border-t-0 pt-0"
+				>
+					<KeyValueGrid>
+						<KeyValueCard label={m.common_id()}>{network.id}</KeyValueCard>
+						<KeyValueCard label={m.common_scope()} valueFormat="text">{network.scope ?? m.common_unknown()}</KeyValueCard>
+						<KeyValueCard label={m.common_created()} valueFormat="text">{createdDate}</KeyValueCard>
+					</KeyValueGrid>
+					{#if network.attachable || network.internal || network.ingress || network.enableIPv6 || network.configOnly}
+						<div class="flex flex-wrap gap-2">
+							{#if network.attachable}<Badge variant="green">{m.attachable()}</Badge>{/if}
+							{#if network.internal}<Badge variant="blue">{m.internal()}</Badge>{/if}
+							{#if network.ingress}<Badge variant="cyan">{m.ingress()}</Badge>{/if}
+							{#if network.enableIPv6}<Badge variant="indigo">{m.ipv6_enabled()}</Badge>{/if}
+							{#if network.configOnly}<Badge variant="pink">{m.config_only()}</Badge>{/if}
+						</div>
+					{/if}
+				</DetailSection>
+				{@render networkIpam(network)}
+				{@render keyValueSection(m.common_labels(), TagIcon, network.labels)}
+				{@render keyValueSection(m.networks_options_title(), SettingsIcon, network.options)}
 			</div>
-			<h2 class="mb-2 text-xl font-medium">{m.common_not_found_title({ resource: m.resource_networks_cap() })}</h2>
-			<p class="mb-6 text-muted-foreground">
-				{m.common_not_found_description({ resource: m.resource_networks_cap().toLowerCase() })}
-			</p>
-			<ArcaneButton
-				action="cancel"
-				customLabel={m.common_back_to({ resource: m.resource_networks_cap() })}
-				onclick={() => goto(resolve('/(app)/networks'))}
-			/>
-		</div>
-	{/if}
-</ResourceDetailLayout>
+		</Tabs.Content>
+		{#if swarmScoped}
+			{@const clusterId = network.clusterId ?? ''}
+			<Tabs.Content value="services" layout="table">
+				{#if urlTab.value === 'services'}
+					{#key `${data.envId}:${network.id}`}
+						<NetworkSwarmResources kind="services" networkId={network.id} {clusterId} environmentId={data.envId} />
+					{/key}
+				{/if}
+			</Tabs.Content>
+			<Tabs.Content value="tasks" layout="table">
+				{#if urlTab.value === 'tasks'}
+					{#key `${data.envId}:${network.id}`}
+						<NetworkSwarmResources kind="tasks" networkId={network.id} {clusterId} environmentId={data.envId} />
+					{/key}
+				{/if}
+			</Tabs.Content>
+		{/if}
+	{/snippet}
+</TabbedPageLayout>

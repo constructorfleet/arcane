@@ -8,7 +8,7 @@
 	import type { ActionButton } from '#lib/components/action-button-group/types.js';
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
 	import EnvironmentDestinationSelect from '#lib/components/form/environment-destination-select.svelte';
-	import { DetailMetaStrip, DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
+	import { DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
 	import EmptyState from '#lib/components/states/empty-state.svelte';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -151,7 +151,7 @@
 	]);
 
 	const metaItems = $derived([
-		{ icon: InfoIcon, label: m.podman_unit(), value: quadlet.unitName || '-', mono: true },
+		{ label: m.podman_unit(), value: quadlet.unitName || '-' },
 		...(quadlet.unitStatus
 			? [
 					{ label: m.podman_unit_load_state(), value: quadlet.unitStatus.loadState },
@@ -160,8 +160,7 @@
 						value: `${quadlet.unitStatus.activeState} (${quadlet.unitStatus.subState})`
 					}
 				]
-			: []),
-		...(quadlet.app ? [{ icon: ContainersIcon, label: m.podman_quadlet_app(), value: quadlet.app }] : [])
+			: [])
 	]);
 </script>
 
@@ -208,11 +207,13 @@
 	{/snippet}
 
 	{#snippet tabContent(activeTab)}
-		<Tabs.Content value="overview" class="h-full">
+		<Tabs.Content value="overview" layout="panel">
 			<div class="space-y-4">
-				<DetailMetaStrip items={metaItems} />
-				<DetailSection title={m.podman_unit()} icon={InfoIcon}>
+				<DetailSection title={m.podman_unit()} icon={InfoIcon} class="border-t-0 pt-0">
 					<KeyValueGrid>
+						{#each metaItems as item (item.label)}
+							<KeyValueCard label={item.label} valueFormat="text">{item.value}</KeyValueCard>
+						{/each}
 						{#if quadlet.unitStatus?.description}
 							<KeyValueCard label={m.common_description()}>{quadlet.unitStatus.description}</KeyValueCard>
 						{/if}
@@ -252,7 +253,7 @@
 			</div>
 		</Tabs.Content>
 
-		<Tabs.Content value="containers" class="h-full">
+		<Tabs.Content value="containers" layout="table">
 			{#if containers.length === 0}
 				<EmptyState icon={ContainersIcon} title={m.podman_quadlet_no_containers()} />
 			{:else}
@@ -322,12 +323,7 @@
 					{/if}
 					{#if activeTab === 'logs'}
 						{#key `${envId}:${selectedContainer.id}`}
-							<ContainerLogsPanel
-								containerId={selectedContainer.id}
-								environmentId={envId}
-								isRunning={selectedContainer.state === 'running'}
-								bind:autoScroll={autoScrollLogs}
-							/>
+							<ContainerLogsPanel containerId={selectedContainer.id} environmentId={envId} bind:autoScroll={autoScrollLogs} />
 						{/key}
 					{/if}
 				</div>

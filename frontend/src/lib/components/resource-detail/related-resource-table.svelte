@@ -117,22 +117,20 @@
 	/>
 {/snippet}
 
-<div class="min-w-0 px-1 sm:px-2">
-	<ArcaneTable
-		{items}
-		{persistKey}
-		bind:requestOptions
-		bind:mobileFieldVisibility
-		mobileFields={fields}
-		columns={tableColumns}
-		selectionDisabled
-		withoutFilters
-		{loading}
-		{refreshError}
-		{onRetry}
-		rowActions={actions}
-		mobileCard={mobile}
-	>
-		{#snippet emptyState()}<p class="p-4 text-sm text-muted-foreground">{empty}</p>{/snippet}
-	</ArcaneTable>
-</div>
+<ArcaneTable
+	{items}
+	{persistKey}
+	bind:requestOptions
+	bind:mobileFieldVisibility
+	mobileFields={fields}
+	columns={tableColumns}
+	selectionDisabled
+	withoutFilters
+	{loading}
+	{refreshError}
+	{onRetry}
+	rowActions={actions}
+	mobileCard={mobile}
+>
+	{#snippet emptyState()}<p class="p-4 text-sm text-muted-foreground">{empty}</p>{/snippet}
+</ArcaneTable>

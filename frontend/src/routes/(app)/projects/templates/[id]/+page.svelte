@@ -9,7 +9,7 @@
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import IfPermitted from '#lib/components/if-permitted.svelte';
-	import { DetailMetaStrip, DetailSection, KeyValueCard } from '#lib/components/resource-detail/index.js';
+	import { DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
 	import { TabBar } from '#lib/components/tab-bar/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as CodeBlock from '#lib/components/ui/code-block/index.js';
@@ -398,13 +398,15 @@
 			<div class="space-y-6">
 				<TabBar items={urlTab.items} onValueChange={(value) => urlTab.select(value)} />
 
-				<Tabs.Content value="overview">
+				<Tabs.Content value="overview" layout="panel">
 					<div class="space-y-6">
 						{#if metaItems.length > 0 || template.metadata?.documentationUrl || template.metadata?.tags?.length}
-							<DetailMetaStrip items={metaItems}>
+							<KeyValueGrid>
+								{#each metaItems as item (item.label)}
+									<KeyValueCard label={item.label} valueFormat="text">{item.value}</KeyValueCard>
+								{/each}
 								{#if template.metadata?.documentationUrl}
-									<div class="flex items-center gap-1.5 text-sm text-muted-foreground">
-										<span class="text-xs font-semibold tracking-wide uppercase">{m.common_documentation()}</span>
+									<KeyValueCard label={m.common_documentation()} valueFormat="custom">
 										<a
 											href={template.metadata.documentationUrl}
 											target="_blank"
@@ -414,17 +416,18 @@
 											{documentationHost}
 											<ExternalLinkIcon class="size-3.5 shrink-0" />
 										</a>
-									</div>
+									</KeyValueCard>
 								{/if}
 								{#if template.metadata?.tags?.length}
-									<div class="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
-										<span class="text-xs font-semibold tracking-wide uppercase">{m.common_tags()}</span>
-										{#each template.metadata.tags as tag (tag)}
-											<Badge variant="outline">{tag}</Badge>
-										{/each}
-									</div>
+									<KeyValueCard label={m.common_tags()} valueFormat="custom">
+										<div class="flex flex-wrap gap-1.5">
+											{#each template.metadata.tags as tag (tag)}
+												<Badge variant="outline">{tag}</Badge>
+											{/each}
+										</div>
+									</KeyValueCard>
 								{/if}
-							</DetailMetaStrip>
+							</KeyValueGrid>
 						{/if}
 
 						{#if services?.length}
