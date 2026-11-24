@@ -1176,7 +1176,7 @@ func (s *ImageService) GetUpdateInfoByImageRefs(ctx context.Context, imageRefs [
 	return result, nil
 }
 
-func (s *ImageService) ListImagesPaginated(ctx context.Context, params pagination.QueryParams) ([]types.ImageSummary, pagination.Response, error) {
+func (s *ImageService) ListImagesPaginated(ctx context.Context, environmentID string, params pagination.QueryParams) ([]types.ImageSummary, pagination.Response, error) {
 	var (
 		dockerImages  []image.Summary
 		containers    []container.Summary
@@ -1232,19 +1232,31 @@ func (s *ImageService) ListImagesPaginated(ctx context.Context, params paginatio
 		return nil, pagination.Response{}, err
 	}
 
-	result := s.getImagePaginationConfig().SearchOrderAndPaginate(MapDockerImagesToDTOs(
+	items := MapDockerImagesToDTOs(
 		dockerImages,
 		containers,
 		BuildVolumeUsageMap(containers, s.BuildProjectIDMap(ctx, containers)),
 		buildUpdateMap(updateRecords),
 		vulnerabilityMap,
-	), params)
+	)
+	if params.Filters["groupByRepository"] == "true" {
+		grouped, resp := s.libraryPage([]pagination.EnvironmentPage[types.ImageSummary]{{Environment: types.EnvironmentRef{ID: environmentID}, Items: items}}, params)
+		return grouped, resp, nil
+	}
+	result := s.getImagePaginationConfig().SearchOrderAndPaginate(items, params)
 
 	return result.Items, pagination.BuildResponse(result.TotalCount, result.TotalAvailable, params), nil
 }
 
 func (s *ImageService) AggregateImages(ctx context.Context, params pagination.QueryParams) (types.ImageListResponse, error) {
-	collection, err := httpx.CollectEnvironments[types.ImageListResponse](ctx, url.Values{"start": {"0"}, "limit": {"-1"}})
+	overrides := url.Values{"start": {"0"}, "limit": {"-1"}}
+	grouped := params.Filters["groupByRepository"] == "true"
+	if grouped {
+		for _, key := range []string{"groupByRepository", "repository", "search", "inUse", "updates", "hardened", "label"} {
+			overrides[key] = nil
+		}
+	}
+	collection, err := httpx.CollectEnvironments[types.ImageListResponse](ctx, overrides)
 	if err != nil {
 		return types.ImageListResponse{}, err
 	}
@@ -1257,7 +1269,12 @@ func (s *ImageService) AggregateImages(ctx context.Context, params pagination.Qu
 			TotalAvailable: cmp.Or(result.Value.Pagination.GrandTotalItems, result.Value.Pagination.TotalItems),
 		})
 	}
-	data, resp := pagination.MergeEnvironmentPages(s.getImagePaginationConfig(), pages, params)
+	data, resp := func() ([]types.ImageSummary, pagination.Response) {
+		if grouped {
+			return s.libraryPage(pages, params)
+		}
+		return pagination.MergeEnvironmentPages(s.getImagePaginationConfig(), pages, params)
+	}()
 
 	return types.ImageListResponse{
 		Success:    true,
@@ -1456,6 +1473,12 @@ func MapDockerImagesToDTOs(
 	vulnerabilityMap map[string]*types.VulnerabilityScanSummary,
 ) []types.ImageSummary {
 	pinnedRefsByImageID := collectPinnedReferencesByImageID(containers)
+	activeReposByImageID := map[string][]string{}
+	for _, workload := range containers {
+		if repo := imageRepositoryName(workload.Image); repo != "" {
+			activeReposByImageID[workload.ImageID] = append(activeReposByImageID[workload.ImageID], repo)
+		}
+	}
 	now := time.Now()
 	items := make([]types.ImageSummary, 0, len(dockerImages))
 	for _, di := range dockerImages {
@@ -1481,15 +1504,16 @@ func MapDockerImagesToDTOs(
 
 		usedBy := usageMap[di.ID]
 		items = append(items, types.ImageSummary{
-			ID:               di.ID,
-			Repo:             repo,
-			Tag:              tag,
-			RepoTags:         repoTags,
-			RepoDigests:      repoDigests,
-			PinnedReferences: pinnedRefsByImageID[di.ID],
-			Created:          di.Created,
-			Size:             di.Size,
-			VirtualSize:      di.SharedSize,
+			ID:                 di.ID,
+			Repo:               repo,
+			Tag:                tag,
+			RepoTags:           repoTags,
+			RepoDigests:        repoDigests,
+			PinnedReferences:   pinnedRefsByImageID[di.ID],
+			ActiveRepositories: sortedUnique(activeReposByImageID[di.ID]),
+			Created:            di.Created,
+			Size:               di.Size,
+			VirtualSize:        di.SharedSize,
 			Labels: func() map[string]any {
 				if di.Labels == nil {
 					return nil
@@ -1519,10 +1543,7 @@ func (s *ImageService) getImagePaginationConfig() pagination.Config[types.ImageS
 			func(i types.ImageSummary) (string, error) { return i.Tag, nil },
 			func(i types.ImageSummary) (string, error) { return i.ID, nil },
 			func(i types.ImageSummary) (string, error) {
-				if len(i.RepoTags) > 0 {
-					return i.RepoTags[0], nil
-				}
-				return "", nil
+				return strings.Join(i.RepoTags, " "), nil
 			},
 			func(i types.ImageSummary) (string, error) {
 				return strings.Join(i.PinnedReferences, " "), nil
@@ -1608,7 +1629,7 @@ func (s *ImageService) getImagePaginationConfig() pagination.Config[types.ImageS
 					case "up_to_date":
 						return i.UpdateInfo != nil && !i.UpdateInfo.HasUpdate && i.UpdateInfo.Error == ""
 					case "error":
-						return kit.FromPtr(i.UpdateInfo).Error != ""
+						return kit.FromPtr(i.UpdateInfo).Error != "" || kit.FromPtr(i.RepositoryGroup).CheckErrorRef != ""
 					case "unknown":
 						return i.UpdateInfo == nil
 					default:

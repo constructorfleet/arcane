@@ -17,6 +17,22 @@ export function imageListQuery(scope: string, environments: EnvironmentRef[], re
 	});
 }
 
+export function imageLibraryQuery(
+	scope: string,
+	environments: EnvironmentRef[],
+	requestOptions: SearchPaginationSortRequest,
+	repository?: string
+) {
+	return imageListQuery(scope, environments, {
+		...requestOptions,
+		filters: {
+			...requestOptions.filters,
+			groupByRepository: true,
+			...(repository ? { repository } : {})
+		}
+	});
+}
+
 export function imageUsageCountsQuery(scope: string, environments: EnvironmentRef[]) {
 	return queryOptions({
 		queryKey: queryKeys.images.usageCounts(scope),

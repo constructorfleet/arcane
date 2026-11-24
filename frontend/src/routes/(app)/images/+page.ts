@@ -1,4 +1,4 @@
-import { imageListQuery, imageUsageCountsQuery } from '#lib/query/images.js';
+import { imageLibraryQuery, imageListQuery, imageUsageCountsQuery } from '#lib/query/images.js';
 import { environmentStore } from '#lib/stores/environment.store.svelte.js';
 import { featureStore } from '#lib/stores/features.store.svelte.js';
 import { throwPageLoadError } from '#lib/utils/api.js';
@@ -24,9 +24,10 @@ export const load: PageLoad = async ({ parent, url }) => {
 
 	if (imageRequestOptions.pagination) imageRequestOptions.pagination.page = resourceTablePage(url.searchParams.get('tablePage'));
 
+	const listQuery = linkedAgent ? imageListQuery : imageLibraryQuery;
 	const result = await tryCatch(
 		Promise.all([
-			queryClient.ensureQueryData({ ...imageListQuery(scope, environments, imageRequestOptions), revalidateIfStale: true }),
+			queryClient.ensureQueryData({ ...listQuery(scope, environments, imageRequestOptions), revalidateIfStale: true }),
 			queryClient.ensureQueryData({ ...imageUsageCountsQuery(scope, environments), revalidateIfStale: true }),
 			featureStore.load(environments.map((env) => env.id))
 		])

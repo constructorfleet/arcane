@@ -31,8 +31,29 @@ export interface ImageUsedBy {
 	id?: string;
 }
 
-export interface ImageSummary {
+export interface ImageRepositoryCopy {
 	id: string;
+	environmentId: string;
+	environmentName?: string;
+	tags: string[] | null;
+	inUse: boolean;
+}
+
+export interface ImageRepositoryGroup {
+	copies: ImageRepositoryCopy[];
+	digests: string[] | null;
+	minSize: number;
+	maxSize: number;
+	variants: number;
+	scannedVariants: number;
+	checkErrorRef?: string;
+	sawScanError?: boolean;
+}
+
+export interface ImageSummary {
+	logicalId?: string;
+	id: string;
+	repositoryGroup?: ImageRepositoryGroup;
 	repoTags: string[];
 	repoDigests: string[];
 	pinnedReferences?: string[];

@@ -9,7 +9,6 @@
 	import DigestCell from '#lib/components/arcane-table/cells/digest-cell.svelte';
 	import InUseStatus from '#lib/components/arcane-table/cells/in-use-status.svelte';
 	import UnixCreatedCell from '#lib/components/arcane-table/cells/unix-created-cell.svelte';
-	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
 	import type { ColumnSpec, MobileFieldVisibility, BulkAction } from '#lib/components/arcane-table/index.js';
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
 	import { HardenedImageBadge } from '#lib/components/badges/index.js';
@@ -55,7 +54,7 @@
 	import { hardenedImageDisplay, hardenedSupportSummary } from '#lib/utils/hardened-images.js';
 	import { blockedUpdateTitle } from '#lib/utils/image-updates.js';
 	import { inUseBadge } from '#lib/utils/mobile-card-badges.js';
-	import { resourceDetailHref, resourceTableHref } from '#lib/utils/resource-navigation.js';
+	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	import ImageTagDialog from './image-tag-dialog.svelte';
@@ -68,9 +67,9 @@
 		requestOptions = $bindable(),
 		onRetry,
 		refreshError,
-		showEnvironment = true
+		repositoryLibrary = false
 	}: {
-		showEnvironment?: boolean;
+		repositoryLibrary?: boolean;
 		images: EnvironmentPage<ImageListResponse>;
 		selectedIds: string[];
 		requestOptions: SearchPaginationSortRequest;
@@ -97,10 +96,25 @@
 
 	const canViewEvents = $derived(hasPermission('events:list', GLOBAL_SCOPE));
 
+	function imageHref(item: ImageRow) {
+		const copy = item.repositoryGroup?.copies.find((entry) => hasPermission('images:read', entry.environmentId));
+		const params = new URLSearchParams({ env: copy?.environmentId ?? item.environmentId });
+		if (item.repositoryGroup) params.set('repo', item.repo);
+		return resourceTableHref(
+			`${resolve('/(app)/images/[imageId]', { imageId: copy?.id ?? item.id })}?${params}`,
+			requestOptions.pagination?.page
+		);
+	}
+
 	function updateErrorHref(item: ImageRow) {
-		if (!canViewEvents || !item.updateInfo?.error || !item.repo || item.repo === '<none>' || !item.tag || item.tag === '<none>')
-			return null;
-		const params = new URLSearchParams({ imageUpdateRef: `${item.repo}:${item.tag}` });
+		if (!canViewEvents) return null;
+		const ref = item.repositoryGroup
+			? item.repositoryGroup.checkErrorRef
+			: item.updateInfo?.error && item.repo && item.repo !== '<none>' && item.tag && item.tag !== '<none>'
+				? `${item.repo}:${item.tag}`
+				: null;
+		if (!ref) return null;
+		const params = new URLSearchParams({ imageUpdateRef: ref });
 		return resourceTableHref(`${resolve('/(app)/events')}?${params}`, requestOptions.pagination?.page);
 	}
 
@@ -251,7 +265,6 @@
 	}
 
 	const allColumns = $derived([
-		...(showEnvironment ? environmentColumns<ImageRow>() : []),
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
 		{ accessorKey: 'repo', title: m.resource_repository_cap(), sortable: true, cell: RepoCell },
 		{
@@ -267,7 +280,7 @@
 				if (!row.repoDigests || row.repoDigests.length === 0) return 'local';
 				if (row.updateInfo?.hasUpdate) return 'has_update';
 				if (row.updateInfo?.updateType === 'local') return 'local';
-				if (row.updateInfo?.error) return 'error';
+				if (row.repositoryGroup?.checkErrorRef || row.updateInfo?.error) return 'error';
 				if (row.updateInfo) return 'up_to_date';
 				return 'unknown';
 			},
@@ -350,12 +363,7 @@
 {#snippet RepoCell({ item }: { item: ImageRow })}
 	<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
 		{#if item.repo && item.repo !== '<none>'}
-			<a
-				class="min-w-0 font-medium wrap-anywhere hover:underline"
-				href={resourceDetailHref(
-					resolve(`/(app)/images/[imageId]?env=${encodeURIComponent(item.environmentId)}`, { imageId: item.id })
-				)}>{item.repo}</a
-			>
+			<a class="min-w-0 font-medium wrap-anywhere hover:underline" href={imageHref(item)}>{item.repo}</a>
 		{:else}
 			<span class="text-muted-foreground italic">{m.images_untagged()}</span>
 		{/if}
@@ -377,7 +385,21 @@
 {/snippet}
 
 {#snippet TagCell({ item }: { item: ImageRow })}
-	{#if item.repoTags && item.repoTags.length > 0 && item.repoTags[0] !== '<none>:<none>'}
+	{#if item.repositoryGroup}
+		<div class="flex min-w-0 flex-wrap items-center gap-1.5">
+			{#if item.tag !== '<none>'}
+				<Badge variant="outline" mono class="max-w-full wrap-anywhere whitespace-normal">{item.tag}</Badge>
+			{/if}
+			{#if (item.repoTags?.length ?? 0) > 1}
+				<Badge variant="gray" title={item.repoTags.join(', ')}>+{item.repoTags.length - 1}</Badge>
+			{/if}
+			{#if item.repositoryGroup.variants > 1}
+				<Badge variant="gray">{m.image_variant_count({ count: item.repositoryGroup.variants })}</Badge>
+			{:else if item.repositoryGroup.digests?.[0]}
+				<DigestCell value={item.repositoryGroup.digests[0]} />
+			{/if}
+		</div>
+	{:else if item.repoTags && item.repoTags.length > 0 && item.repoTags[0] !== '<none>:<none>'}
 		<div class="flex flex-wrap gap-1.5">
 			{#each item.repoTags as repoTag, tagIndex (`${repoTag}-${tagIndex}`)}
 				<Badge variant="outline" mono class="max-w-full wrap-anywhere whitespace-normal"
@@ -406,8 +428,12 @@
 	{/if}
 {/snippet}
 
-{#snippet SizeCell({ value }: { value: unknown })}
-	{bytes.format(Number(value ?? 0), { unitSeparator: ' ' })}
+{#snippet SizeCell({ item }: { item: ImageRow })}
+	{#if item.repositoryGroup && item.repositoryGroup.minSize !== item.repositoryGroup.maxSize}
+		{bytes.format(item.repositoryGroup.minSize)}–{bytes.format(item.repositoryGroup.maxSize)}
+	{:else}
+		{bytes.format(Number(item.size ?? 0), { unitSeparator: ' ' })}
+	{/if}
 {/snippet}
 
 {#snippet StatusCell({ item }: { item: ImageRow })}
@@ -504,7 +530,19 @@
 				</Tooltip.Root>
 			</Tooltip.Provider>
 		{/if}
-		{#if !errorHref || item.updateInfo?.hasUpdate}
+		{#if item.repositoryGroup}
+			{#if item.updateInfo?.hasUpdate}
+				<Badge variant="blue">{m.images_has_updates()}</Badge>
+			{:else if !errorHref}
+				{#if item.updateInfo?.updateType === 'local'}
+					<span class="text-muted-foreground">{m.image_update_local_title()}</span>
+				{:else if item.updateInfo && !item.updateInfo.error}
+					<span class="text-muted-foreground">{m.images_no_updates()}</span>
+				{:else}
+					<span class="text-muted-foreground">—</span>
+				{/if}
+			{/if}
+		{:else if !errorHref || item.updateInfo?.hasUpdate}
 			<ImageUpdateItem
 				updateInfo={errorHref && item.updateInfo ? { ...item.updateInfo, error: undefined } : item.updateInfo}
 				imageId={item.id}
@@ -520,7 +558,25 @@
 
 {#snippet VulnerabilitiesCell({ item }: { item: ImageRow })}
 	<!-- The column shows when any environment scans; each row needs its own environment to. -->
-	{#if featureStore.isEnabled('vulnerabilityManagement', item.environmentId)}
+	{#if item.repositoryGroup}
+		{@const stats = item.repositoryGroup}
+		{@const findings = item.vulnerabilityScan?.summary}
+		<div class="flex min-w-0 flex-wrap items-center justify-center gap-1.5">
+			{#if findings}
+				<Badge variant={findings.critical ? 'red' : findings.high ? 'amber' : 'gray'}>{findings.total}</Badge>
+			{/if}
+			{#if stats.sawScanError}
+				<span class="text-xs text-destructive">{m.vuln_scan_failed()}</span>
+			{/if}
+			{#if stats.scannedVariants < stats.variants}
+				<span class="text-xs text-muted-foreground"
+					>{stats.scannedVariants
+						? m.image_scan_coverage({ scanned: stats.scannedVariants, total: stats.variants })
+						: m.vuln_no_scan()}</span
+				>
+			{/if}
+		</div>
+	{:else if featureStore.isEnabled('vulnerabilityManagement', item.environmentId)}
 		<div class="flex max-w-full min-w-0 items-center justify-center">
 			<VulnerabilityScanItem
 				scanSummary={item.vulnerabilityScan}
@@ -533,7 +589,9 @@
 {/snippet}
 
 {#snippet MobileTagsValue(item: ImageRow)}
-	{#if item.repoTags && item.repoTags.length > 0 && item.repoTags[0] !== '<none>:<none>'}
+	{#if item.repositoryGroup}
+		{@render TagCell({ item })}
+	{:else if item.repoTags && item.repoTags.length > 0 && item.repoTags[0] !== '<none>:<none>'}
 		<span class="font-mono text-xs">{item.repoTags.map((rt) => rt.split(':').pop() || rt).join(', ')}</span>
 	{:else if item.pinnedReferences && item.pinnedReferences.length > 0}
 		<span class="font-mono text-xs break-all whitespace-normal select-all">
@@ -547,6 +605,14 @@
 	{:else}
 		<span class="text-muted-foreground italic">{m.images_untagged()}</span>
 	{/if}
+{/snippet}
+
+{#snippet MobileUpdatesValue(item: ImageRow)}
+	{@render UpdatesCell({ item })}
+{/snippet}
+
+{#snippet MobileVulnerabilitiesValue(item: ImageRow)}
+	{@render VulnerabilitiesCell({ item })}
 {/snippet}
 
 {#snippet ImageMobileCardSnippet({
@@ -608,6 +674,20 @@
 				show: mobileFieldVisibility['repoTags'] ?? true
 			},
 			{
+				label: m.updates(),
+				getValue: (item: ImageRow) => (item.repositoryGroup ? item : null),
+				type: 'component',
+				component: MobileUpdatesValue,
+				show: repositoryLibrary
+			},
+			{
+				label: m.vuln_title(),
+				getValue: (item: ImageRow) => (item.repositoryGroup ? item : null),
+				type: 'component',
+				component: MobileVulnerabilitiesValue,
+				show: repositoryLibrary && vulnerabilityManagementEnabled
+			},
+			{
 				label: m.images_used_by(),
 				getValue: (item: ImageRow) => item.usedBy?.map((usage) => usage.name).join(', ') || '—',
 				icon: ImagesIcon,
@@ -623,8 +703,7 @@
 				}
 			: undefined}
 		rowActions={RowActions}
-		href={(item: ImageRow) =>
-			resolve(`/(app)/images/[imageId]?env=${encodeURIComponent(item.environmentId)}`, { imageId: item.id })}
+		href={imageHref}
 	/>
 {/snippet}
 
@@ -632,10 +711,7 @@
 	{@const envId = item.environmentId}
 	{@const errorHref = updateErrorHref(item)}
 	<RowActionsMenu name={item.repo && item.repo !== '<none>' ? `${item.repo}:${item.tag}` : item.id}>
-		<DropdownMenu.Item
-			onclick={() =>
-				goto(resourceDetailHref(resolve(`/(app)/images/[imageId]?env=${encodeURIComponent(envId)}`, { imageId: item.id })))}
-		>
+		<DropdownMenu.Item onclick={() => goto(imageHref(item))}>
 			<InspectIcon class="size-4" />
 			{m.common_inspect()}
 		</DropdownMenu.Item>
@@ -645,7 +721,7 @@
 				<AlertIcon class="size-4 text-destructive" />
 				{m.view_errors()}
 			</DropdownMenu.Item>
-			{#if hasPermission('image-updates:check', envId)}
+			{#if !item.repositoryGroup && hasPermission('image-updates:check', envId)}
 				<DropdownMenu.Item onclick={() => recheckImage(item)} disabled={isLoading.checking}>
 					<RefreshIcon class="size-4" />
 					{m.image_update_recheck_button()}
@@ -653,71 +729,74 @@
 			{/if}
 		{/if}
 
-		{#if canPullImage || canScanImage || canTagImage || canReadImage}
-			<DropdownMenu.Separator />
-		{/if}
+		{#if !item.repositoryGroup}
+			{#if canPullImage || canScanImage || canTagImage || canReadImage}
+				<DropdownMenu.Separator />
+			{/if}
 
-		{#if canTagImage && hasPermission('images:tag', envId)}
-			<DropdownMenu.Item onclick={() => (tagDialogImage = item)}>
-				<TagIcon class="size-4" />
-				{m.images_tag_image()}
-			</DropdownMenu.Item>
-		{/if}
+			{#if canTagImage && hasPermission('images:tag', envId)}
+				<DropdownMenu.Item onclick={() => (tagDialogImage = item)}>
+					<TagIcon class="size-4" />
+					{m.images_tag_image()}
+				</DropdownMenu.Item>
+			{/if}
 
-		{#if canReadImage && hasPermission('images:read', envId)}
-			<DropdownMenu.Item onclick={() => handleExportImage(item.id, envId)}>
-				<DownloadIcon class="size-4" />
-				{m.images_export()}
-			</DropdownMenu.Item>
-		{/if}
+			{#if canReadImage && hasPermission('images:read', envId)}
+				<DropdownMenu.Item onclick={() => handleExportImage(item.id, envId)}>
+					<DownloadIcon class="size-4" />
+					{m.images_export()}
+				</DropdownMenu.Item>
+			{/if}
 
-		{@const usableTags = item.repoTags?.filter((tag) => tag !== '<none>:<none>') ?? []}
-		<!-- Prefer a real tag: a digest name kept beside it would pull the old pinned image. -->
-		{@const usableTag = usableTags.find((tag) => !tag.includes('@')) ?? usableTags[0]}
-		{#if canPullImage && hasPermission('images:pull', envId)}
-			<DropdownMenu.Item onclick={() => handleInlineImagePull(usableTag || '', envId)} disabled={!usableTag}>
-				<DownloadIcon class="size-4" />
-				{m.pull()}
-			</DropdownMenu.Item>
-		{/if}
+			{@const usableTags = item.repoTags?.filter((tag) => tag !== '<none>:<none>') ?? []}
+			<!-- Prefer a real tag: a digest name kept beside it would pull the old pinned image. -->
+			{@const usableTag = usableTags.find((tag) => !tag.includes('@')) ?? usableTags[0]}
+			{#if canPullImage && hasPermission('images:pull', envId)}
+				<DropdownMenu.Item onclick={() => handleInlineImagePull(usableTag || '', envId)} disabled={!usableTag}>
+					<DownloadIcon class="size-4" />
+					{m.pull()}
+				</DropdownMenu.Item>
+			{/if}
 
-		{#if canScanImage && featureStore.isEnabled('vulnerabilityManagement', envId) && hasPermission('vulnerabilities:scan', envId)}
-			<DropdownMenu.Item onclick={() => handleInlineVulnerabilityScan(item)}>
-				<SearchIcon class="size-4" />
-				{m.vuln_scan()}
-			</DropdownMenu.Item>
-		{/if}
+			{#if canScanImage && featureStore.isEnabled('vulnerabilityManagement', envId) && hasPermission('vulnerabilities:scan', envId)}
+				<DropdownMenu.Item onclick={() => handleInlineVulnerabilityScan(item)}>
+					<SearchIcon class="size-4" />
+					{m.vuln_scan()}
+				</DropdownMenu.Item>
+			{/if}
 
-		{#if canPatchImage && hasPermission('images:patch', envId)}
-			{@const imageIsLocal = !item.repoDigests || item.repoDigests.length === 0}
-			<DropdownMenu.Item onclick={() => handleInlineImagePatch(item.id, envId)} disabled={imageIsLocal || !usableTag}>
-				<ShieldCheckIcon class="size-4" />
-				<div class="flex flex-col items-start">
-					<span>{m.images_patch()}</span>
-					{#if imageIsLocal}
-						<span class="text-xs text-muted-foreground">{m.security_local_image_unpatchable()}</span>
+			{#if canPatchImage && hasPermission('images:patch', envId)}
+				{@const imageIsLocal = !item.repoDigests || item.repoDigests.length === 0}
+				<DropdownMenu.Item onclick={() => handleInlineImagePatch(item.id, envId)} disabled={imageIsLocal || !usableTag}>
+					<ShieldCheckIcon class="size-4" />
+					<div class="flex flex-col items-start">
+						<span>{m.images_patch()}</span>
+						{#if imageIsLocal}
+							<span class="text-xs text-muted-foreground">{m.security_local_image_unpatchable()}</span>
+						{/if}
+					</div>
+				</DropdownMenu.Item>
+			{/if}
+
+			{#if canDeleteImage && hasPermission('images:delete', envId)}
+				<DropdownMenu.Separator />
+
+				<DropdownMenu.Item variant="destructive" onclick={() => deleteImage(item.id, envId)} disabled={isLoading.removing}>
+					{#if isLoading.removing}
+						<Spinner class="size-4" />
+					{:else}
+						<TrashIcon class="size-4" />
 					{/if}
-				</div>
-			</DropdownMenu.Item>
-		{/if}
-
-		{#if canDeleteImage && hasPermission('images:delete', envId)}
-			<DropdownMenu.Separator />
-
-			<DropdownMenu.Item variant="destructive" onclick={() => deleteImage(item.id, envId)} disabled={isLoading.removing}>
-				{#if isLoading.removing}
-					<Spinner class="size-4" />
-				{:else}
-					<TrashIcon class="size-4" />
-				{/if}
-				{m.common_remove()}
-			</DropdownMenu.Item>
+					{m.common_remove()}
+				</DropdownMenu.Item>
+			{/if}
 		{/if}
 	</RowActionsMenu>
 {/snippet}
 
 <ArcaneTable
-	persistKey={showEnvironment ? 'arcane-image-table' : 'arcane-image-agent-scoped-table'}
+	persistKey={repositoryLibrary ? 'arcane-image-table' : 'arcane-image-agent-scoped-table'}
+	selectionDisabled={repositoryLibrary}
 	items={images}
 	bind:requestOptions
 	bind:selectedIds

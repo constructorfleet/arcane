@@ -29,12 +29,14 @@
 	import { activityStore } from '#lib/stores/activity.store.svelte.js';
 	import { environmentStore } from '#lib/stores/environment.store.svelte.js';
 	import { featureStore } from '#lib/stores/features.store.svelte.js';
+	import type { ImageRepositoryCopy } from '#lib/types/image.js';
 	import type { VulnerabilityScanResult } from '#lib/types/vulnerability.js';
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
 	import { handleApiResultWithCallbacks, extractApiErrorMessage } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { stabilizeFailedVulnerabilitySummary, isVulnerabilityScanInProgress } from '#lib/utils/docker.js';
 	import { parseImageRef } from '#lib/utils/docker.js';
+	import { environmentName } from '#lib/utils/environments.js';
 	import { bytes, formatDateTimeShort, nowInstantString } from '#lib/utils/formatting.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 	import { toastVulnerabilityScanStatus } from '#lib/utils/vulnerability.js';
@@ -54,6 +56,19 @@
 	);
 
 	const currentEnvId = $derived(data.envId);
+
+	function repositoryCopyKey(copy: ImageRepositoryCopy) {
+		return `${copy.environmentId}/${copy.id}`;
+	}
+
+	function selectRepositoryCopy(key: string) {
+		const copy = data.repositoryCopies.find((entry) => repositoryCopyKey(entry) === key);
+		if (!copy) return;
+		const params = new URLSearchParams(page.url.searchParams.toString());
+		params.set('env', copy.environmentId);
+		void goto(`${resolve('/(app)/images/[imageId]', { imageId: copy.id })}?${params}`);
+	}
+
 	const vulnerabilityManagementEnabled = $derived(featureStore.isEnabled('vulnerabilityManagement', currentEnvId));
 
 	const urlTab = useUrlTab({
@@ -397,6 +412,24 @@
 		{/snippet}
 		{#snippet headerActions()}<ActionButtonGroup buttons={actions} />{/snippet}
 		{#snippet tabContent()}
+			{#if data.repository && data.repositoryCopies.length > 0}
+				<label class="mb-4 flex max-w-full flex-wrap items-center gap-2 text-sm">
+					<span class="shrink-0 font-medium">{m.image_node_copy()}</span>
+					<select
+						class="max-w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm"
+						value={`${currentEnvId}/${data.imageId}`}
+						onchange={(e) => selectRepositoryCopy(e.currentTarget.value)}
+					>
+						{#each data.repositoryCopies as copy (repositoryCopyKey(copy))}
+							<option value={repositoryCopyKey(copy)}>
+								{copy.environmentName || environmentName(copy.environmentId)} ·
+								{copy.tags?.[0]?.split(':').at(-1) ?? m.images_untagged()} · {copy.id.replace(/^sha256:/, '').slice(0, 12)}
+								{copy.inUse ? ` · ${m.common_in_use()}` : ''}
+							</option>
+						{/each}
+					</select>
+				</label>
+			{/if}
 			{#snippet kvTile(label: string, value: string, wide = false)}
 				<KeyValueCard {label} class={wide ? 'sm:col-span-2 lg:col-span-3' : undefined} valueTitle={value}>
 					{value}

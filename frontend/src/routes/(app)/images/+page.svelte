@@ -18,7 +18,7 @@
 	import { CloseIcon, VolumesIcon, LocalFolderComputerIcon, SearchIcon } from '#lib/icons/index.js';
 	import { ResourcePageLayout, type ActionButton, type StatCardConfig } from '#lib/layouts/index.js';
 	import { m } from '#lib/paraglide/messages.js';
-	import { imageListQuery, imageUsageCountsQuery } from '#lib/query/images.js';
+	import { imageLibraryQuery, imageListQuery, imageUsageCountsQuery } from '#lib/query/images.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { imageService } from '#lib/services/image-service.js';
 	import { emptySettings, settingsService } from '#lib/services/settings-service.js';
@@ -72,8 +72,9 @@
 
 	const imagesQuery = createQuery(() => {
 		const scope = pageState.scope;
+		const listQuery = data.linkedAgent ? imageListQuery : imageLibraryQuery;
 		return {
-			...imageListQuery(scope, readableEnvironments('images:list', data.linkedAgent), pageState.requestOptions),
+			...listQuery(scope, readableEnvironments('images:list', data.linkedAgent), pageState.requestOptions),
 			placeholderData: (previous, query) => (query?.queryKey[1] === scope ? previous : undefined),
 			select: (value) => ({ envId: scope, value })
 		};
@@ -365,7 +366,7 @@
 		{#if resourcesReady}
 			{#key JSON.stringify([pageState.scope, data.linkedAgent])}
 				<ImageTable
-					showEnvironment={!data.linkedAgent}
+					repositoryLibrary={!data.linkedAgent}
 					images={withFailedEnvironments(images, countFailures)}
 					bind:selectedIds={pageState.selectedIds}
 					bind:requestOptions={pageState.requestOptions}

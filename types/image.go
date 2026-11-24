@@ -81,18 +81,39 @@ type (
 		Hardened          *HardenedImageInfo        `json:"hardened,omitempty"`
 
 		EnvironmentTag
-		ID               string        `json:"id" sortable:"true"`
-		Repo             string        `json:"repo" sortable:"true"`
-		Tag              string        `json:"tag" sortable:"true"`
-		RepoTags         []string      `json:"repoTags"`
-		RepoDigests      []string      `json:"repoDigests"`
-		UsedBy           []ImageUsedBy `json:"usedBy,omitempty"`
-		PinnedReferences []string      `json:"pinnedReferences,omitempty"`
+		RepositoryGroup    *ImageRepositoryGroup `json:"repositoryGroup,omitempty"`
+		LogicalID          string                `json:"logicalId,omitempty"`
+		ID                 string                `json:"id" sortable:"true"`
+		Repo               string                `json:"repo" sortable:"true"`
+		Tag                string                `json:"tag" sortable:"true"`
+		RepoTags           []string              `json:"repoTags"`
+		RepoDigests        []string              `json:"repoDigests"`
+		UsedBy             []ImageUsedBy         `json:"usedBy,omitempty"`
+		ActiveRepositories []string              `json:"activeRepositories,omitempty"`
+		PinnedReferences   []string              `json:"pinnedReferences,omitempty"`
 
 		Created     int64 `json:"created" sortable:"true"`
 		Size        int64 `json:"size" sortable:"true"`
 		VirtualSize int64 `json:"virtualSize"`
 		InUse       bool  `json:"inUse" sortable:"true"`
+	}
+
+	ImageRepositoryGroup struct {
+		CheckErrorRef   string                `json:"checkErrorRef,omitempty"`
+		Copies          []ImageRepositoryCopy `json:"copies"`
+		Digests         []string              `json:"digests"`
+		MinSize         int64                 `json:"minSize"`
+		MaxSize         int64                 `json:"maxSize"`
+		Variants        int                   `json:"variants"`
+		ScannedVariants int                   `json:"scannedVariants"`
+		SawScanError    bool                  `json:"sawScanError,omitempty"`
+	}
+
+	ImageRepositoryCopy struct {
+		EnvironmentTag
+		ID    string   `json:"id"`
+		Tags  []string `json:"tags"`
+		InUse bool     `json:"inUse"`
 	}
 
 	ImageAttestationList struct {
