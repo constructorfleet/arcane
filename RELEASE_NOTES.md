@@ -1,5 +1,4 @@
-# 3.0.1-cf.97
+# 3.0.1-cf.98
 
-- Link image update-check flags and row actions to the corresponding errors in the Event Log.
-- Add short hover and keyboard-focus previews to the image flags.
-- Record failed image update checks for future Event Log navigation. Previously recorded batch failures remain in their job activity.
+- Wrap long repository names and scan labels inside image cards.
+- Give image layer commands most of the History table width. Keep dates compact, put tags beneath their command, and omit the layer ID column.

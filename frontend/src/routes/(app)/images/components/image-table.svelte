@@ -348,10 +348,10 @@
 </script>
 
 {#snippet RepoCell({ item }: { item: ImageRow })}
-	<div class="flex items-center gap-2">
+	<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
 		{#if item.repo && item.repo !== '<none>'}
 			<a
-				class="font-medium whitespace-nowrap hover:underline"
+				class="min-w-0 font-medium wrap-anywhere hover:underline"
 				href={resourceDetailHref(
 					resolve(`/(app)/images/[imageId]?env=${encodeURIComponent(item.environmentId)}`, { imageId: item.id })
 				)}>{item.repo}</a
@@ -380,7 +380,9 @@
 	{#if item.repoTags && item.repoTags.length > 0 && item.repoTags[0] !== '<none>:<none>'}
 		<div class="flex flex-wrap gap-1.5">
 			{#each item.repoTags as repoTag, tagIndex (`${repoTag}-${tagIndex}`)}
-				<Badge variant="outline" mono>{repoTag.split(':').pop() || repoTag}</Badge>
+				<Badge variant="outline" mono class="max-w-full wrap-anywhere whitespace-normal"
+					>{repoTag.split(':').pop() || repoTag}</Badge
+				>
 			{/each}
 		</div>
 	{:else if item.pinnedReferences && item.pinnedReferences.length > 0 && item.pinnedReferences[0]}
@@ -389,16 +391,16 @@
 				{@const digestAt = pin.indexOf('@')}
 				{@const pinName = digestAt === -1 ? pin : pin.slice(0, digestAt)}
 				{@const tagAt = pinName.lastIndexOf(':')}
-				<div class="flex items-center gap-1.5">
+				<div class="flex max-w-full min-w-0 flex-wrap items-center gap-1.5">
 					{#if tagAt > pinName.lastIndexOf('/')}
-						<Badge variant="outline" mono>{pinName.slice(tagAt + 1)}</Badge>
+						<Badge variant="outline" mono class="max-w-full wrap-anywhere whitespace-normal">{pinName.slice(tagAt + 1)}</Badge>
 					{/if}
 					<DigestCell value={digestAt === -1 ? pin : pin.slice(digestAt + 1)} />
 				</div>
 			{/each}
 		</div>
 	{:else if item.tag && item.tag !== '<none>'}
-		<Badge variant="outline" mono>{item.tag}</Badge>
+		<Badge variant="outline" mono class="max-w-full wrap-anywhere whitespace-normal">{item.tag}</Badge>
 	{:else}
 		<span class="text-muted-foreground italic">{m.images_untagged()}</span>
 	{/if}
@@ -482,7 +484,7 @@
 
 {#snippet UpdatesCell({ item }: { item: ImageRow })}
 	{@const errorHref = updateErrorHref(item)}
-	<div class="flex min-w-table-update items-center">
+	<div class="flex min-w-0 items-center">
 		{#if errorHref}
 			<Tooltip.Provider>
 				<Tooltip.Root>
@@ -519,7 +521,7 @@
 {#snippet VulnerabilitiesCell({ item }: { item: ImageRow })}
 	<!-- The column shows when any environment scans; each row needs its own environment to. -->
 	{#if featureStore.isEnabled('vulnerabilityManagement', item.environmentId)}
-		<div class="flex min-w-table-security items-center justify-center">
+		<div class="flex max-w-full min-w-0 items-center justify-center">
 			<VulnerabilityScanItem
 				scanSummary={item.vulnerabilityScan}
 				imageId={item.id}

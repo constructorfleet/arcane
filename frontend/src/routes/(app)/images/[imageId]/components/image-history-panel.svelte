@@ -9,7 +9,7 @@
 	import { imageService } from '#lib/services/image-service.js';
 	import { environmentStore } from '#lib/stores/environment.store.svelte.js';
 	import { hasPermission } from '#lib/utils/auth.js';
-	import { bytes, formatDateTimeShort } from '#lib/utils/formatting.js';
+	import { bytes, formatDate, formatDateTime } from '#lib/utils/formatting.js';
 
 	let { imageId, environmentId: imageEnvironmentId }: { imageId: string; environmentId: string } = $props();
 
@@ -31,11 +31,6 @@
 		if (historyQuery.error) return m.images_history_load_failed();
 		return null;
 	});
-
-	function formatCreated(created: number) {
-		if (!created) return m.common_na();
-		return formatDateTimeShort(Temporal.Instant.fromEpochMilliseconds(created * 1000));
-	}
 </script>
 
 <Card.Root>
@@ -54,38 +49,42 @@
 		{:else if history.length === 0}
 			<p class="py-8 text-sm text-muted-foreground">{m.images_history_empty()}</p>
 		{:else}
-			<div class="overflow-x-auto">
-				<table class="w-full min-w-180 text-sm">
-					<thead class="border-b text-left text-xs text-muted-foreground uppercase">
-						<tr>
-							<th class="py-2 pr-4 font-medium">{m.common_id()}</th>
-							<th class="py-2 pr-4 font-medium">{m.common_created()}</th>
-							<th class="py-2 pr-4 font-medium">{m.common_size()}</th>
-							<th class="py-2 pr-4 font-medium">{m.common_command()}</th>
-							<th class="py-2 font-medium">{m.common_tags()}</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each history as item, index (`${item.id}-${index}`)}
-							<tr class="border-b last:border-0">
-								<td class="max-w-45 py-3 pr-4 font-mono text-xs break-all">{item.id || m.images_history_missing_layer()}</td>
-								<td class="py-3 pr-4 whitespace-nowrap">{formatCreated(item.created)}</td>
-								<td class="py-3 pr-4 whitespace-nowrap">{bytes.format(item.size)}</td>
-								<td class="max-w-80 py-3 pr-4 font-mono text-xs break-all">{item.createdBy || m.common_na()}</td>
-								<td class="py-3">
-									<div class="flex flex-wrap gap-1">
-										{#each item.tags ?? [] as tag (tag)}
-											<Badge variant="secondary">{tag}</Badge>
-										{:else}
-											<span class="text-muted-foreground">{m.common_na()}</span>
+			<table class="w-full table-fixed text-sm">
+				<thead class="border-b text-left text-xs text-muted-foreground uppercase">
+					<tr>
+						<th scope="col" class="py-2 pr-2 font-medium">{m.common_command()}</th>
+						<th scope="col" class="w-19 py-2 pr-2 font-medium wrap-anywhere">{m.common_created()}</th>
+						<th scope="col" class="w-18 py-2 text-right font-medium wrap-anywhere">{m.common_size()}</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each history as item, index (`${item.id}-${index}`)}
+						<tr class="border-b align-top last:border-0">
+							<td class="py-3 pr-3">
+								<div class="font-mono text-xs wrap-anywhere whitespace-pre-wrap">{item.createdBy || m.common_na()}</div>
+								{#if item.tags?.length}
+									<div class="mt-1.5 flex min-w-0 flex-wrap gap-1" role="group" aria-label={m.common_tags()}>
+										{#each item.tags as tag (tag)}
+											<Badge variant="secondary" class="max-w-full wrap-anywhere whitespace-normal">{tag}</Badge>
 										{/each}
 									</div>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
+								{/if}
+							</td>
+							<td class="py-3 pr-2 text-xs wrap-anywhere tabular-nums">
+								{#if item.created}
+									{@const instant = Temporal.Instant.fromEpochMilliseconds(item.created * 1000)}
+									<time datetime={instant.toString()} title={formatDateTime(instant)}
+										>{formatDate(instant, { dateStyle: 'short' })}</time
+									>
+								{:else}
+									{m.common_na()}
+								{/if}
+							</td>
+							<td class="py-3 text-right text-xs wrap-anywhere tabular-nums">{bytes.format(item.size)}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
 		{/if}
 	</Card.Content>
 </Card.Root>

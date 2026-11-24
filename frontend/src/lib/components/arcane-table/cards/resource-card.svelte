@@ -76,7 +76,7 @@
 						</div>
 					{/if}
 					{#if badges}
-						<div class="flex shrink-0 flex-wrap items-center gap-1.5" data-row-select-ignore>
+						<div class="flex max-w-full min-w-0 flex-wrap items-center gap-1.5" data-row-select-ignore>
 							{@render badges()}
 						</div>
 					{/if}
