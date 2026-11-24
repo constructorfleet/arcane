@@ -23,14 +23,15 @@ type (
 	}
 
 	ListEventsInput struct {
-		Search       string `query:"search" doc:"Search query"`
-		Sort         string `query:"sort" doc:"Column to sort by"`
-		Order        string `query:"order" default:"asc" doc:"Sort direction"`
-		Severity     string `query:"severity" doc:"Filter by severity"`
-		Type         string `query:"type" doc:"Filter by event type (exact type or category prefix, comma-separated)"`
-		Start        int    `query:"start" default:"0" doc:"Start index"`
-		Limit        int    `query:"limit" default:"20" doc:"Limit"`
-		IncludeTotal bool   `query:"includeTotal" doc:"Return exact totalItems and totalPages; otherwise they are -1 and hasNextPage reports whether more rows exist"`
+		Search         string `query:"search" doc:"Search query"`
+		Sort           string `query:"sort" doc:"Column to sort by"`
+		Order          string `query:"order" default:"asc" doc:"Sort direction"`
+		Severity       string `query:"severity" doc:"Filter by severity"`
+		ImageUpdateRef string `query:"imageUpdateRef" doc:"Filter to update-check events for this image reference"`
+		Type           string `query:"type" doc:"Filter by event type (exact type or category prefix, comma-separated)"`
+		Start          int    `query:"start" default:"0" doc:"Start index"`
+		Limit          int    `query:"limit" default:"20" doc:"Limit"`
+		IncludeTotal   bool   `query:"includeTotal" doc:"Return exact totalItems and totalPages; otherwise they are -1 and hasNextPage reports whether more rows exist"`
 	}
 
 	GetEventStatsInput struct{}
@@ -68,6 +69,7 @@ type (
 func (h *EventHandler) ListEvents(ctx context.Context, input *ListEventsInput) (*handlerutil.Page[types.Event], error) {
 	params := handlerutil.PaginationParams(input.Start, input.Limit, input.Sort, input.Order, input.Search)
 	params.SkipCount = !input.IncludeTotal
+	params.Filters["imageUpdateRef"] = input.ImageUpdateRef
 
 	if input.Severity != "" {
 		params.Filters["severity"] = input.Severity

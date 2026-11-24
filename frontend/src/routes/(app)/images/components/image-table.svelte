@@ -32,7 +32,9 @@
 		ShieldCheckIcon,
 		ProjectsIcon,
 		ContainersIcon,
-		TagIcon
+		TagIcon,
+		AlertIcon,
+		RefreshIcon
 	} from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
@@ -41,6 +43,7 @@
 	import { environmentStore } from '#lib/stores/environment.store.svelte.js';
 	import { featureStore } from '#lib/stores/features.store.svelte.js';
 	import type { ImageListResponse, ImageSummary } from '#lib/types/image.js';
+	import { GLOBAL_SCOPE } from '#lib/types/role.js';
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import type { VulnerabilityScanSummary } from '#lib/types/vulnerability.js';
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
@@ -52,7 +55,7 @@
 	import { hardenedImageDisplay, hardenedSupportSummary } from '#lib/utils/hardened-images.js';
 	import { blockedUpdateTitle } from '#lib/utils/image-updates.js';
 	import { inUseBadge } from '#lib/utils/mobile-card-badges.js';
-	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
+	import { resourceDetailHref, resourceTableHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	import ImageTagDialog from './image-tag-dialog.svelte';
@@ -91,6 +94,15 @@
 	const canTagImage = $derived(hasShownPermission('images:tag'));
 	const canPatchImage = $derived(hasShownPermission('images:patch'));
 	const canReadImage = $derived(hasShownPermission('images:read'));
+
+	const canViewEvents = $derived(hasPermission('events:list', GLOBAL_SCOPE));
+
+	function updateErrorHref(item: ImageRow) {
+		if (!canViewEvents || !item.updateInfo?.error || !item.repo || item.repo === '<none>' || !item.tag || item.tag === '<none>')
+			return null;
+		const params = new URLSearchParams({ imageUpdateRef: `${item.repo}:${item.tag}` });
+		return resourceTableHref(`${resolve('/(app)/events')}?${params}`, requestOptions.pagination?.page);
+	}
 
 	let tagDialogImage = $state<ImageRow | null>(null);
 
@@ -156,6 +168,23 @@
 			}
 		});
 	}
+	async function recheckImage(item: ImageRow) {
+		if (isLoading.checking) return;
+		isLoading.checking = true;
+		const result = await tryCatch(imageService.checkImageUpdateByID(item.id, item.environmentId));
+		await handleApiResultWithCallbacks({
+			result,
+			message: m.images_update_check_failed(),
+			setLoadingState: (value) => (isLoading.checking = value),
+			onSuccess: async (data) => {
+				const options = activityToastOptions(extractActivityId(data));
+				if (data.error) toast.error(m.image_update_check_failed_title(), options);
+				else toast.success(m.images_update_check_completed(), options);
+				await invalidateImages();
+			}
+		});
+	}
+
 	async function handleInlineImagePull(repoTag: string, environmentId: string) {
 		if (!repoTag || repoTag === '<none>:<none>') {
 			toast.error(m.images_pull_no_tag());
@@ -452,16 +481,38 @@
 {/snippet}
 
 {#snippet UpdatesCell({ item }: { item: ImageRow })}
+	{@const errorHref = updateErrorHref(item)}
 	<div class="flex min-w-table-update items-center">
-		<ImageUpdateItem
-			updateInfo={item.updateInfo}
-			imageId={item.id}
-			environmentId={item.environmentId}
-			repo={item.repo}
-			tag={item.tag}
-			isLocal={!item.repoDigests || item.repoDigests.length === 0}
-			onUpdated={invalidateImages}
-		/>
+		{#if errorHref}
+			<Tooltip.Provider>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<a
+								{...props}
+								href={errorHref}
+								aria-label={m.image_update_check_failed_title()}
+								class="touch-hit relative inline-flex p-1 text-destructive hover:text-destructive/80"
+							>
+								<AlertIcon class="size-4" aria-hidden="true" />
+							</a>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content>{m.image_update_check_failed_title()}</Tooltip.Content>
+				</Tooltip.Root>
+			</Tooltip.Provider>
+		{/if}
+		{#if !errorHref || item.updateInfo?.hasUpdate}
+			<ImageUpdateItem
+				updateInfo={errorHref && item.updateInfo ? { ...item.updateInfo, error: undefined } : item.updateInfo}
+				imageId={item.id}
+				environmentId={item.environmentId}
+				repo={item.repo}
+				tag={item.tag}
+				isLocal={!item.repoDigests || item.repoDigests.length === 0}
+				onUpdated={invalidateImages}
+			/>
+		{/if}
 	</div>
 {/snippet}
 
@@ -577,6 +628,7 @@
 
 {#snippet RowActions({ item }: { item: ImageRow })}
 	{@const envId = item.environmentId}
+	{@const errorHref = updateErrorHref(item)}
 	<RowActionsMenu name={item.repo && item.repo !== '<none>' ? `${item.repo}:${item.tag}` : item.id}>
 		<DropdownMenu.Item
 			onclick={() =>
@@ -585,6 +637,19 @@
 			<InspectIcon class="size-4" />
 			{m.common_inspect()}
 		</DropdownMenu.Item>
+
+		{#if errorHref}
+			<DropdownMenu.Item onclick={() => goto(errorHref)}>
+				<AlertIcon class="size-4 text-destructive" />
+				{m.view_errors()}
+			</DropdownMenu.Item>
+			{#if hasPermission('image-updates:check', envId)}
+				<DropdownMenu.Item onclick={() => recheckImage(item)} disabled={isLoading.checking}>
+					<RefreshIcon class="size-4" />
+					{m.image_update_recheck_button()}
+				</DropdownMenu.Item>
+			{/if}
+		{/if}
 
 		{#if canPullImage || canScanImage || canTagImage || canReadImage}
 			<DropdownMenu.Separator />

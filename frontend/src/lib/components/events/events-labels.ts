@@ -123,6 +123,7 @@ const actionLabels: Record<string, () => string> = {
 	load: m.events_action_load,
 	import: m.events_action_import,
 	scan: m.events_action_scan,
+	update_check: m.image_update_check_failed_title,
 	error: m.common_error,
 	login: m.events_action_login,
 	logout: m.common_logout,

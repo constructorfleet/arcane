@@ -1,4 +1,5 @@
-# 3.0.1-cf.96
+# 3.0.1-cf.97
 
-- Clarify the helper-container notice in the volume’s Containers section.
-- Explain that a helper can keep the volume mounted even when no app is using it.
+- Link image update-check flags and row actions to the corresponding errors in the Event Log.
+- Add short hover and keyboard-focus previews to the image flags.
+- Record failed image update checks for future Event Log navigation. Previously recorded batch failures remain in their job activity.

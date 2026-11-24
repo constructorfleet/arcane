@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { createQuery, keepPreviousData } from '@tanstack/svelte-query';
 	import { untrack } from 'svelte';
 
@@ -19,10 +20,24 @@
 	let requestOptions = $state(untrack(() => data.eventRequestOptions));
 	let isDeleting = $state(false);
 
+	let requestScope = untrack(() => data.imageUpdateRef);
+	$effect.pre(() => {
+		if (data.imageUpdateRef === requestScope) return;
+		requestScope = data.imageUpdateRef;
+		untrack(() => {
+			requestOptions = data.eventRequestOptions;
+			selectedIds = [];
+		});
+	});
+
 	// The load already cached the first page under its key; seeding every key with it would hide other pages and filters.
 	const eventsQuery = createQuery(() => ({
-		...eventListQuery(requestOptions),
-		placeholderData: keepPreviousData
+		...eventListQuery(
+			data.imageUpdateRef
+				? { ...requestOptions, filters: { ...requestOptions.filters, imageUpdateRef: data.imageUpdateRef, severity: 'error' } }
+				: requestOptions
+		),
+		placeholderData: data.imageUpdateRef ? undefined : keepPreviousData
 	}));
 
 	const statsQuery = createQuery(() => ({
@@ -158,8 +173,23 @@
 	]);
 </script>
 
-<ResourcePageLayout title={m.events_title()} subtitle={m.events_subtitle()} {actionButtons} {statCards}>
+<ResourcePageLayout
+	title={m.events_title()}
+	subtitle={data.imageUpdateRef || m.events_subtitle()}
+	{actionButtons}
+	statCards={data.imageUpdateRef ? [] : statCards}
+>
 	{#snippet mainContent()}
-		<EventTable {events} bind:selectedIds bind:requestOptions />
+		{#if data.imageUpdateRef}
+			{#if data.source}
+				<a href={data.source} class="mr-4 mb-3 inline-block text-sm text-primary-text hover:underline">{m.images()}</a>
+			{/if}
+			<a href={resolve('/(app)/events')} class="mb-3 inline-block text-sm text-primary-text hover:underline"
+				>{m.common_view_all()}</a
+			>
+		{/if}
+		{#key data.imageUpdateRef}
+			<EventTable {events} bind:selectedIds bind:requestOptions scoped={!!data.imageUpdateRef} />
+		{/key}
 	{/snippet}
 </ResourcePageLayout>

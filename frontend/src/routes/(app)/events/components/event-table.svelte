@@ -39,11 +39,13 @@
 	let {
 		events,
 		selectedIds = $bindable(),
-		requestOptions = $bindable()
+		requestOptions = $bindable(),
+		scoped = false
 	}: {
 		events: Paginated<Event>;
 		selectedIds: string[];
 		requestOptions: SearchPaginationSortRequest;
+		scoped?: boolean;
 	} = $props();
 
 	const queryClient = useQueryClient();
@@ -274,7 +276,7 @@
 {/snippet}
 
 <ArcaneTable
-	persistKey="arcane-events-table"
+	persistKey={scoped ? undefined : 'arcane-events-table'}
 	items={events}
 	bind:requestOptions
 	bind:selectedIds

@@ -58,6 +58,7 @@ const (
 	EventTypeImageCommit                  EventType     = "image.commit"
 	EventTypeImageDelete                  EventType     = "image.delete"
 	EventTypeImageScan                    EventType     = "image.scan"
+	EventTypeImageUpdateCheck             EventType     = "image.update_check"
 	EventTypeImageError                   EventType     = "image.error"
 	EventTypeImageVulnerabilityScan       EventType     = "image.vulnerability_scan"
 	EventTypeProjectDeploy                EventType     = "project.deploy"

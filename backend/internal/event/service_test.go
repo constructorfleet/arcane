@@ -318,6 +318,31 @@ func TestEventService_ListEventsPaginated_TypeCategoryFilter(t *testing.T) {
 	require.ElementsMatch(t, []string{"container.start", "container.stop", "image.pull"}, listWithTypeFilter("container,image.pull"))
 }
 
+func TestEventService_ListImageUpdateCheckErrors(t *testing.T) {
+	ctx := t.Context()
+	db := setupEventServiceTestDB(t)
+	svc := NewEventService(db, &config.Config{}, nil)
+	for index, item := range []CreateEventRequest{
+		{Type: EventTypeImageUpdateCheck, Severity: EventSeverityError, Title: "oldest", ResourceName: new("docker.io/library/alpine:latest")},
+		{Type: EventTypeImageUpdateCheck, Severity: EventSeverityError, Title: "newest", ResourceName: new("docker.io/library/alpine:latest")},
+		{Type: EventTypeImageUpdateCheck, Severity: EventSeverityError, Title: "different tag", ResourceName: new("docker.io/library/alpine:edge")},
+		{Type: EventTypeImagePull, Severity: EventSeverityError, Title: "different operation", ResourceName: new("docker.io/library/alpine:latest")},
+	} {
+		created, err := svc.CreateEvent(ctx, item)
+		require.NoError(t, err)
+		require.NoError(t, db.Model(created).Update("timestamp", time.Unix(int64(100+index), 0)).Error)
+	}
+	matched, _, err := svc.ListEventsPaginated(ctx, pagination.QueryParams{
+		Limit:      10,
+		SortParams: pagination.SortParams{Sort: "timestamp", Order: pagination.SortDesc},
+		Filters:    map[string]string{"imageUpdateRef": "alpine:latest", "severity": "error"},
+	})
+	require.NoError(t, err)
+	require.Len(t, matched, 2)
+	require.Equal(t, "newest", matched[0].Title)
+	require.Equal(t, "oldest", matched[1].Title)
+}
+
 func TestIngestAgentEventAuthenticatedEnvironment(t *testing.T) {
 	for _, supplied := range []string{"0", "unrelated-environment", ""} {
 		t.Run("payload environment "+supplied, func(t *testing.T) {

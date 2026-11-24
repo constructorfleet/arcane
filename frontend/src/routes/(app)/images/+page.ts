@@ -3,6 +3,7 @@ import { environmentStore } from '#lib/stores/environment.store.svelte.js';
 import { featureStore } from '#lib/stores/features.store.svelte.js';
 import { throwPageLoadError } from '#lib/utils/api.js';
 import { readableEnvironments, resolveLinkedListAgent } from '#lib/utils/environments.js';
+import { resourceTablePage } from '#lib/utils/resource-navigation.js';
 import { resolveInitialListPageRequest } from '#lib/utils/tables.js';
 import { tryCatch } from '#lib/utils/try-catch.js';
 
@@ -20,6 +21,8 @@ export const load: PageLoad = async ({ parent, url }) => {
 			direction: 'desc'
 		}
 	);
+
+	if (imageRequestOptions.pagination) imageRequestOptions.pagination.page = resourceTablePage(url.searchParams.get('tablePage'));
 
 	const result = await tryCatch(
 		Promise.all([

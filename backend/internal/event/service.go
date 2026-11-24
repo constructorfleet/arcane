@@ -31,6 +31,7 @@ import (
 	"kit.getarcane.app/docker/streams/agg"
 	"kit.getarcane.app/docker/streams/bus"
 	"kit.getarcane.app/mapping"
+	"kit.getarcane.app/updater/refs"
 
 	"getarcane.dev/arcane/v3/internal/common"
 	"getarcane.dev/arcane/v3/internal/config"
@@ -504,6 +505,9 @@ func paginateEvents(q *gorm.DB, params pagination.QueryParams) ([]types.Event, p
 		q = q.Where(strings.Join(typeConds, " OR "), typeArgs...)
 	}
 
+	if imageRef := strings.TrimSpace(params.Filters["imageUpdateRef"]); imageRef != "" {
+		q = q.Where("type = ? AND resource_name = ?", EventTypeImageUpdateCheck, cmp.Or(refs.NormalizeImageUpdateRef(imageRef), imageRef))
+	}
 	q = pagination.ApplyFilter(q, "severity", params.Filters["severity"])
 	q = pagination.ApplyFilter(q, "resource_type", params.Filters["resourceType"])
 	q = pagination.ApplyFilter(q, "username", params.Filters["username"])

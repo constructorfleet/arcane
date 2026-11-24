@@ -339,22 +339,7 @@ func (s *ImageUpdateService) CheckImageUpdate(ctx context.Context, imageRef stri
 			ResponseTimeMs: int(time.Since(startTime).Milliseconds()),
 			ActivityID:     mo.EmptyableToOption(strings.TrimSpace(activityID)).ToPointer(),
 		}
-		if logErr := s.eventService.LogResourceEvent(ctx, event.ResourceEvent{
-			Type:          event.EventTypeImageScan,
-			ResourceType:  "image",
-			ResourceName:  imageRef,
-			UserID:        types.SystemUser.ID,
-			Username:      types.SystemUser.Username,
-			EnvironmentID: "0",
-			Metadata: database.JSON{
-				"action":    "check_update",
-				"imageRef":  imageRef,
-				"error":     err.Error(),
-				"checkType": "digest",
-			},
-		}); logErr != nil {
-			slog.WarnContext(ctx, "Failed to log image update check error event", "imageRef", imageRef, "error", logErr.Error())
-		}
+		s.logImageUpdateCheckError(ctx, imageRef, err)
 		if saveErr := s.saveUpdateResultWithSnapshot(ctx, imageRef, result, snapshot); saveErr != nil {
 			slog.WarnContext(ctx, "Failed to save update result", "imageRef", imageRef, "error", saveErr.Error())
 		}
@@ -1554,6 +1539,9 @@ func (s *ImageUpdateService) checkImage(ctx context.Context, t flow.Task) (any, 
 		}
 	}()
 	s.appendImageUpdateActivityMessage(ctx, t.ActivityID(), level, message, nil, "")
+	if checkErr != nil {
+		s.logImageUpdateCheckError(ctx, group[0], checkErr)
+	}
 	if err := s.saveUpdateResultWithSnapshot(ctx, group[0], res, snapshot); err != nil {
 		slog.WarnContext(ctx, "Failed to save update result", "imageRef", group[0], "error", err.Error())
 	}
@@ -1565,6 +1553,17 @@ func (s *ImageUpdateService) checkImage(ctx context.Context, t flow.Task) (any, 
 		return nil, checkErr
 	}
 	return imageCheckResult{Local: res.UpdateType == UpdateTypeLocal, Result: kit.Ternary(input.Report, res, nil)}, nil
+}
+
+func (s *ImageUpdateService) logImageUpdateCheckError(ctx context.Context, imageRef string, err error) {
+	s.eventService.LogErrorEvent(ctx, event.ResourceEvent{
+		Type:          event.EventTypeImageUpdateCheck,
+		ResourceType:  "image",
+		ResourceName:  cmp.Or(refs.NormalizeImageUpdateRef(imageRef), imageRef),
+		UserID:        types.SystemUser.ID,
+		Username:      types.SystemUser.Username,
+		EnvironmentID: "0",
+	}, err)
 }
 
 func (s *ImageUpdateService) checkTagPolicies(ctx context.Context, t flow.Task) (any, error) {
