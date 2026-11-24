@@ -396,7 +396,14 @@
 	});
 </script>
 
-<ResourceDetailLayout backUrl="/images" backLabel={m.images()} environmentId={currentEnvId} title={detailTitle} {actions}>
+<ResourceDetailLayout
+	icon={ImagesIcon}
+	backUrl="/images"
+	backLabel={m.images()}
+	environmentId={currentEnvId}
+	title={detailTitle}
+	{actions}
+>
 	{#if image}
 		{#snippet kvTile(label: string, value: string, wide = false)}
 			<KeyValueCard {label} class={wide ? 'sm:col-span-2 lg:col-span-3' : undefined} valueTitle={value}>

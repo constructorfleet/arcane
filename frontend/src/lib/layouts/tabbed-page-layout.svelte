@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 
-	import ResourcePrevious from '#lib/components/resource-detail/resource-previous.svelte';
+	import ResourceHeaderRow from '#lib/components/resource-detail/resource-header-row.svelte';
 	import { TabBar, type TabItem } from '#lib/components/tab-bar/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { cn } from '#lib/utils.js';
@@ -43,21 +43,7 @@
 		inert={floatingHeaderVisible || undefined}
 	>
 		<div class="max-w-full px-4 pt-3">
-			<div class="flex flex-wrap items-center gap-3">
-				<div class="flex min-w-0 flex-1 items-center gap-3">
-					{#if backUrl}
-						<ResourcePrevious fallback={backUrl} />
-					{/if}
-					<div class="min-w-0 [&_h1]:text-xl [&_h1]:leading-7 [&_h1]:font-semibold sm:[&_h1]:text-2xl">
-						{@render headerInfo()}
-					</div>
-				</div>
-				{#if headerActions}
-					<div class="flex shrink-0 items-center justify-end gap-2">
-						{@render headerActions()}
-					</div>
-				{/if}
-			</div>
+			<ResourceHeaderRow {backUrl} {headerInfo} {headerActions} />
 
 			{#if subHeader}
 				{@render subHeader()}
@@ -83,18 +69,7 @@
 				<div
 					class="bubble-shadow-lg pointer-events-auto max-w-full rounded-lg border border-border/50 bg-popover/90 px-4 py-3 backdrop-blur-md supports-backdrop-filter:bg-popover/80"
 				>
-					<div class="flex items-center gap-4">
-						{#if backUrl}<ResourcePrevious fallback={backUrl} />{/if}
-						<div class="min-w-0">
-							{@render headerInfo()}
-						</div>
-						{#if headerActions}
-							<div class="h-4 w-px shrink-0 bg-border"></div>
-							<div class="flex min-w-9 flex-1 basis-0 items-center justify-end gap-2">
-								{@render headerActions()}
-							</div>
-						{/if}
-					</div>
+					<ResourceHeaderRow {backUrl} {headerInfo} {headerActions} compact />
 				</div>
 			</div>
 		{/if}

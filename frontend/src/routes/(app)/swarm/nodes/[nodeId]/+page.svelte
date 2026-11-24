@@ -63,7 +63,10 @@
 	onTabChange={urlTab.select}
 >
 	{#snippet headerInfo()}
-		<h1 class="min-w-0 truncate text-sm font-semibold">{node.hostname}</h1>
+		<div class="flex min-h-9 items-center gap-2">
+			<UsersIcon class="size-5 shrink-0 text-primary" />
+			<h1 class="shrink-0 font-semibold">{node.hostname}</h1>
+		</div>
 	{/snippet}
 	{#snippet tabContent()}
 		<Tabs.Content value="overview">

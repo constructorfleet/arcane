@@ -1218,28 +1218,26 @@
 {#if volume}
 	<TabbedPageLayout backUrl="/volumes" backLabel={m.resource_volumes_cap()} {tabItems} {selectedTab} {onTabChange}>
 		{#snippet headerInfo()}
-			<div class="flex flex-col gap-1">
-				<div class="flex min-w-0 items-center">
-					<EnvironmentDestinationSelect value={currentEnvId} variant="prefix" readonly />
-					<h1 class="max-w-40 min-w-0 truncate text-sm font-semibold sm:max-w-56 md:max-w-72 lg:max-w-88" title={volume.name}>
-						{volume.name}
-					</h1>
-				</div>
-				<div class="flex flex-wrap items-center gap-2 pt-1">
-					<InUseStatus inUse={volume.inUse} />
-					{#if volume.driver}
-						<Badge variant="blue" minWidth="20">{volume.driver}</Badge>
-					{/if}
-					{#if volume.scope}
-						<Badge variant="purple" minWidth="20">{volume.scope}</Badge>
-					{/if}
-				</div>
-				{#if logicalVolume?.workspaceState === 'active'}
-					<p class="text-xs text-muted-foreground">
-						{m.workspace_uses_active_attachment({ agent: logicalVolume.environmentName ?? currentEnvId })}
-					</p>
+			<div class="flex min-h-9 min-w-0 items-center gap-2">
+				<VolumesIcon class="size-5 shrink-0 text-primary" />
+				<EnvironmentDestinationSelect value={currentEnvId} variant="prefix" readonly />
+				<h1 class="min-w-0 truncate font-semibold" title={volume.name}>{volume.name}</h1>
+				<InUseStatus inUse={volume.inUse} />
+				{#if volume.driver}
+					<Badge variant="blue" minWidth="20">{volume.driver}</Badge>
+				{/if}
+				{#if volume.scope && volume.scope !== volume.driver}
+					<Badge variant="purple" minWidth="20">{volume.scope}</Badge>
 				{/if}
 			</div>
+		{/snippet}
+
+		{#snippet subHeader()}
+			{#if logicalVolume?.workspaceState === 'active'}
+				<p class="mt-1 truncate text-xs text-muted-foreground">
+					{m.workspace_uses_active_attachment({ agent: logicalVolume.environmentName ?? currentEnvId })}
+				</p>
+			{/if}
 		{/snippet}
 
 		{#snippet headerActions()}

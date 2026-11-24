@@ -121,7 +121,7 @@
 		{/if}
 	</div>
 {:else if variant === 'prefix' && currentId}
-	<div class="flex min-w-0 items-center gap-2 pr-2 text-sm text-muted-foreground sm:shrink-0" title={environmentName(currentId)}>
+	<div class="flex min-w-0 shrink-0 items-center gap-2 pr-2 text-sm text-muted-foreground" title={environmentName(currentId)}>
 		<span class="inline-flex min-w-0 items-center gap-1.5">
 			{@render environmentGlyph(currentId)}
 			<span class="max-w-24 truncate sm:max-w-48">{environmentName(currentId)}</span>

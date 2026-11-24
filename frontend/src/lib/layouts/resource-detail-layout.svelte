@@ -4,13 +4,15 @@
 	import ActionButtonGroup from '#lib/components/action-button-group/action-button-group.svelte';
 	import type { ActionButton } from '#lib/components/action-button-group/types.js';
 	import EnvironmentDestinationSelect from '#lib/components/form/environment-destination-select.svelte';
-	import ResourcePrevious from '#lib/components/resource-detail/resource-previous.svelte';
+	import ResourceHeaderRow from '#lib/components/resource-detail/resource-header-row.svelte';
+	import type { IconType } from '#lib/icons/index.js';
 	import { cn } from '#lib/utils.js';
 
 	interface Props {
 		backUrl?: string;
 		backLabel?: string;
 		title: string;
+		icon?: IconType;
 		environmentId?: string;
 		subtitle?: string;
 		actions?: ActionButton[];
@@ -23,6 +25,7 @@
 	let {
 		backUrl,
 		title,
+		icon: Icon,
 		environmentId,
 		subtitle,
 		actions = [],
@@ -38,55 +41,47 @@
 
 <svelte:window bind:scrollY />
 
+{#snippet detailIdentity(compact: boolean)}
+	<div class="flex min-h-9 min-w-0 items-center gap-2">
+		{#if Icon}
+			<Icon class="size-5 shrink-0 text-primary" aria-hidden="true" />
+		{/if}
+		{#if environmentId}
+			<EnvironmentDestinationSelect value={environmentId} variant="prefix" readonly />
+		{/if}
+		{#if compact}
+			<span class="min-w-0 truncate text-sm font-semibold" {title}>{title}</span>
+		{:else}
+			<h1 class="min-w-0 truncate font-semibold" {title}>{title}</h1>
+		{/if}
+		{@render badges?.()}
+	</div>
+{/snippet}
+
+{#snippet headerActions()}
+	<ActionButtonGroup buttons={actions} />
+{/snippet}
+
 {#if showFloatingHeader}
-	<div
-		class="fixed top-4 left-1/2 z-(--arcane-z-page-floating) w-full-inset max-w-fit -translate-x-1/2 animate-in px-2 duration-200 fade-in slide-in-from-top-2 sm:w-auto sm:px-0"
-	>
+	<div class="pointer-events-none fixed inset-x-4 top-4 z-(--arcane-z-page-floating) flex justify-center">
 		<div
-			class="bubble-shadow-lg flex items-center gap-3 rounded-lg border border-border/60 bg-popover/95 px-4 py-2 backdrop-blur-md supports-backdrop-filter:bg-popover/85"
+			class="bubble-shadow-lg pointer-events-auto max-w-full rounded-lg border border-border/60 bg-popover/95 px-4 py-2 backdrop-blur-md supports-backdrop-filter:bg-popover/85"
 		>
-			{#if backUrl}
-				<ResourcePrevious fallback={backUrl} />
-
-				<div class="h-4 w-px bg-border/60"></div>
-			{/if}
-
-			<span class="max-w-50 truncate text-sm font-semibold">{title}</span>
-
-			{#if actions.length > 0}
-				<div class="h-4 w-px bg-border/60"></div>
-				<ActionButtonGroup buttons={actions} size="sm" />
-			{/if}
+			<ResourceHeaderRow {backUrl} headerActions={actions.length ? headerActions : undefined} compact>
+				{#snippet headerInfo()}{@render detailIdentity(true)}{/snippet}
+			</ResourceHeaderRow>
 		</div>
 	</div>
 {/if}
 
 <div class={cn('space-y-6 pb-8', className)}>
 	<div class="space-y-3">
-		<div class="flex flex-wrap items-center gap-3">
-			<div class="flex min-w-0 flex-1 items-center gap-3">
-				{#if backUrl}
-					<ResourcePrevious fallback={backUrl} />
-				{/if}
-				<div class="min-w-0 flex-1">
-					<div class="flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-						<div class="flex min-w-0 items-center">
-							{#if environmentId}
-								<EnvironmentDestinationSelect value={environmentId} variant="prefix" readonly />
-							{/if}
-							<h1 class="truncate text-xl leading-7 font-semibold sm:text-2xl" {title}>{title}</h1>
-						</div>
-						{@render badges?.()}
-					</div>
-					{#if subtitle}
-						<p class="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
-					{/if}
-				</div>
-			</div>
-
-			<ActionButtonGroup buttons={actions} class="shrink-0" />
-		</div>
-
+		<ResourceHeaderRow {backUrl} headerActions={actions.length ? headerActions : undefined}>
+			{#snippet headerInfo()}{@render detailIdentity(false)}{/snippet}
+		</ResourceHeaderRow>
+		{#if subtitle}
+			<p class="truncate text-sm text-muted-foreground" title={subtitle}>{subtitle}</p>
+		{/if}
 		{@render headerExtra?.()}
 	</div>
 

@@ -471,26 +471,23 @@
 {/snippet}
 
 {#snippet environmentHeader()}
-	<div class="flex min-w-0 flex-col gap-1">
-		<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-			<EditableName
-				bind:value={formInputs.name.value}
-				bind:ref={nameInputRef}
-				variant="inline"
-				error={formInputs.name.error ?? undefined}
-				originalValue={environment.name}
-				placeholder={m.environments_name_placeholder()}
-				class="max-w-56 min-w-0 sm:max-w-80 md:max-w-104"
-			/>
-			<EnvironmentStatusSummary
-				environment={runtimeEnvironment}
-				{currentStatus}
-				{isLoadingVersion}
-				{remoteVersion}
-				{versionInformation}
-			/>
-		</div>
-		{@render apiUrlLine()}
+	<div class="flex min-h-9 min-w-0 items-center gap-2">
+		<EditableName
+			bind:value={formInputs.name.value}
+			bind:ref={nameInputRef}
+			variant="inline"
+			error={formInputs.name.error ?? undefined}
+			originalValue={environment.name}
+			placeholder={m.environments_name_placeholder()}
+			class="max-w-56 min-w-0 sm:max-w-80 md:max-w-104"
+		/>
+		<EnvironmentStatusSummary
+			environment={runtimeEnvironment}
+			{currentStatus}
+			{isLoadingVersion}
+			{remoteVersion}
+			{versionInformation}
+		/>
 	</div>
 {/snippet}
 
@@ -513,6 +510,7 @@
 {/snippet}
 
 {#snippet environmentSubHeader()}
+	{@render apiUrlLine()}
 	{#if !environment.enabled || !isCurrentlyOnline || !settings}
 		<div class="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4 text-warning">
 			<AlertIcon class="mt-0.5 size-5 shrink-0 text-warning" />

@@ -531,7 +531,13 @@
 	</div>
 {/snippet}
 
-<ResourceDetailLayout backUrl="/images/registries" backLabel={m.registries_title()} title={registryLabel} {actions}>
+<ResourceDetailLayout
+	icon={RegistryIcon}
+	backUrl="/images/registries"
+	backLabel={m.registries_title()}
+	title={registryLabel}
+	{actions}
+>
 	{#if repository}
 		{@render tagList()}
 	{:else if data.namespaces && (data.namespaces.pagination.grandTotalItems ?? data.namespaces.pagination.totalItems) > 0}

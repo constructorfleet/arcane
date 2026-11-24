@@ -2424,94 +2424,90 @@
 {/snippet}
 
 {#snippet projectHeader(project: Project)}
-	<div class="flex min-w-0 items-start gap-2.5">
+	<div class="flex min-w-0 items-center gap-2.5">
 		<IconImage
 			src={getThemedIconUrl(project, mode.current)}
 			alt={project.name}
 			fallback={ProjectsIcon}
 			class="size-6"
-			containerClass="size-9 bg-transparent ring-0"
+			containerClass="size-9 shrink-0 bg-transparent ring-0"
 		/>
-		<div class="min-w-0 flex-1">
-			<div class="flex min-h-9 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-				<div class="flex min-w-0 items-center">
-					<EnvironmentDestinationSelect value={envId} variant="prefix" readonly />
-					<ProjectDirectorySelect value={project.projectsRoot} environmentId={envId} readonly />
-					<EditableName
-						bind:value={inputs.name.value}
-						displayValue={effectiveName}
-						bind:ref={nameInputRef}
-						variant="inline"
-						error={inputs.name.error ?? undefined}
-						originalValue={serverName}
-						canEdit={canEditName}
-						disabledMessage={nameDisabledMessage}
-						onCommit={saveNameIfChanged}
-						class="max-w-40 min-w-0 sm:max-w-56 md:max-w-72 lg:max-w-88"
-					/>
-				</div>
-				{@render projectStatus(project)}
-				{#if project.isArchived}
-					<Badge variant="gray" minWidth="20">{m.projects_archived_badge()}</Badge>
-				{/if}
-				<ProjectTagEditor
-					tags={project.tags ?? []}
-					availableTags={availableProjectTags}
-					canEdit={canUpdateProject}
-					onToggle={handleProjectTagToggle}
-				/>
-				<ProjectUpdateItem
-					updateInfo={project.updateInfo}
-					environmentId={envId}
-					onCheck={handleCheckProjectUpdates}
-					checking={checkProjectUpdatesMutation.isPending}
-					disabled={!!project.isArchived || composeActionsBlocked}
-				/>
-			</div>
-
-			{#if project.urls && project.urls.length > 0}
-				<div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-					{#each project.urls as url (url)}
-						<a
-							class="inline-flex h-6 max-w-40 min-w-0 items-center gap-1.5 rounded-lg border border-info/20 bg-background/70 px-2.5 text-xs font-semibold ring-offset-background transition-colors hover:border-info/40 hover:bg-info/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none sm:max-w-56 md:max-w-72 dark:bg-info/20 dark:hover:bg-info/30"
-							href={toSafeHref(url)}
-							target="_blank"
-							rel="external noopener noreferrer"
-							title={url}
-						>
-							<GlobeIcon class="size-3 text-info" />
-							<span class="truncate">{formatUrlLabel(url)}</span>
-						</a>
-					{/each}
-				</div>
-			{/if}
-
-			{#if project.lastSyncCommit}
-				{@const commitUrl = project.gitRepositoryURL
-					? toGitRouteUrl(project.gitRepositoryURL, 'commit', project.lastSyncCommit, '', project.gitRepositoryProvider)
-					: null}
-				<div class="mt-1 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-					<div class="flex items-center gap-1.5">
-						<span class="hidden sm:inline">{m.commit()}:</span>
-						{#if commitUrl}
-							<a
-								href={commitUrl}
-								target="_blank"
-								rel="external"
-								class="font-mono transition-colors hover:text-primary sm:rounded sm:bg-muted sm:px-1.5 sm:py-0.5"
-							>
-								{project.lastSyncCommit}
-							</a>
-						{:else}
-							<span class="font-mono sm:rounded sm:bg-muted sm:px-1.5 sm:py-0.5">
-								{project.lastSyncCommit}
-							</span>
-						{/if}
-					</div>
-				</div>
-			{/if}
-		</div>
+		<EnvironmentDestinationSelect value={envId} variant="prefix" readonly />
+		<ProjectDirectorySelect value={project.projectsRoot} environmentId={envId} readonly />
+		<EditableName
+			bind:value={inputs.name.value}
+			displayValue={effectiveName}
+			bind:ref={nameInputRef}
+			variant="inline"
+			error={inputs.name.error ?? undefined}
+			originalValue={serverName}
+			canEdit={canEditName}
+			disabledMessage={nameDisabledMessage}
+			onCommit={saveNameIfChanged}
+			class="min-w-0"
+		/>
+		{@render projectStatus(project)}
+		{#if project.isArchived}
+			<Badge variant="gray" minWidth="20">{m.projects_archived_badge()}</Badge>
+		{/if}
+		<ProjectTagEditor
+			tags={project.tags ?? []}
+			availableTags={availableProjectTags}
+			canEdit={canUpdateProject}
+			onToggle={handleProjectTagToggle}
+		/>
+		<ProjectUpdateItem
+			updateInfo={project.updateInfo}
+			environmentId={envId}
+			onCheck={handleCheckProjectUpdates}
+			checking={checkProjectUpdatesMutation.isPending}
+			disabled={!!project.isArchived || composeActionsBlocked}
+		/>
 	</div>
+{/snippet}
+
+{#snippet projectHeaderLinks(project: Project)}
+	{#if project.urls && project.urls.length > 0}
+		<div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+			{#each project.urls as url (url)}
+				<a
+					class="inline-flex h-6 max-w-40 min-w-0 items-center gap-1.5 rounded-lg border border-info/20 bg-background/70 px-2.5 text-xs font-semibold ring-offset-background transition-colors hover:border-info/40 hover:bg-info/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none sm:max-w-56 md:max-w-72 dark:bg-info/20 dark:hover:bg-info/30"
+					href={toSafeHref(url)}
+					target="_blank"
+					rel="external noopener noreferrer"
+					title={url}
+				>
+					<GlobeIcon class="size-3 text-info" />
+					<span class="truncate">{formatUrlLabel(url)}</span>
+				</a>
+			{/each}
+		</div>
+	{/if}
+
+	{#if project.lastSyncCommit}
+		{@const commitUrl = project.gitRepositoryURL
+			? toGitRouteUrl(project.gitRepositoryURL, 'commit', project.lastSyncCommit, '', project.gitRepositoryProvider)
+			: null}
+		<div class="mt-1 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+			<div class="flex items-center gap-1.5">
+				<span class="hidden sm:inline">{m.commit()}:</span>
+				{#if commitUrl}
+					<a
+						href={commitUrl}
+						target="_blank"
+						rel="external"
+						class="font-mono transition-colors hover:text-primary sm:rounded sm:bg-muted sm:px-1.5 sm:py-0.5"
+					>
+						{project.lastSyncCommit}
+					</a>
+				{:else}
+					<span class="font-mono sm:rounded sm:bg-muted sm:px-1.5 sm:py-0.5">
+						{project.lastSyncCommit}
+					</span>
+				{/if}
+			</div>
+		</div>
+	{/if}
 {/snippet}
 
 {#if project}
@@ -2529,6 +2525,10 @@
 	>
 		{#snippet headerInfo()}
 			{@render projectHeader(project)}
+		{/snippet}
+
+		{#snippet subHeader()}
+			{@render projectHeaderLinks(project)}
 		{/snippet}
 
 		{#snippet headerActions()}

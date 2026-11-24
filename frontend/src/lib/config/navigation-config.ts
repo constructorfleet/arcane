@@ -401,13 +401,13 @@ function canSeeItem(item: NavigationItem, user: User, accessManifest: Permission
 	return canReachShownAccessSurface(accessManifest, item.accessSurfaceId, user);
 }
 
-export function getNavigationTitleForPath(pathname: string): string | undefined {
+export function getNavigationTitleForPath(pathname: string, exact = false): string | undefined {
 	let title: string | undefined;
 	let bestLength = 0;
 	const visit = (items: NavigationItem[]) => {
 		for (const item of items) {
 			const url = item.url.split('?')[0] ?? item.url;
-			if (url.length > bestLength && (pathname === url || pathname.startsWith(`${url}/`))) {
+			if (url.length > bestLength && (pathname === url || (!exact && pathname.startsWith(`${url}/`)))) {
 				title = item.title;
 				bestLength = url.length;
 			}

@@ -536,23 +536,16 @@
 </script>
 
 {#snippet containerHeader(container: ContainerDetails)}
-	<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+	<div class="flex min-h-9 min-w-0 items-center gap-2">
 		<IconImage
 			src={containerIconUrl}
 			alt={containerDisplayName}
 			fallback={ContainersIcon}
 			class="size-5"
-			containerClass="size-9"
+			containerClass="size-9 shrink-0"
 		/>
-		<div class="flex min-w-0 items-center">
-			<EnvironmentDestinationSelect value={currentEnvId} variant="prefix" readonly />
-			<h1
-				class="max-w-40 min-w-0 truncate text-sm font-semibold sm:max-w-56 md:max-w-72 lg:max-w-88"
-				title={containerDisplayName}
-			>
-				{containerDisplayName}
-			</h1>
-		</div>
+		<EnvironmentDestinationSelect value={currentEnvId} variant="prefix" readonly />
+		<h1 class="min-w-0 truncate font-semibold" title={containerDisplayName}>{containerDisplayName}</h1>
 		{#if container?.state}
 			<Badge variant={getStateBadgeVariant(container.state.status)} minWidth="20"
 				>{getContainerStatusLabel(container.state.status)}</Badge

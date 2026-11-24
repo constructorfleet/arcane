@@ -17,7 +17,16 @@
 	import WorkspaceFileTreePanel from '#lib/components/workspace-file-tree-panel.svelte';
 	import { useHighlightedCode } from '#lib/hooks/use-highlighted-code.svelte.js';
 	import { useUrlTab } from '#lib/hooks/use-url-tab.svelte.js';
-	import { ContainersIcon, JobsIcon, TrashIcon, EditIcon, FileTextIcon, StopIcon, PlayIcon } from '#lib/icons/index.js';
+	import {
+		ContainersIcon,
+		JobsIcon,
+		LayersIcon,
+		TrashIcon,
+		EditIcon,
+		FileTextIcon,
+		StopIcon,
+		PlayIcon
+	} from '#lib/icons/index.js';
 	import type { ActionButton } from '#lib/layouts/index.js';
 	import TabbedPageLayout from '#lib/layouts/tabbed-page-layout.svelte';
 	import { m } from '#lib/paraglide/messages.js';
@@ -304,11 +313,12 @@
 
 <TabbedPageLayout backUrl="/swarm/stacks" {tabItems} {selectedTab} onTabChange={urlTab.select}>
 	{#snippet headerInfo()}
-		<h1 class="truncate text-sm font-semibold">{stackName}</h1>
-		<div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-			<span>{stackSubtitle}</span>
-			<Badge variant="secondary">{m.services()} {totalServices}</Badge>
-			<Badge variant="secondary">{m.tasks()} {totalTasks}</Badge>
+		<div class="flex min-h-9 min-w-0 items-center gap-2">
+			<LayersIcon class="size-5 shrink-0 text-primary" />
+			<h1 class="min-w-0 truncate font-semibold" title={stackName}>{stackName}</h1>
+			<Badge variant="secondary">{stackSubtitle}</Badge>
+			<Badge variant="secondary">{m.resource_header_count({ resource: m.services(), count: totalServices })}</Badge>
+			<Badge variant="secondary">{m.resource_header_count({ resource: m.tasks(), count: totalTasks })}</Badge>
 		</div>
 	{/snippet}
 	{#snippet headerActions()}

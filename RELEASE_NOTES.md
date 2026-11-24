@@ -1,4 +1,4 @@
-# 3.0.1-cf.91
+# 3.0.1-cf.92
 
-- Report a completed image patch even when no verification scan was recorded. (#151)
-- Include verification scan startup errors in the image patch activity. (#151)
+- Use a shared detail-header row that keeps navigation and actions aligned and lets long titles yield to resource metadata. (#222)
+- Show the contextual return destination beside the back arrow, standardize stack header tags, and show a shared local driver and scope label once. (#222)

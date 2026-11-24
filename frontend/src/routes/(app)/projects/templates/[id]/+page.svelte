@@ -374,6 +374,7 @@
 	</TemplateEditorWorkspace>
 {:else}
 	<ResourceDetailLayout
+		icon={TemplateIcon}
 		backUrl="/projects/templates"
 		backLabel={m.templates_title()}
 		title={template.name}

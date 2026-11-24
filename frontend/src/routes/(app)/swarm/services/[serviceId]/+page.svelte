@@ -365,7 +365,7 @@
 {#if service}
 	<TabbedPageLayout backUrl="/swarm/services" backLabel={m.common_back()} {tabItems} {selectedTab} {onTabChange}>
 		{#snippet headerInfo()}
-			<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+			<div class="flex min-h-9 min-w-0 items-center gap-2">
 				<div data-slot="swarm-service-icon" class="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
 					<ContainersIcon class="size-5 text-primary" />
 				</div>
@@ -374,17 +374,16 @@
 				</h1>
 				<Badge variant={getSwarmServiceModeVariant(serviceMode)} minWidth="20">{getSwarmServiceModeLabel(serviceMode)}</Badge>
 				{#if showsReplicas}
-					<span class="font-mono text-sm text-muted-foreground">
-						{desiredReplicas}
-						{m.swarm_replicas()}
-					</span>
+					<Badge variant="secondary">
+						{m.resource_header_count({ resource: m.swarm_replicas(), count: desiredReplicas })}
+					</Badge>
 				{/if}
 			</div>
 		{/snippet}
 
 		{#snippet headerActions()}
 			{#if serviceActions.length > 0}
-				<ActionButtonGroup size="sm" buttons={serviceActions} />
+				<ActionButtonGroup buttons={serviceActions} />
 			{/if}
 		{/snippet}
 

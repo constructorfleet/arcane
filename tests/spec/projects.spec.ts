@@ -989,7 +989,7 @@ test.describe('GitOps Managed Project', () => {
 		await projectLink.click();
 		await page.waitForURL(/\/projects\/.+/, { timeout: 10000 });
 
-		const backLink = page.getByRole('link', { name: 'Previous view', exact: true }).first();
+		const backLink = page.getByRole('link', { name: 'Back to Git Syncs', exact: true }).first();
 		await expect(backLink).toBeVisible();
 		await backLink.click();
 
@@ -1156,7 +1156,7 @@ test.describe('Project Detail Page', () => {
 		await page.goto(`/projects/${firstProject.id || firstProject.name}?env=0`);
 		await page.waitForLoadState('load');
 
-		const backLink = page.getByRole('link', { name: 'Previous view', exact: true }).first();
+		const backLink = page.getByRole('link', { name: 'Back to Projects', exact: true }).first();
 		await expect(backLink).toBeVisible();
 		await backLink.click();
 

@@ -173,13 +173,9 @@
 	onTabChange={urlTab.select}
 >
 	{#snippet headerInfo()}
-		<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-			<div class="flex min-w-0 items-center">
-				<EnvironmentDestinationSelect value={envId} variant="prefix" readonly />
-				<h1 class="max-w-40 min-w-0 truncate text-sm font-semibold sm:max-w-56 md:max-w-72 lg:max-w-88" title={quadlet.name}>
-					{quadlet.name}
-				</h1>
-			</div>
+		<div class="flex min-h-9 min-w-0 items-center gap-2">
+			<EnvironmentDestinationSelect value={envId} variant="prefix" readonly />
+			<h1 class="min-w-0 truncate font-semibold" title={quadlet.name}>{quadlet.name}</h1>
 			<Badge variant={podmanStateVariant(quadlet.status)} minWidth="20">{quadlet.status}</Badge>
 			{#if quadlet.template}
 				<Badge variant="gray" size="sm">{m.podman_quadlet_template()}</Badge>

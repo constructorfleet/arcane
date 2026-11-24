@@ -405,6 +405,7 @@
 {/snippet}
 
 <ResourceDetailLayout
+	icon={NetworksIcon}
 	backUrl="/networks"
 	backLabel={m.resource_networks_cap()}
 	environmentId={data.envId}
