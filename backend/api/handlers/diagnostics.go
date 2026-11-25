@@ -24,7 +24,7 @@ type (
 		Body types.ActorDiagnostics
 	}
 
-	GetEnvironmentGoroutineDiagnosticsOutput struct {
+	GoroutineDiagnosticsOutput struct {
 		Body types.GoroutineProfile
 	}
 )
@@ -50,7 +50,17 @@ func RegisterDiagnostics(api huma.API, diag *diagnostics.DiagnosticsService) {
 		Description: "Returns the live goroutines grouped by identical stack, largest group first.",
 		Tags:        []string{"Diagnostics"},
 		Security:    handlerutil.DefaultOperationSecurity(),
-	}, authz.PermDiagnosticsRead, h.GetEnvironmentGoroutineDiagnostics)
+	}, authz.PermDiagnosticsRead, goroutineDiagnostics[types.EnvironmentInput](diag))
+
+	middleware.RegisterWithPermission(api, huma.Operation{
+		OperationID: "get-manager-goroutine-diagnostics",
+		Method:      http.MethodGet,
+		Path:        "/diagnostics/goroutines",
+		Summary:     "Get goroutine diagnostics for the manager",
+		Description: "Returns the manager's live goroutines grouped by identical stack, largest group first.",
+		Tags:        []string{"Diagnostics"},
+		Security:    handlerutil.DefaultOperationSecurity(),
+	}, authz.PermDiagnosticsRead, goroutineDiagnostics[struct{}](diag))
 
 	middleware.RegisterWithPermission(api, huma.Operation{
 		OperationID: "pprof-index",
@@ -136,10 +146,12 @@ func (h *DiagnosticsHandler) GetEnvironmentActorDiagnostics(ctx context.Context,
 	return &GetEnvironmentActorDiagnosticsOutput{Body: d}, nil
 }
 
-func (h *DiagnosticsHandler) GetEnvironmentGoroutineDiagnostics(_ context.Context, _ *types.EnvironmentInput) (*GetEnvironmentGoroutineDiagnosticsOutput, error) {
-	profile, err := h.diag.Goroutines()
-	if err != nil {
-		return nil, huma.Error500InternalServerError("Failed to collect goroutine diagnostics: " + err.Error())
+func goroutineDiagnostics[Input any](diag *diagnostics.DiagnosticsService) func(context.Context, *Input) (*GoroutineDiagnosticsOutput, error) {
+	return func(_ context.Context, _ *Input) (*GoroutineDiagnosticsOutput, error) {
+		profile, err := diag.Goroutines()
+		if err != nil {
+			return nil, huma.Error500InternalServerError("Failed to collect goroutine diagnostics: " + err.Error())
+		}
+		return &GoroutineDiagnosticsOutput{Body: profile}, nil
 	}
-	return &GetEnvironmentGoroutineDiagnosticsOutput{Body: profile}, nil
 }

@@ -10,7 +10,6 @@
 	import { ArrowRightIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { diagnosticsService } from '#lib/services/diagnostics-service.js';
-	import { LOCAL_DOCKER_ENVIRONMENT_ID } from '#lib/stores/environment.store.svelte.js';
 	import type { GoroutineGroup, GoroutineProfile } from '#lib/types/system.js';
 	import { cn } from '#lib/utils.js';
 	import { extractApiErrorMessage } from '#lib/utils/api.js';
@@ -50,7 +49,7 @@
 
 	async function load() {
 		loading = true;
-		const result = await tryCatch(diagnosticsService.getGoroutinesForEnvironment(LOCAL_DOCKER_ENVIRONMENT_ID));
+		const result = await tryCatch(diagnosticsService.getGoroutines());
 		loading = false;
 		if (result.error !== null) {
 			error = extractApiErrorMessage(result.error);

@@ -1,4 +1,4 @@
-# 3.0.1-cf.101
+# 3.0.1-cf.102
 
-- Start a vulnerability scan from the Images row actions. For repositories with multiple eligible copies, choose the node and image ID to scan.
-- Show the scan timestamp beside the vulnerability count in the image list and cards. Grouped rows show the timestamp from the report behind the count.
+- Restore the System Diagnostics Goroutines tab in control-plane deployments. It reads the manager's Go runtime directly, including when no Docker agents are registered.
+- HTTP checks passed in both manager modes and confirmed requests without diagnostics access are denied. The tab awaits verification on the deployed release.
