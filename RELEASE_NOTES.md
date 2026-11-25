@@ -1,4 +1,4 @@
-# 3.0.1-cf.100
+# 3.0.1-cf.101
 
-- Count running workloads in the Images repository summary. On Swarm managers, require both desired and current task states to be Running. Stopped tasks and idle caches remain visible in the node selector.
-- Count copies pinned to the same digest as a single variant across nodes.
+- Start a vulnerability scan from the Images row actions. For repositories with multiple eligible copies, choose the node and image ID to scan.
+- Show the scan timestamp beside the vulnerability count in the image list and cards. Grouped rows show the timestamp from the report behind the count.

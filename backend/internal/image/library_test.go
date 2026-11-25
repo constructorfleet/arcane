@@ -2,6 +2,7 @@ package image
 
 import (
 	"testing"
+	"time"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/swarm"
@@ -97,21 +98,34 @@ func TestImageLibrarySurfacesActiveCheckFailures(t *testing.T) {
 	require.Equal(t, ref, running[0].Image)
 	require.Equal(t, "standalone", running[1].ID)
 
+	olderScan := &types.VulnerabilityScanSummary{
+		Status: types.VulnerabilityScanStatusCompleted, ScanTime: time.Unix(100, 0),
+		Summary: &types.VulnerabilitySeveritySummary{High: 2, Total: 2},
+	}
+	newerScan := &types.VulnerabilityScanSummary{
+		Status: types.VulnerabilityScanStatusCompleted, ScanTime: time.Unix(200, 0),
+		Summary: &types.VulnerabilitySeveritySummary{High: 2, Total: 2},
+	}
 	grouped := mergeImageRepository([]types.ImageSummary{
 		{
 			ID: "v1", Repo: "example.com/project/image", Tag: "latest", InUse: true, Size: 10,
-			ActiveReferences: []string{ref},
-			UpdateInfo:       &types.ImageUpdateInfo{HasUpdate: true},
+			ActiveReferences:  []string{ref},
+			UpdateInfo:        &types.ImageUpdateInfo{HasUpdate: true},
+			VulnerabilityScan: olderScan,
 		},
 		{
 			ID: "v2", Repo: "example.com/project/image", Tag: "edge", InUse: true, Size: 20,
 			UpdateInfo: &types.ImageUpdateInfo{Error: "registry check failed"},
 		},
-		{ID: "another-node-id", Repo: "example.com/project/image", Tag: "latest", InUse: true, Size: 10, ActiveReferences: []string{ref}},
+		{
+			ID: "z-node-id", Repo: "example.com/project/image", Tag: "latest", InUse: true, Size: 10,
+			ActiveReferences: []string{ref}, VulnerabilityScan: newerScan,
+		},
 	})
 	require.True(t, grouped.UpdateInfo.HasUpdate)
 	require.Equal(t, "example.com/project/image:edge", grouped.RepositoryGroup.CheckErrorRef)
 	require.Equal(t, 2, grouped.RepositoryGroup.Variants)
+	require.Equal(t, newerScan, grouped.VulnerabilityScan)
 	require.EqualValues(t, 10, grouped.RepositoryGroup.MinSize)
 	require.EqualValues(t, 20, grouped.RepositoryGroup.MaxSize)
 }

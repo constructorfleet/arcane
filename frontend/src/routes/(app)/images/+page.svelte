@@ -367,6 +367,7 @@
 			{#key JSON.stringify([pageState.scope, data.linkedAgent])}
 				<ImageTable
 					repositoryLibrary={!data.linkedAgent}
+					scope={pageState.scope}
 					images={withFailedEnvironments(images, countFailures)}
 					bind:selectedIds={pageState.selectedIds}
 					bind:requestOptions={pageState.requestOptions}

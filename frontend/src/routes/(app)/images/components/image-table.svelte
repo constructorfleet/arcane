@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { useQueryClient } from '@tanstack/svelte-query';
+	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
@@ -39,6 +40,7 @@
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { imageService } from '#lib/services/image-service.js';
 	import { vulnerabilityService } from '#lib/services/vulnerability-service.js';
+	import { activityStore } from '#lib/stores/activity.store.svelte.js';
 	import { environmentStore } from '#lib/stores/environment.store.svelte.js';
 	import { featureStore } from '#lib/stores/features.store.svelte.js';
 	import type { ImageListResponse, ImageSummary } from '#lib/types/image.js';
@@ -49,13 +51,20 @@
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { bulkConfirmAndRun } from '#lib/utils/bulk-actions.js';
-	import { environmentHref, type EnvironmentPage, type EnvironmentRow, hasShownPermission } from '#lib/utils/environments.js';
+	import {
+		environmentHref,
+		environmentName,
+		type EnvironmentPage,
+		type EnvironmentRow,
+		hasShownPermission
+	} from '#lib/utils/environments.js';
 	import { bytes, formatDate, formatDateTimeShort } from '#lib/utils/formatting.js';
 	import { hardenedImageDisplay, hardenedSupportSummary } from '#lib/utils/hardened-images.js';
 	import { blockedUpdateTitle } from '#lib/utils/image-updates.js';
 	import { inUseBadge } from '#lib/utils/mobile-card-badges.js';
 	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
+	import { toastVulnerabilityScanStatus } from '#lib/utils/vulnerability.js';
 
 	import ImageTagDialog from './image-tag-dialog.svelte';
 
@@ -67,9 +76,11 @@
 		requestOptions = $bindable(),
 		onRetry,
 		refreshError,
+		scope,
 		repositoryLibrary = false
 	}: {
 		repositoryLibrary?: boolean;
+		scope: string;
 		images: EnvironmentPage<ImageListResponse>;
 		selectedIds: string[];
 		requestOptions: SearchPaginationSortRequest;
@@ -89,7 +100,6 @@
 	);
 	const canDeleteImage = $derived(hasShownPermission('images:delete'));
 	const canPullImage = $derived(hasShownPermission('images:pull'));
-	const canScanImage = $derived(vulnerabilityManagementEnabled && hasShownPermission('vulnerabilities:scan'));
 	const canTagImage = $derived(hasShownPermission('images:tag'));
 	const canPatchImage = $derived(hasShownPermission('images:patch'));
 	const canReadImage = $derived(hasShownPermission('images:read'));
@@ -121,7 +131,7 @@
 	let tagDialogImage = $state<ImageRow | null>(null);
 
 	function invalidateImages() {
-		return queryClient.invalidateQueries({ queryKey: queryKeys.images.listPrefix(environmentStore.shownKey) });
+		return queryClient.invalidateQueries({ queryKey: queryKeys.images.listPrefix(scope) });
 	}
 
 	function handleDeleteSelected(ids: string[]) {
@@ -217,29 +227,38 @@
 		});
 	}
 
-	async function handleInlineVulnerabilityScan(image: ImageRow) {
-		if (!canScanImage) return;
-		const result = await tryCatch(vulnerabilityService.scanImage(image.id, image.environmentId));
+	function canScanOn(environmentId: string) {
+		return (
+			featureStore.isEnabled('vulnerabilityManagement', environmentId) && hasPermission('vulnerabilities:scan', environmentId)
+		);
+	}
+
+	async function handleInlineVulnerabilityScan(imageId: string, environmentId: string) {
+		if (!canScanOn(environmentId)) return;
+		const result = await tryCatch(vulnerabilityService.scanImage(imageId, environmentId));
 		await handleApiResultWithCallbacks({
 			result,
 			message: m.vuln_scan_failed(),
 			setLoadingState: () => {},
 			onSuccess: async (data) => {
+				toastVulnerabilityScanStatus(data, { includeStarted: true });
 				await invalidateImages();
-
-				if (data.status === 'completed') {
-					toast.success(m.vuln_scan_completed(), activityToastOptions(data.activityId));
-					return;
-				}
-				if (data.status === 'failed') {
-					toast.error(data.error || m.vuln_scan_failed(), activityToastOptions(data.activityId));
-					return;
-				}
-
-				toast.info(m.vuln_scan_started(), activityToastOptions(data.activityId));
 			}
 		});
 	}
+
+	onMount(() => {
+		let previous: string | undefined;
+		return activityStore.subscribeActivities((activities) => {
+			const scans = activities
+				.filter(({ type, status }) => type === 'vulnerability_scan' && (status === 'success' || status === 'failed'))
+				.map(({ id, status, updatedAt }) => `${id}:${status}:${updatedAt}`)
+				.sort()
+				.join('|');
+			if (previous !== undefined && scans !== previous) void invalidateImages();
+			previous = scans;
+		});
+	});
 
 	async function handleExportImage(imageId: string, environmentId: string) {
 		const url = await imageService.getImageExportUrl(imageId, environmentId);
@@ -557,13 +576,19 @@
 {/snippet}
 
 {#snippet VulnerabilitiesCell({ item }: { item: ImageRow })}
-	<!-- The column shows when any environment scans; each row needs its own environment to. -->
+	<!-- Scan support is configured per environment. -->
 	{#if item.repositoryGroup}
 		{@const stats = item.repositoryGroup}
-		{@const findings = item.vulnerabilityScan?.summary}
+		{@const scan = item.vulnerabilityScan}
+		{@const findings = scan?.status === 'completed' ? scan.summary : undefined}
 		<div class="flex min-w-0 flex-wrap items-center justify-center gap-1.5">
 			{#if findings}
 				<Badge variant={findings.critical ? 'red' : findings.high ? 'amber' : 'gray'}>{findings.total}</Badge>
+				{#if scan?.scanTime}
+					<time datetime={scan.scanTime} class="text-xs whitespace-nowrap text-muted-foreground">
+						{formatDateTimeShort(scan.scanTime)}
+					</time>
+				{/if}
 			{/if}
 			{#if stats.sawScanError}
 				<span class="text-xs text-destructive">{m.vuln_scan_failed()}</span>
@@ -710,6 +735,8 @@
 {#snippet RowActions({ item }: { item: ImageRow })}
 	{@const envId = item.environmentId}
 	{@const errorHref = updateErrorHref(item)}
+	{@const scanCopies = item.repositoryGroup?.copies.filter((copy) => canScanOn(copy.environmentId)) ?? []}
+	{@const scanCopy = scanCopies[0]}
 	<RowActionsMenu name={item.repo && item.repo !== '<none>' ? `${item.repo}:${item.tag}` : item.id}>
 		<DropdownMenu.Item onclick={() => goto(imageHref(item))}>
 			<InspectIcon class="size-4" />
@@ -729,8 +756,31 @@
 			{/if}
 		{/if}
 
+		{#if scanCopies.length > 1}
+			<DropdownMenu.Sub>
+				<DropdownMenu.SubTrigger>
+					<SearchIcon class="size-4" />
+					{m.vuln_scan()}
+				</DropdownMenu.SubTrigger>
+				<DropdownMenu.SubContent class="max-h-72 overflow-y-auto">
+					{#each scanCopies as copy (`${copy.environmentId}/${copy.id}`)}
+						<DropdownMenu.Item onclick={() => handleInlineVulnerabilityScan(copy.id, copy.environmentId)}>
+							<span class="min-w-0 truncate">{copy.environmentName || environmentName(copy.environmentId)}</span>
+							<span class="font-mono text-xs text-muted-foreground">{copy.id.replace(/^sha256:/, '').slice(0, 12)}</span>
+							{#if copy.inUse}<Badge variant="outline">{m.common_in_use()}</Badge>{/if}
+						</DropdownMenu.Item>
+					{/each}
+				</DropdownMenu.SubContent>
+			</DropdownMenu.Sub>
+		{:else if scanCopy}
+			<DropdownMenu.Item onclick={() => handleInlineVulnerabilityScan(scanCopy.id, scanCopy.environmentId)}>
+				<SearchIcon class="size-4" />
+				{m.vuln_scan()}
+			</DropdownMenu.Item>
+		{/if}
+
 		{#if !item.repositoryGroup}
-			{#if canPullImage || canScanImage || canTagImage || canReadImage}
+			{#if canPullImage || canScanOn(envId) || canTagImage || canReadImage}
 				<DropdownMenu.Separator />
 			{/if}
 
@@ -758,8 +808,8 @@
 				</DropdownMenu.Item>
 			{/if}
 
-			{#if canScanImage && featureStore.isEnabled('vulnerabilityManagement', envId) && hasPermission('vulnerabilities:scan', envId)}
-				<DropdownMenu.Item onclick={() => handleInlineVulnerabilityScan(item)}>
+			{#if canScanOn(envId)}
+				<DropdownMenu.Item onclick={() => handleInlineVulnerabilityScan(item.id, envId)}>
 					<SearchIcon class="size-4" />
 					{m.vuln_scan()}
 				</DropdownMenu.Item>

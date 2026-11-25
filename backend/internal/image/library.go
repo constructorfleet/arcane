@@ -213,7 +213,7 @@ func mergeImageRepository(copies []types.ImageSummary) types.ImageSummary {
 			group.SawScanError = group.SawScanError || report.Status == types.VulnerabilityScanStatusFailed
 			if report.Status == types.VulnerabilityScanStatusCompleted && report.Summary != nil {
 				scanned[key] = struct{}{}
-				if row.VulnerabilityScan == nil || compareImageScans(report.Summary, row.VulnerabilityScan.Summary) > 0 {
+				if row.VulnerabilityScan == nil || compareImageScans(report, row.VulnerabilityScan) > 0 {
 					row.VulnerabilityScan = report
 				}
 			}
@@ -248,6 +248,11 @@ func imageVariant(observation types.ImageSummary) (string, string) {
 	return observation.ID, ""
 }
 
-func compareImageScans(a, b *types.VulnerabilitySeveritySummary) int {
-	return cmp.Or(cmp.Compare(a.Critical, b.Critical), cmp.Compare(a.High, b.High), cmp.Compare(a.Total, b.Total))
+func compareImageScans(a, b *types.VulnerabilityScanSummary) int {
+	return cmp.Or(
+		cmp.Compare(a.Summary.Critical, b.Summary.Critical),
+		cmp.Compare(a.Summary.High, b.Summary.High),
+		cmp.Compare(a.Summary.Total, b.Summary.Total),
+		a.ScanTime.Compare(b.ScanTime),
+	)
 }
