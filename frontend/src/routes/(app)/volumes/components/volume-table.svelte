@@ -67,6 +67,7 @@
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	import RenameVolumeDialog from './rename-volume-dialog.svelte';
+	import VolumeFilesystemUsage from './volume-filesystem-usage.svelte';
 
 	type VolumeRow = EnvironmentRow<Volume>;
 
@@ -330,6 +331,7 @@
 		{ accessorKey: 'name', title: m.common_name(), sortable: true, cell: NameCell },
 		{ accessorKey: 'inUse', title: m.common_status(), sortable: true, cell: StatusCell },
 		{ accessorKey: 'size', title: m.common_size(), sortable: true, cell: SizeCell, align: 'right' },
+		{ id: 'filesystemUsage', title: m.backing_filesystem(), cell: FilesystemUsageCell, align: 'right' },
 		{ accessorKey: 'createdAt', title: m.common_created(), sortable: true, cell: CreatedCell },
 		{ accessorKey: 'driver', title: m.common_driver(), sortable: true }
 	] satisfies ColumnSpec<VolumeRow>[]);
@@ -338,6 +340,7 @@
 		{ id: 'id', label: m.common_id(), defaultVisible: false },
 		{ id: 'inUse', label: m.common_status(), defaultVisible: true },
 		{ id: 'size', label: m.common_size(), defaultVisible: true },
+		{ id: 'filesystemUsage', label: m.backing_filesystem(), defaultVisible: true },
 		{ id: 'createdAt', label: m.common_created(), defaultVisible: true },
 		{ id: 'driver', label: m.common_driver(), defaultVisible: true }
 	];
@@ -420,6 +423,18 @@
 	{formatDateTimeShort(String(value))}
 {/snippet}
 
+{#snippet FilesystemUsageCell({ item }: { item: VolumeRow })}
+	{#if hasPermission('volumes:read', item.environmentId) && (!item.logicalId || item.workspaceState === 'active')}
+		{#if (item.runningHelpers ?? 0) > 0}
+			<VolumeFilesystemUsage environmentId={item.environmentId} volumeName={item.name} />
+		{:else}
+			<a class="text-sm text-primary-text hover:underline" href={volumeDetailHref(item, 'workspace')}>{m.open_workspace()}</a>
+		{/if}
+	{:else}
+		<span class="text-sm text-muted-foreground">{m.common_unavailable()}</span>
+	{/if}
+{/snippet}
+
 {#snippet VolumeMobileCardSnippet({
 	item,
 	mobileFieldVisibility
@@ -443,6 +458,13 @@
 				icon: VolumesIcon,
 				iconVariant: 'gray' as const,
 				show: mobileFieldVisibility['driver'] ?? true
+			},
+			{
+				label: m.backing_filesystem(),
+				getValue: (item: VolumeRow) => ({ item }),
+				type: 'component',
+				component: FilesystemUsageCell,
+				show: mobileFieldVisibility['filesystemUsage'] ?? true
 			}
 		]}
 		footer={(mobileFieldVisibility['createdAt'] ?? true)

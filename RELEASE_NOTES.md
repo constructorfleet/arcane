@@ -1,7 +1,5 @@
-# 3.0.1-cf.104
+# 3.0.1-cf.105
 
-- Make image detail actions and tabs available from list menus, including Push, release notes, history, attestations, and registry vulnerability reports. Grouped images expose operations for each explicitly identified owning agent and image copy.
-- Add missing detail navigation to container, project, volume, network, agent, Swarm, Podman, and template lists. Add container commit and dashboard pins, project and agent dashboard pins, agent sync, and Swarm service rollback access.
-- Keep selection and action columns visible despite legacy saved column preferences. Volume selection retains metadata across pages and bulk removal excludes in-use, logical, protected backup, and unauthorized volumes.
-- Validate image copy metadata and operation targets, table column preferences, frontend type/lint checks, and backend tests before publication.
-- Runtime limitation: interactive menu and destructive action acceptance on the live Swarm require human QA; automated checks do not establish that acceptance.
+- Show used and total capacity for the backing filesystem in Volume Workspace and in the all-agent and agent-scoped volume lists. Local directory volumes can share the same filesystem.
+- List rows with an existing workspace helper can report usage on the selected agent. Other readable rows can link to Workspace when access is available. Loading the list never mounts volumes.
+- Verify filesystem accounting, unavailable readings, agent command routing, and frontend checks. Live RBD usage remains subject to deployment verification.

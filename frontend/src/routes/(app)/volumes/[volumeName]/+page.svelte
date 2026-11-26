@@ -66,6 +66,7 @@
 
 	import VolumeAgentRecords from '../components/volume-agent-records.svelte';
 	import BackupList from '../components/volume-backup-table.svelte';
+	import VolumeFilesystemUsage from '../components/volume-filesystem-usage.svelte';
 	import { volumeWorkspaceReadOnlyMessage } from '../components/volume-workspace-utils';
 
 	let { data } = $props();
@@ -155,6 +156,12 @@
 		folderQuery: (path) => volumeWorkspaceFolderQuery(currentEnvId, volume?.name ?? '', path),
 		enabled: () => workspaceEnabled,
 		changes: () => workspaceFileChanges
+	});
+	$effect(() => {
+		if (workspaceEnabled && workspaceFolders.root?.data) {
+			// Opening Workspace may have started the helper required by the volume list's usage column.
+			void queryClient.invalidateQueries({ queryKey: queryKeys.volumes.all, refetchType: 'none' });
+		}
 	});
 
 	const visibleWorkspaceFiles = $derived.by(() =>
@@ -1125,6 +1132,12 @@
 		</div>
 	{:else}
 		<div class="space-y-3">
+			{#if workspaceEnabled && workspaceFolders.root?.data}
+				<p class="flex flex-wrap items-baseline gap-x-2 text-sm">
+					<span class="font-medium">{m.backing_filesystem()}</span>
+					<VolumeFilesystemUsage environmentId={currentEnvId} volumeName={volume.name} />
+				</p>
+			{/if}
 			{#if workspaceFolders.truncated}
 				<Alert.Root>
 					<AlertIcon class="size-4" />

@@ -58,6 +58,11 @@ type (
 		Total  int `json:"total"`
 	}
 
+	VolumeFilesystemUsage struct {
+		UsedBytes  uint64 `json:"usedBytes" doc:"Allocated bytes on the volume's backing filesystem"`
+		TotalBytes uint64 `json:"totalBytes" doc:"Total bytes on the volume's backing filesystem"`
+	}
+
 	VolumePruneReport struct {
 		ActivityID     *string  `json:"activityId,omitempty"`
 		VolumesDeleted []string `json:"volumesDeleted"`

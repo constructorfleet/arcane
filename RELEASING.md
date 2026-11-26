@@ -51,8 +51,14 @@ into the helper's private `/tmp` filesystem, never the mounted volume. The tools
 image continues to supply shell, archive and scanning utilities. No extra helper
 privileges or execution-user changes are required.
 
-Custom binary/static-image distributions must also ship the matching Linux ACFS
-companion beside the executable. Without it, legacy helper reads can work, but
+The release Dockerfiles build and package `volume-stat` beside ACFS. It reads
+filesystem capacity inside an existing helper's mounted volume. The usage probe
+does not extend the helper's idle deadline.
+
+Custom binary/static-image distributions should ship both Linux companions
+beside the executable. Build `volume-stat` from `backend/cmd/volumestat` for the
+Docker engine's architecture. Filesystem usage displays as unavailable if the
+probe is missing. Without ACFS, legacy helper reads can work, but
 existing-file writes require the ownership-preservation capability and fail
 closed when it is absent. Run the volume tests and validate an owned local-file
 edit's content, UID/GID and mode before marking workspace write QA accepted.

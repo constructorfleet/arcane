@@ -15,6 +15,12 @@ func RegisterRoutes(api huma.API, h *Handler) {
 	handlerutil.RegisterSecured(api, handlerutil.Operation("get-volume-workspace", http.MethodGet, basePath, "Get volume workspace", "", tag), authz.PermVolumesRead, h.GetVolumeWorkspace)
 	handlerutil.RegisterSecured(
 		api,
+		handlerutil.Operation("get-volume-workspace-storage", http.MethodGet, basePath+"/storage", "Get volume filesystem usage", "Reports usage for a volume mounted in an existing workspace helper", tag),
+		authz.PermVolumesRead,
+		h.GetVolumeWorkspaceStorage,
+	)
+	handlerutil.RegisterSecured(
+		api,
 		handlerutil.Operation(
 			"get-volume-workspace-file",
 			http.MethodGet,

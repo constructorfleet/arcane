@@ -36,6 +36,60 @@ import (
 	"getarcane.dev/types/v3"
 )
 
+func TestGetVolumeWorkspaceStorageReportsBackingFilesystemUsage(t *testing.T) {
+	for _, test := range []struct {
+		want         *types.VolumeFilesystemUsage
+		execErr      error
+		name         string
+		output       string
+		helperExists bool
+	}{
+		{
+			name:         "mounted filesystem",
+			output:       "4096 8192 8176\n",
+			want:         &types.VolumeFilesystemUsage{UsedBytes: 65536, TotalBytes: 33554432},
+			helperExists: true,
+		},
+		{
+			name:         "empty filesystem",
+			output:       "4096 8192 8192\n",
+			want:         &types.VolumeFilesystemUsage{UsedBytes: 0, TotalBytes: 33554432},
+			helperExists: true,
+		},
+		{name: "no existing helper"},
+		{name: "tool unavailable", execErr: errors.New("stat failed"), helperExists: true},
+		{name: "invalid free blocks", output: "4096 8192 8193\n", helperExists: true},
+		{name: "overflow", output: "4096 18446744073709551615 0\n", helperExists: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			held := false
+			service := NewService(Dependencies{
+				AcquireHelper: func(context.Context, string) (string, func(), error) {
+					t.Fatal("storage lookup attempted to start a volume helper")
+					return "", nil, nil
+				},
+				HoldExistingHelper: func(volumeName string) (string, func(), bool) {
+					require.Equal(t, "data", volumeName)
+					if !test.helperExists {
+						return "", nil, false
+					}
+					held = true
+					return "helper", func() { held = false }, true
+				},
+				Exec: func(_ context.Context, containerID, _ string, cmd []string) (string, string, error) {
+					require.True(t, held)
+					require.Equal(t, "helper", containerID)
+					require.Equal(t, []string{"volume-stat"}, cmd)
+					return test.output, "", test.execErr
+				},
+			})
+
+			require.Equal(t, test.want, service.GetVolumeWorkspaceStorage(t.Context(), "data"))
+			require.False(t, held)
+		})
+	}
+}
+
 func newVolumeWorkspaceTestDockerClient(t *testing.T, server *httptest.Server) *client.Client {
 	t.Helper()
 	dockerClient, err := client.New(

@@ -24,12 +24,12 @@ import (
 
 func TestVolumeACFSCompanionInstallation(t *testing.T) {
 	filename := filepath.Join(t.TempDir(), "acfs")
-	missing, err := loadVolumeACFSCompanion(filename)
+	missing, err := loadVolumeCompanion(filename)
 	require.NoError(t, err)
 	require.Nil(t, missing)
 	content := []byte("packaged executable fixture")
 	require.NoError(t, os.WriteFile(filename, content, 0o555))
-	binary, err := loadVolumeACFSCompanion(filename)
+	binary, err := loadVolumeCompanion(filename)
 	require.NoError(t, err)
 	require.True(t, path.IsAbs(binary.path))
 	require.Equal(t, "/tmp", path.Dir(path.Dir(binary.path)))
@@ -88,13 +88,13 @@ func TestVolumeACFSCompanionInstallation(t *testing.T) {
 	service := &VolumeService{}
 	dockerClient := newVolumeServiceTestDockerClient(t, server)
 	for range 2 {
-		executable, installErr := service.installVolumeACFSCompanion(t.Context(), dockerClient, "helper", binary)
+		executable, installErr := service.installVolumeCompanion(t.Context(), dockerClient, "helper", binary)
 		require.NoError(t, installErr)
 		require.Equal(t, binary.path, executable)
 	}
 	require.Equal(t, 1, copies)
 	mode = os.ModeSymlink | 0o555
-	_, err = service.installVolumeACFSCompanion(t.Context(), dockerClient, "helper", binary)
+	_, err = service.installVolumeCompanion(t.Context(), dockerClient, "helper", binary)
 	require.ErrorContains(t, err, "unexpected metadata")
 	require.Equal(t, 1, copies)
 

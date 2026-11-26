@@ -73,7 +73,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go build -p 2 -trimpath \
     -ldflags "-w -s -X kit.getarcane.app/acfs/internal/version.Version=0.10.3-cf.1" \
     -o /build/acfs \
-    kit.getarcane.app/acfs/cmd
+    kit.getarcane.app/acfs/cmd && \
+    CGO_ENABLED=0 GOOS=linux GOMAXPROCS=4 \
+    go build -p 2 -trimpath -ldflags "-w -s" -o /build/volume-stat ./cmd/volumestat
 
 RUN mkdir -p /build/rootfs/app/data /build/rootfs/builds
 
@@ -105,6 +107,7 @@ COPY --from=backend-builder --chown=65532:65532 /build/rootfs/app/ /app/
 COPY --from=backend-builder --chown=65532:65532 /build/rootfs/builds/ /builds/
 COPY --from=backend-builder --chown=65532:65532 /build/arcane .
 COPY --from=backend-builder --chmod=0555 /build/acfs ./acfs
+COPY --from=backend-builder --chmod=0555 /build/volume-stat ./volume-stat
 EXPOSE 3552
 VOLUME ["/app/data"]
 

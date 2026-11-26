@@ -45,6 +45,19 @@
 	const resourcesReady = $derived(volumesQuery.data?.envId === pageState.scope);
 	const volumes = $derived(volumesQuery.data?.value ?? data.volumes);
 
+	async function refreshVolumes() {
+		const [result] = await Promise.all([
+			volumesQuery.refetch(),
+			...volumes.data.map((item) =>
+				queryClient.invalidateQueries({
+					queryKey: queryKeys.volumes.workspaceStorage(item.environmentId, item.name),
+					exact: true
+				})
+			)
+		]);
+		return result;
+	}
+
 	const createVolumeMutation = createMutation(() => ({
 		mutationKey: ['volumes', 'create', pageState.scope],
 		mutationFn: ({ options, requestedEnvId }: { options: VolumeCreate; requestedEnvId: string }) =>
@@ -109,7 +122,7 @@
 			placement: 'secondary',
 			iconOnly: true,
 			label: m.common_refresh(),
-			onclick: () => volumesQuery.refetch(),
+			onclick: refreshVolumes,
 			loading: isRefreshing,
 			disabled: volumesQuery.isFetching
 		});
@@ -146,7 +159,7 @@
 					{volumes}
 					bind:selectedIds={pageState.selectedIds}
 					bind:requestOptions={pageState.requestOptions}
-					onRetry={() => volumesQuery.refetch()}
+					onRetry={refreshVolumes}
 					refreshError={volumesQuery.error}
 				/>
 			{/key}

@@ -41,6 +41,7 @@ func TestResolveCommandName(t *testing.T) {
 			shouldHit: true,
 		},
 		{name: "volume workspace list", method: "GET", path: "/api/agents/0/volumes/data/workspace", command: "volume.workspace.list", shouldHit: true},
+		{name: "volume workspace storage", method: "GET", path: "/api/agents/0/volumes/data/workspace/storage", command: "volume.workspace.storage", shouldHit: true},
 		{name: "volume named backups inspect", method: "GET", path: "/api/agents/0/volumes/backups", command: "volume.inspect", shouldHit: true},
 		{name: "volume named backups workspace", method: "GET", path: "/api/agents/0/volumes/backups/workspace", command: "volume.workspace.list", shouldHit: true},
 		{name: "volume driver discovery", method: "GET", path: "/api/agents/node-a/volume-drivers", command: "volume.drivers", shouldHit: true},

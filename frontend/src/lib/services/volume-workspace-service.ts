@@ -1,5 +1,5 @@
 import type { MessageResponse } from '#lib/types/base.js';
-import type { VolumeWorkspaceUpdateManifest } from '#lib/types/volume.js';
+import type { VolumeFilesystemUsage, VolumeWorkspaceUpdateManifest } from '#lib/types/volume.js';
 import type { Workspace, WorkspaceFileContent } from '#lib/types/workspace.js';
 import { downloadBlob, filenameFromPath } from '#lib/utils/browser-download.js';
 import { createWorkspaceFormData } from '#lib/utils/workspace-files.js';
@@ -15,6 +15,17 @@ class VolumeWorkspaceService extends BaseAPIService {
 				retry: 0,
 				cache: 'no-store',
 				params: { path }
+			})
+		);
+	}
+
+	async getStorage(volumeName: string, environmentId: string, config?: APIRequestConfig): Promise<VolumeFilesystemUsage | null> {
+		return this.handleResponse(
+			this.api.get(`/agents/${environmentId}/volumes/${encodeURIComponent(volumeName)}/workspace/storage`, {
+				...config,
+				timeout: 5_000,
+				retry: 0,
+				cache: 'no-store'
 			})
 		);
 	}

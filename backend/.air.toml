@@ -5,7 +5,7 @@ env_files = [".env"]
 
 [build]
   #cmd = "CGO_ENABLED=1 go build -tags 'exclude_frontend,buildables' -ldflags='-X getarcane.dev/arcane/v3/buildables.EnabledFeatures=autologin' -o ./.bin/arcane ./cmd"
-  cmd = "CGO_ENABLED=0 go build -tags 'exclude_frontend' -ldflags='-w -s' -o ./.bin/arcane ./cmd"
+  cmd = "CGO_ENABLED=0 GOOS=linux go build -ldflags='-w -s' -o ./.bin/volume-stat ./cmd/volumestat && CGO_ENABLED=0 go build -tags 'exclude_frontend' -ldflags='-w -s' -o ./.bin/arcane ./cmd"
   bin = "./.bin/arcane"
   entrypoint = ["./.bin/arcane"]
   include_ext = ["go", "tpl", "tmpl", "html"]

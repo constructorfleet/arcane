@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"path"
 	"slices"
@@ -47,6 +48,7 @@ type (
 		Events             *event.EventService
 		Locks              *concurrency.KeyedMutex
 		AcquireHelper      func(ctx context.Context, volumeName string) (string, func(), error)
+		HoldExistingHelper func(volumeName string) (string, func(), bool)
 		ACFSExecutable     func(ctx context.Context, containerID string) (string, error)
 		RequireACFS        func(ctx context.Context, volumeName, containerID string, requirements types.VolumeHelperRequirements) (bool, error)
 		Exec               func(ctx context.Context, containerID, execUser string, cmd []string) (string, string, error)
@@ -165,6 +167,38 @@ func NewService(deps Dependencies) *Service {
 
 func (s *Service) MaxFileSizeBytes(ctx context.Context) int64 {
 	return workspacepkg.MaxFileSizeBytes(s.deps.Settings.GetIntSetting(ctx, "volumeWorkspaceMaxFileSizeMb"))
+}
+
+func (s *Service) GetVolumeWorkspaceStorage(ctx context.Context, volumeName string) *types.VolumeFilesystemUsage {
+	containerID, release, ok := s.deps.HoldExistingHelper(volumeName)
+	if !ok {
+		return nil
+	}
+	defer release()
+
+	probeCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	output, _, err := s.deps.Exec(probeCtx, containerID, "", []string{"volume-stat"})
+	if err != nil {
+		slog.DebugContext(ctx, "could not read volume filesystem usage", "volume", volumeName, "error", err)
+		return nil
+	}
+
+	fields := strings.Fields(output)
+	if len(fields) != 3 {
+		return nil
+	}
+	blockSize, sizeErr := strconv.ParseUint(fields[0], 10, 64)
+	totalBlocks, totalErr := strconv.ParseUint(fields[1], 10, 64)
+	freeBlocks, freeErr := strconv.ParseUint(fields[2], 10, 64)
+	if sizeErr != nil || totalErr != nil || freeErr != nil || blockSize == 0 || totalBlocks == 0 ||
+		freeBlocks > totalBlocks || totalBlocks > math.MaxUint64/blockSize {
+		return nil
+	}
+	return &types.VolumeFilesystemUsage{
+		UsedBytes:  (totalBlocks - freeBlocks) * blockSize,
+		TotalBytes: totalBlocks * blockSize,
+	}
 }
 
 func (s *Service) GetVolumeWorkspace(ctx context.Context, volumeName, folderPath string) (*types.Workspace, error) {

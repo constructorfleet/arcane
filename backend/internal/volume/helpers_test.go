@@ -180,8 +180,9 @@ func TestCollectStaleHelperIDsSkipsInUseHelpers(t *testing.T) {
 		},
 	}
 
-	release, ok := s.acquireHelper("vol-a", "c-a")
+	containerID, release, ok := s.holdVolumeHelper("vol-a", "c-a", true)
 	require.True(t, ok)
+	require.Equal(t, "c-a", containerID)
 
 	require.Empty(t, s.collectStaleHelperIDs(now, 10*time.Minute),
 		"an in-use helper must survive the reaper regardless of lastUsedAt")
@@ -195,8 +196,21 @@ func TestCollectStaleHelperIDsSkipsInUseHelpers(t *testing.T) {
 
 	// Acquiring a helper that was reaped (or replaced) since resolve must fail
 	// so the caller re-resolves instead of using a dead container.
-	_, ok = s.acquireHelper("vol-a", "c-a")
+	_, _, ok = s.holdVolumeHelper("vol-a", "c-a", true)
 	require.False(t, ok)
+}
+
+func TestVolumeStorageHoldKeepsExistingIdleDeadline(t *testing.T) {
+	now := time.Now()
+	service := &VolumeService{helperByVolume: map[string]*volumeHelper{
+		"data": {id: "helper", lastUsedAt: now.Add(-time.Hour)},
+	}}
+	containerID, release, ok := service.holdVolumeHelper("data", "", false)
+	require.True(t, ok)
+	require.Equal(t, "helper", containerID)
+	require.Empty(t, service.collectStaleHelperIDs(now, time.Minute))
+	release()
+	require.Equal(t, []string{"helper"}, service.collectStaleHelperIDs(now, time.Minute))
 }
 
 func TestTakeHelperID(t *testing.T) {

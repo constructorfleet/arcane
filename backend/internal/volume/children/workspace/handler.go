@@ -31,6 +31,11 @@ type (
 		Path          string `query:"path" doc:"Folder path relative to the volume workspace root; empty lists the root"`
 	}
 
+	GetVolumeWorkspaceStorageInput struct {
+		EnvironmentID string `path:"id" doc:"Environment ID"`
+		VolumeName    string `path:"volumeName" doc:"Volume name"`
+	}
+
 	GetVolumeWorkspaceFileInput struct {
 		EnvironmentID string `path:"id" doc:"Environment ID"`
 		VolumeName    string `path:"volumeName" doc:"Volume name"`
@@ -69,6 +74,13 @@ func (h *Handler) GetVolumeWorkspace(ctx context.Context, input *GetVolumeWorksp
 		return nil, volumeWorkspaceHTTPError(err)
 	}
 	return &handlerutil.Out[types.Workspace]{Body: types.ApiResponse[types.Workspace]{Success: true, Data: *result}}, nil
+}
+
+func (h *Handler) GetVolumeWorkspaceStorage(ctx context.Context, input *GetVolumeWorkspaceStorageInput) (*handlerutil.Out[*types.VolumeFilesystemUsage], error) {
+	return &handlerutil.Out[*types.VolumeFilesystemUsage]{Body: types.ApiResponse[*types.VolumeFilesystemUsage]{
+		Success: true,
+		Data:    h.service.GetVolumeWorkspaceStorage(ctx, input.VolumeName),
+	}}, nil
 }
 
 func (h *Handler) GetVolumeWorkspaceFile(ctx context.Context, input *GetVolumeWorkspaceFileInput) (*handlerutil.Out[types.WorkspaceFileContent], error) {

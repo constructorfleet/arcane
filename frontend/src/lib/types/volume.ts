@@ -137,3 +137,8 @@ export interface VolumeSizeInfo {
 	size: number;
 	refCount: number;
 }
+
+export interface VolumeFilesystemUsage {
+	usedBytes: number;
+	totalBytes: number;
+}

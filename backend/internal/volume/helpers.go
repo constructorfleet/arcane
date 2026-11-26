@@ -134,8 +134,8 @@ func (s *VolumeService) acquireVolumeHelper(ctx context.Context, volumeName stri
 		if resolveHelperErr != nil {
 			return "", nil, resolveHelperErr
 		}
-		if release, ok := s.acquireHelper(volumeName, containerID); ok {
-			return containerID, release, nil
+		if heldID, release, ok := s.holdVolumeHelper(volumeName, containerID, true); ok {
+			return heldID, release, nil
 		}
 	}
 	return "", nil, errors.New("failed to acquire volume helper container")
@@ -185,25 +185,28 @@ func (s *VolumeService) resolveHelper(ctx context.Context, volumeName string) (s
 	return containerID, nil
 }
 
-// Release refreshes the idle clock so the timeout counts from the end of the last request.
-func (s *VolumeService) acquireHelper(volumeName, containerID string) (func(), bool) {
+func (s *VolumeService) holdVolumeHelper(volumeName, containerID string, refreshIdle bool) (string, func(), bool) {
 	s.helperMu.Lock()
 	defer s.helperMu.Unlock()
 
 	helper := s.helperByVolume[volumeName]
-	if helper == nil || helper.id != containerID {
-		return nil, false
+	if helper == nil || helper.id == "" || (containerID != "" && helper.id != containerID) {
+		return "", nil, false
 	}
 
 	helper.inUse++
-	helper.lastUsedAt = time.Now()
+	if refreshIdle {
+		helper.lastUsedAt = time.Now()
+	}
 
-	return func() {
+	return helper.id, func() {
 		s.helperMu.Lock()
 		defer s.helperMu.Unlock()
 		if current := s.helperByVolume[volumeName]; current == helper {
 			helper.inUse--
-			helper.lastUsedAt = time.Now()
+			if refreshIdle {
+				helper.lastUsedAt = time.Now()
+			}
 		}
 	}, true
 }
@@ -350,7 +353,7 @@ func (s *VolumeService) collectStaleHelperIDs(now time.Time, idleTimeout time.Du
 			delete(s.helperByVolume, volumeName)
 			continue
 		}
-		// Held helpers are serving a request; release refreshes lastUsedAt.
+		// Held helpers are serving a request and cannot be reaped yet.
 		if helper.inUse > 0 {
 			continue
 		}
@@ -439,6 +442,19 @@ func (s *VolumeService) execInContainer(ctx context.Context, containerID, execUs
 		}
 		cmd = slices.Clone(cmd)
 		cmd[0] = executable
+	} else if len(cmd) > 0 && cmd[0] == volumeStatExecutable {
+		binary, binaryErr := volumeStatCompanion()
+		if binaryErr != nil {
+			return "", "", binaryErr
+		}
+		if binary == nil {
+			return "", "", errors.New("volume-stat companion is unavailable")
+		}
+		executable, installErr := s.installVolumeCompanion(ctx, dockerClient, containerID, binary)
+		if installErr != nil {
+			return "", "", installErr
+		}
+		cmd = []string{executable}
 	}
 	var stdout, stderr bytes.Buffer
 	exitCode, err := docker.ExecInContainer(ctx, dockerClient, docker.ExecRequest{

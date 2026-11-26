@@ -18,34 +18,46 @@ import (
 	"getarcane.dev/arcane/v3/pkg/timeouts"
 )
 
-type volumeACFSBinary struct {
+type volumeCompanion struct {
 	path    string
 	archive []byte
 	size    int64
 }
 
-var volumeACFSCompanion = sync.OnceValues(func() (*volumeACFSBinary, error) {
+const volumeStatExecutable = "volume-stat"
+
+var (
+	volumeACFSCompanion = sync.OnceValues(func() (*volumeCompanion, error) {
+		return loadPackagedVolumeCompanion("acfs")
+	})
+	volumeStatCompanion = sync.OnceValues(func() (*volumeCompanion, error) {
+		return loadPackagedVolumeCompanion(volumeStatExecutable)
+	})
+)
+
+func loadPackagedVolumeCompanion(name string) (*volumeCompanion, error) {
 	executable, err := os.Executable()
 	if err != nil {
 		return nil, err
 	}
-	return loadVolumeACFSCompanion(filepath.Join(filepath.Dir(executable), "acfs"))
-})
+	return loadVolumeCompanion(filepath.Join(filepath.Dir(executable), name))
+}
 
-func loadVolumeACFSCompanion(filename string) (*volumeACFSBinary, error) {
+func loadVolumeCompanion(filename string) (*volumeCompanion, error) {
+	name := filepath.Base(filename)
 	content, err := os.ReadFile(filename)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("read packaged ACFS companion: %w", err)
+		return nil, fmt.Errorf("read packaged %s companion: %w", name, err)
 	}
 	if len(content) == 0 {
-		return nil, errors.New("packaged ACFS companion is empty")
+		return nil, fmt.Errorf("packaged %s companion is empty", name)
 	}
-	directory := fmt.Sprintf(".arcane-acfs-%x", sha256.Sum256(content))
+	directory := fmt.Sprintf(".arcane-%s-%x", name, sha256.Sum256(content))
 	staged := path.Join(directory, "payload")
-	published := path.Join(directory, "acfs")
+	published := path.Join(directory, name)
 	var archive bytes.Buffer
 	writer := tar.NewWriter(&archive)
 	if headerErr := writer.WriteHeader(&tar.Header{Name: directory, Typeflag: tar.TypeDir, Mode: 0o755}); headerErr != nil {
@@ -64,22 +76,22 @@ func loadVolumeACFSCompanion(filename string) (*volumeACFSBinary, error) {
 	if closeErr := writer.Close(); closeErr != nil {
 		return nil, closeErr
 	}
-	return &volumeACFSBinary{archive: archive.Bytes(), path: path.Join("/tmp", published), size: int64(len(content))}, nil
+	return &volumeCompanion{archive: archive.Bytes(), path: path.Join("/tmp", published), size: int64(len(content))}, nil
 }
 
-func (s *VolumeService) installVolumeACFSCompanion(ctx context.Context, dockerClient *client.Client, containerID string, binary *volumeACFSBinary) (string, error) {
-	result := s.helperGroup.DoChan("acfs:"+containerID+":"+binary.path, func() (any, error) {
+func (s *VolumeService) installVolumeCompanion(ctx context.Context, dockerClient *client.Client, containerID string, binary *volumeCompanion) (string, error) {
+	result := s.helperGroup.DoChan("companion:"+containerID+":"+binary.path, func() (any, error) {
 		installCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeouts.DefaultDockerAPI)
 		defer cancel()
 		stat, err := dockerClient.ContainerStatPath(installCtx, containerID, client.ContainerStatPathOptions{Path: binary.path})
 		if err == nil {
 			if !stat.Stat.Mode.IsRegular() || stat.Stat.Mode.Perm() != 0o555 || stat.Stat.Size != binary.size || stat.Stat.LinkTarget != "" {
-				return nil, errors.New("packaged ACFS companion path has unexpected metadata")
+				return nil, fmt.Errorf("packaged %s companion path has unexpected metadata", path.Base(binary.path))
 			}
 			return binary.path, nil
 		}
 		if !errdefs.IsNotFound(err) {
-			return nil, fmt.Errorf("inspect packaged ACFS companion: %w", err)
+			return nil, fmt.Errorf("inspect packaged %s companion: %w", path.Base(binary.path), err)
 		}
 		_, err = dockerClient.CopyToContainer(installCtx, containerID, client.CopyToContainerOptions{
 			DestinationPath: "/tmp",
@@ -87,7 +99,7 @@ func (s *VolumeService) installVolumeACFSCompanion(ctx context.Context, dockerCl
 			CopyUIDGID:      true,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("install packaged ACFS companion: %w", err)
+			return nil, fmt.Errorf("install packaged %s companion: %w", path.Base(binary.path), err)
 		}
 		return binary.path, nil
 	})
@@ -114,5 +126,5 @@ func (s *VolumeService) volumeACFSExecutable(ctx context.Context, containerID st
 	if err != nil {
 		return "", err
 	}
-	return s.installVolumeACFSCompanion(ctx, dockerClient, containerID, binary)
+	return s.installVolumeCompanion(ctx, dockerClient, containerID, binary)
 }

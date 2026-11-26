@@ -141,10 +141,13 @@ func NewVolumeService(p VolumeServiceParams) *VolumeService {
 	}
 	service.backup = volumebackup.NewService(backupDeps)
 	service.workspace = workspace.NewService(workspace.Dependencies{
-		Docker:             p.DockerService,
-		Events:             p.EventService,
-		Locks:              &service.workspaceLocks,
-		AcquireHelper:      service.acquireVolumeHelper,
+		Docker:        p.DockerService,
+		Events:        p.EventService,
+		Locks:         &service.workspaceLocks,
+		AcquireHelper: service.acquireVolumeHelper,
+		HoldExistingHelper: func(volumeName string) (string, func(), bool) {
+			return service.holdVolumeHelper(volumeName, "", false)
+		},
 		RequireACFS:        service.requireVolumeHelperACFS,
 		ACFSExecutable:     service.volumeACFSExecutable,
 		Exec:               service.execInContainer,

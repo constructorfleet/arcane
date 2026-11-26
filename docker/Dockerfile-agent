@@ -49,7 +49,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go build -p 2 -trimpath \
     -ldflags "-w -s -X kit.getarcane.app/acfs/internal/version.Version=0.10.3-cf.1" \
     -o /out/acfs \
-    kit.getarcane.app/acfs/cmd
+    kit.getarcane.app/acfs/cmd && \
+    CGO_ENABLED=0 GOOS=linux GOMAXPROCS=4 \
+    go build -p 2 -trimpath -ldflags "-w -s" -o /out/volume-stat ./cmd/volumestat
 
 RUN mkdir -p /out/rootfs/app/data
 
@@ -62,6 +64,7 @@ USER 0:0
 COPY --from=agent-builder --chown=65532:65532 /out/rootfs/app/ /app/
 COPY --from=agent-builder --chown=65532:65532 /out/arcane-agent ./arcane-agent
 COPY --from=agent-builder --chmod=0555 /out/acfs ./acfs
+COPY --from=agent-builder --chmod=0555 /out/volume-stat ./volume-stat
 
 ARG VERSION="dev"
 ARG REVISION="unknown"

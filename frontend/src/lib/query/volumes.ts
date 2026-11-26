@@ -40,3 +40,17 @@ export function volumeWorkspaceFolderQuery(environmentId: string, volumeName: st
 		refetchOnReconnect: false
 	});
 }
+
+export function volumeWorkspaceStorageQuery(environmentId: string, volumeName: string) {
+	return queryOptions({
+		queryKey: queryKeys.volumes.workspaceStorage(environmentId, volumeName),
+		queryFn: async ({ signal }) => {
+			await environmentStore.ready;
+			return volumeWorkspaceService.getStorage(volumeName, environmentId, { signal });
+		},
+		staleTime: 0,
+		retry: false,
+		refetchOnWindowFocus: false,
+		refetchOnReconnect: false
+	});
+}

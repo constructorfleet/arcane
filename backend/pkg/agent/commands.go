@@ -137,6 +137,7 @@ var (
 		{Method: http.MethodPost, PathPattern: "/api/agents/{id}/volumes/{volumeName}/rename", CommandName: "volume.rename"},
 		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/volumes/sizes", CommandName: "volume.sizes"},
 		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/volumes/{volumeName}/workspace", CommandName: "volume.workspace.list"},
+		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/volumes/{volumeName}/workspace/storage", CommandName: "volume.workspace.storage"},
 		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/volumes/{volumeName}/workspace/file", CommandName: "volume.workspace.read_file"},
 		{Method: http.MethodGet, PathPattern: "/api/agents/{id}/volumes/{volumeName}/workspace/file/download", CommandName: "volume.workspace.download"},
 		{Method: http.MethodPatch, PathPattern: "/api/agents/{id}/volumes/{volumeName}/workspace", CommandName: "volume.workspace.update"},

@@ -274,6 +274,7 @@ export const queryKeys = {
 			['gitops-syncs', environmentId, syncId, 'backup-revision', commit] as const
 	},
 	volumes: {
+		all: ['volumes'] as const,
 		sizes: (environmentId: string) => ['volume-sizes', environmentId] as const,
 		backupVolumeNames: (scope: string) => ['volume-backup-names', scope] as const,
 		listPrefix: (scope: string) => ['volumes', scope] as const,
@@ -282,7 +283,9 @@ export const queryKeys = {
 		detail: (environmentId: string, volumeName: string) => ['volume', environmentId, volumeName] as const,
 		workspace: (environmentId: string, volumeName: string) => ['volume', environmentId, volumeName, 'workspace'] as const,
 		workspaceFolder: (environmentId: string, volumeName: string, path: string) =>
-			['volume', environmentId, volumeName, 'workspace', path] as const,
+			['volume', environmentId, volumeName, 'workspace', 'folder', path] as const,
+		workspaceStorage: (environmentId: string, volumeName: string) =>
+			['volume', environmentId, volumeName, 'workspace', 'storage'] as const,
 		workspaceFile: (environmentId: string, volumeName: string, relativePath: string) =>
 			['volume', environmentId, volumeName, 'workspace-file', relativePath] as const,
 		backups: (volumeName: string) => ['volume-backups', volumeName] as const,
