@@ -186,14 +186,9 @@ func (s *Service) harborNames(ctx context.Context, target *target, path string, 
 	}
 	// Native Ping may race HTTPS and the explicitly permitted HTTP fallback.
 	*remaining -= probeBudget
-	base := cmp.Or(s.transport, http.DefaultTransport)
-	challenge, pingErr := transport.Ping(ctx, target.registry, discoveryTransport{base: base, host: target.registry.RegistryStr()})
-	if pingErr != nil {
-		return nil, pingErr
-	}
-	scheme := "https"
-	if challenge.Insecure {
-		scheme = "http"
+	scheme, err := s.harborScheme(ctx, target)
+	if err != nil {
+		return nil, err
 	}
 	var names []string
 	seenPages := make(map[string]struct{})
@@ -203,9 +198,9 @@ func (s *Service) harborNames(ctx context.Context, target *target, path string, 
 			return nil, errors.New("project discovery request limit reached; select a namespace")
 		}
 		*remaining--
-		result, err := s.harborPage(ctx, target, path, page, scheme)
-		if err != nil {
-			return nil, err
+		result, pageErr := s.harborPage(ctx, target, path, page, scheme)
+		if pageErr != nil {
+			return nil, pageErr
 		}
 		if len(result.Names) == 0 {
 			if result.Total > len(names) {
@@ -235,26 +230,43 @@ func (s *Service) harborNames(ctx context.Context, target *target, path string, 
 	return nil, errors.New("project discovery exceeded the page limit")
 }
 
-// The project API accepts registry username/password, including CLI and robot secrets.
-func (s *Service) harborPage(ctx context.Context, target *target, path string, page int, scheme string) (harborPage, error) {
+func (s *Service) harborScheme(ctx context.Context, target *target) (string, error) {
+	base := cmp.Or(s.transport, http.DefaultTransport)
+	challenge, err := transport.Ping(ctx, target.registry, discoveryTransport{base: base, host: target.registry.RegistryStr()})
+	if err != nil {
+		return "", err
+	}
+	if challenge.Insecure {
+		return "http", nil
+	}
+	return "https", nil
+}
+
+// The Harbor API accepts registry username/password, including CLI and robot secrets.
+func (s *Service) harborGET(ctx context.Context, target *target, scheme, path string, query url.Values, mediaType string) (*http.Response, error) {
 	auth, err := target.auth.Authorization()
 	if err != nil {
-		return harborPage{}, errors.New("failed to resolve project discovery credentials")
+		return nil, errors.New("failed to resolve Harbor credentials")
 	}
-	endpoint := url.URL{
-		Scheme: scheme, Host: target.registry.RegistryStr(), Path: path,
-		RawQuery: url.Values{"page": {strconv.Itoa(page)}, "page_size": {strconv.Itoa(harborPageSize)}}.Encode(),
-	}
+	endpoint := url.URL{Scheme: scheme, Host: target.registry.RegistryStr(), Path: path, RawQuery: query.Encode()}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), http.NoBody)
 	if err != nil {
-		return harborPage{}, err
+		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
+	if mediaType != "" {
+		req.Header.Set("X-Accept-Vulnerabilities", mediaType)
+	}
 	if auth.Username != "" || auth.Password != "" {
 		req.SetBasicAuth(auth.Username, auth.Password)
 	}
 	client := &http.Client{Transport: s.transport, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
-	response, err := client.Do(req)
+	return client.Do(req)
+}
+
+func (s *Service) harborPage(ctx context.Context, target *target, path string, page int, scheme string) (harborPage, error) {
+	query := url.Values{"page": {strconv.Itoa(page)}, "page_size": {strconv.Itoa(harborPageSize)}}
+	response, err := s.harborGET(ctx, target, scheme, path, query, "")
 	if err != nil {
 		return harborPage{}, err
 	}

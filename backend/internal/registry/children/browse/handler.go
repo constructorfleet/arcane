@@ -35,6 +35,13 @@ type (
 		Limit      int    `query:"limit" default:"20" doc:"Items per page"`
 	}
 
+	RegistryScanReportInput struct {
+		ID         string `path:"id" doc:"Registry ID"`
+		Repository string `query:"repository" required:"true" minLength:"1" doc:"Project and repository"`
+		Digest     string `query:"digest" required:"true" minLength:"1" doc:"Image manifest digest"`
+		Platform   string `query:"platform" doc:"Optional platform, such as linux/amd64"`
+	}
+
 	DeleteRegistryTagInput struct {
 		ID         string `path:"id" doc:"Registry ID"`
 		Repository string `query:"repository" required:"true" minLength:"1" doc:"Repository name"`
@@ -110,5 +117,16 @@ func (h *Handler) DeleteTag(ctx context.Context, input *DeleteRegistryTagInput) 
 			Success: true,
 			Data:    types.ContainerRegistryDeleteTagResponse{Digest: digest},
 		},
+	}, nil
+}
+
+func (h *Handler) ScanReport(ctx context.Context, input *RegistryScanReportInput) (*handlerutil.Out[types.RegistryScanReport], error) {
+	report, err := h.service.ScanReport(ctx, input.ID, input.Repository, input.Digest, input.Platform)
+	if err != nil {
+		apiErr := common.ToAPIError(err)
+		return nil, huma.NewError(apiErr.HTTPStatus(), err.Error())
+	}
+	return &handlerutil.Out[types.RegistryScanReport]{
+		Body: types.ApiResponse[types.RegistryScanReport]{Success: true, Data: report},
 	}, nil
 }

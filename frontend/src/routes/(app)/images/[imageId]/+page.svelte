@@ -46,6 +46,7 @@
 	import HardenedImagePanel from './components/hardened-image-panel.svelte';
 	import ImageAttestationsPanel from './components/image-attestations-panel.svelte';
 	import ImageHistoryPanel from './components/image-history-panel.svelte';
+	import RegistryVulnerabilityPanel from './components/registry-vulnerability-panel.svelte';
 
 	let { data } = $props();
 
@@ -71,13 +72,20 @@
 
 	const vulnerabilityManagementEnabled = $derived(featureStore.isEnabled('vulnerabilityManagement', currentEnvId));
 
+	const canViewRegistryScan = $derived(
+		hasPermission('registries:list', currentEnvId) &&
+			hasPermission('registries:browse', currentEnvId) &&
+			((image?.repoDigests?.length ?? 0) > 0 || (image?.pinnedReferences?.length ?? 0) > 0)
+	);
+
 	const urlTab = useUrlTab({
 		tabs: () => [
 			{ value: 'overview', label: m.common_overview(), icon: ImagesIcon },
 			{ value: 'history', label: m.images_history_title(), icon: LayersIcon },
 			{ value: 'attestations', label: m.images_attestations_title(), icon: InspectIcon },
 			{ value: 'hardened', label: m.docker_hardened_image(), icon: ShieldCheckIcon, visible: !!image?.hardened },
-			{ value: 'vulnerabilities', label: m.vuln_title(), icon: ShieldCheckIcon, visible: vulnerabilityManagementEnabled }
+			{ value: 'vulnerabilities', label: m.vuln_title(), icon: ShieldCheckIcon, visible: vulnerabilityManagementEnabled },
+			{ value: 'registry-vulnerabilities', label: m.registry_scan_tab(), icon: ShieldCheckIcon, visible: canViewRegistryScan }
 		],
 		defaultTab: () => 'overview'
 	});
@@ -534,6 +542,14 @@
 					<HardenedImagePanel info={image.hardened} />
 				</Tabs.Content>
 			{/if}
+			{#if canViewRegistryScan && activeTab === 'registry-vulnerabilities'}
+				<Tabs.Content value="registry-vulnerabilities" layout="table">
+					{#key `${currentEnvId}/${image.id}`}
+						<RegistryVulnerabilityPanel {image} />
+					{/key}
+				</Tabs.Content>
+			{/if}
+
 			{#if vulnerabilityManagementEnabled}
 				<Tabs.Content value="vulnerabilities" layout="table">
 					<VulnerabilityScanPanel

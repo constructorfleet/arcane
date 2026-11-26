@@ -40,6 +40,15 @@ func RegisterRoutes(api huma.API, h *Handler) {
 	}, authz.PermRegistriesBrowse, h.ListTags)
 
 	middleware.RegisterWithPermission(api, huma.Operation{
+		OperationID: "getContainerRegistryScanReport",
+		Method:      "GET",
+		Path:        "/registries/{id}/scan-report",
+		Summary:     "Read the saved registry's vulnerability report for an image digest",
+		Tags:        []string{"Container Registries"},
+		Security:    handlerutil.DefaultOperationSecurity(),
+	}, authz.PermRegistriesBrowse, h.ScanReport)
+
+	middleware.RegisterWithPermission(api, huma.Operation{
 		OperationID: "deleteContainerRegistryTag",
 		Method:      "DELETE",
 		Path:        "/registries/{id}/tags",

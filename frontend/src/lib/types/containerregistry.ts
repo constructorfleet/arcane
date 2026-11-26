@@ -73,3 +73,24 @@ export interface ContainerRegistryCredential {
 	token: string;
 	enabled: boolean;
 }
+
+export interface RegistryScanFinding {
+	id: string;
+	package: string;
+	version: string;
+	fix_version?: string;
+	severity: string;
+	links?: string[];
+}
+
+export interface RegistryScanReport {
+	digest: string;
+	status: string;
+	severity?: string;
+	scanner?: string;
+	completedAt?: string;
+	platform?: string;
+	findings: RegistryScanFinding[];
+	counts?: Record<string, number>;
+	total: number;
+}

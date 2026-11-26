@@ -11,7 +11,7 @@ all: e2e backend cli
 e2e:
     vp -C tests run test
 
-backend: (_go 'backend' '-tags=exclude_frontend,buildables' '-ldflags=-X getarcane.dev/arcane/v3/buildables.EnabledFeatures=autologin')
+backend: (_go 'backend' '-tags=exclude_frontend,buildables')
 
 cli: (_go 'cli')
 

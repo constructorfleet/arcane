@@ -3169,7 +3169,10 @@ func TestProjectService_CreateProject_CommitsWorkspaceAndConfigurationTogether(t
 	var count int64
 	require.NoError(t, db.WithContext(ctx).Model(&Project{}).Count(&count).Error)
 	require.Equal(t, int64(1), count)
-	require.NoDirExists(t, filepath.Join(projectsDir, "Atomic-Workspace"))
+	entries, err := os.ReadDir(projectsDir)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	require.Equal(t, "atomic-workspace", entries[0].Name())
 }
 
 func TestProjectService_CreateProject_RollsBackInvalidWorkspaceManifest(t *testing.T) {

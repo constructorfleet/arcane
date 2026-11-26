@@ -4846,5 +4846,18 @@
   "view_errors": "View errors",
   "image_variant_count": "{count} variants",
   "image_scan_coverage": "{scanned}/{total} scanned",
-  "image_node_copy": "Image on node"
+  "image_node_copy": "Image on node",
+  "registry_scan_tab": "Registry vulnerabilities",
+  "registry_scan_no_match": "Add a saved registry for this image’s repository to read its scan report.",
+  "registry_scan_reference": "Image reference",
+  "registry_scan_account": "Registry connection",
+  "registry_scan_candidate_digest": "Candidate manifest digest",
+  "registry_scan_compare": "Compare candidate",
+  "registry_scan_candidate_invalid": "Enter a valid SHA-256 manifest digest.",
+  "registry_scan_running": "Selected image",
+  "registry_scan_candidate": "Candidate image",
+  "registry_scan_compare_result": "No longer reported: {removed} · Still reported: {persisting} · Newly reported: {added}",
+  "registry_scan_compare_unavailable": "Comparison needs completed registry reports for both digests.",
+  "registry_scan_report_total": "{count} findings",
+  "registry_scan_invalid_reference": "This image has no usable registry digest."
 }
