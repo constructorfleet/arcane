@@ -40,6 +40,7 @@
 		hasShownPermission,
 		withFailedEnvironments
 	} from '#lib/utils/environments.js';
+	import { inUseImageTargets } from '#lib/utils/image-scan.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 	import {
 		getSeveritySegments,
@@ -249,8 +250,10 @@
 						(env) => hasPermission('vulnerabilities:scan', env.id) && hasPermission('images:list', env.id)
 					);
 					const fetchImagesPage = (page: number) =>
-						fetchAcrossEnvironments(environments, { pagination: { page, limit: BULK_FETCH_PAGE_SIZE } }, (id, request, config) =>
-							imageService.getImagesForEnvironment(id, request, config)
+						fetchAcrossEnvironments(
+							environments,
+							{ pagination: { page, limit: BULK_FETCH_PAGE_SIZE }, filters: { inUse: true } },
+							(id, request, config) => imageService.getImagesForEnvironment(id, request, config)
 						);
 					const firstPage = await fetchImagesPage(1);
 					const imagePages = [firstPage];
@@ -261,7 +264,8 @@
 					) {
 						imagePages.push(await fetchImagesPage(page));
 					}
-					const images = imagePages.flatMap((imagePage) => imagePage.data ?? []);
+					const fetchedImages = imagePages.flatMap((imagePage) => imagePage.data ?? []);
+					const images = inUseImageTargets(fetchedImages);
 					// Environments whose images could not be listed were not scanned.
 					const skipped =
 						withFailedEnvironments(firstPage, ...imagePages.slice(1).map((imagePage) => imagePage.failedEnvironments))
@@ -273,7 +277,7 @@
 						});
 					}
 
-					if (firstPage.pagination.totalItems > images.length) {
+					if (firstPage.pagination.totalItems > fetchedImages.length) {
 						toast.warning(m.security_scan_all_capped({ count: images.length, total: firstPage.pagination.totalItems }));
 					}
 

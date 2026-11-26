@@ -121,7 +121,7 @@ func (h *Handler) DeleteTag(ctx context.Context, input *DeleteRegistryTagInput) 
 }
 
 func (h *Handler) ScanReport(ctx context.Context, input *RegistryScanReportInput) (*handlerutil.Out[types.RegistryScanReport], error) {
-	report, err := h.service.ScanReport(ctx, input.ID, input.Repository, input.Digest, input.Platform)
+	report, err := h.service.ScanArtifact(ctx, types.RegistryArtifactScanOptions{RegistryID: input.ID, Repository: input.Repository, Digest: input.Digest, Platform: input.Platform})
 	if err != nil {
 		apiErr := common.ToAPIError(err)
 		return nil, huma.NewError(apiErr.HTTPStatus(), err.Error())

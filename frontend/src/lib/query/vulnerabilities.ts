@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/svelte-query';
 
 import { queryKeys } from '#lib/query/query-keys.js';
+import { APIError } from '#lib/services/api-service.js';
 import { imageService } from '#lib/services/image-service.js';
 import { vulnerabilityService } from '#lib/services/vulnerability-service.js';
 import { environmentStore, type EnvironmentRef } from '#lib/stores/environment.store.svelte.js';
@@ -8,6 +9,7 @@ import type { Paginated } from '#lib/types/base.js';
 import type { PatchTarget } from '#lib/types/imagepatch.js';
 import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 import type { Vulnerability } from '#lib/types/vulnerability.js';
+import { isVulnerabilityScanInProgress } from '#lib/utils/docker.js';
 import { fetchAcrossEnvironments, type EnvironmentFailure, type EnvironmentRow } from '#lib/utils/environments.js';
 import { fetchRiskOverview, mapVulnerabilityPage } from '#lib/utils/vulnerability.js';
 
@@ -81,5 +83,21 @@ export function imageVulnerabilityListQuery(
 				data: response.data.map((item, index) => ({ ...item, id: imageVulnerabilityRowKey(item, offset + index) }))
 			};
 		}
+	});
+}
+
+export function imageScanResultQuery(environmentId: string, imageId: string) {
+	return queryOptions({
+		queryKey: queryKeys.vulnerabilities.scanResult(environmentId, imageId),
+		queryFn: async () => {
+			try {
+				return await vulnerabilityService.getScanResult(imageId, environmentId);
+			} catch (error) {
+				if (error instanceof APIError && error.status === 404) return null;
+				throw error;
+			}
+		},
+		refetchInterval: (query) => (isVulnerabilityScanInProgress(query.state.data?.status) ? 2000 : false),
+		retry: false
 	});
 }

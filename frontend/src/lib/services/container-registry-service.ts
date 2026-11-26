@@ -4,8 +4,7 @@ import type {
 	ContainerRegistry,
 	ContainerRegistryRepository,
 	ContainerRegistryNamespace,
-	ContainerRegistryRepositoryTag,
-	RegistryScanReport
+	ContainerRegistryRepositoryTag
 } from '#lib/types/containerregistry.js';
 import type {
 	ContainerRegistryCreate,
@@ -75,10 +74,6 @@ class ContainerRegistryService extends BaseAPIService {
 		const res = await this.api.get(`/registries/${id}/tags`, { params });
 		const page: Paginated<ContainerRegistryRepositoryTag> = res.data;
 		return { ...page, data: page.data.map((tag) => ({ ...tag, id: tag.name })) };
-	}
-
-	async getScanReport(id: string, repository: string, digest: string, platform?: string): Promise<RegistryScanReport> {
-		return this.handleResponse(this.api.get(`/registries/${id}/scan-report`, { params: { repository, digest, platform } }));
 	}
 
 	async deleteTag(id: string, repository: string, tag: string): Promise<{ digest: string }> {

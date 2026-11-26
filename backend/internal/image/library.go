@@ -95,7 +95,11 @@ func groupImageRepositories(pages []pagination.EnvironmentPage[types.ImageSummar
 				groups[repo] = append(groups[repo], observation)
 			}
 			if len(byRepository) == 0 && onlyRepository == "" {
-				items = append(items, image)
+				if image.InUse {
+					groups["local:"+image.ID] = append(groups["local:"+image.ID], image)
+				} else {
+					items = append(items, image)
+				}
 			}
 		}
 	}
@@ -167,6 +171,9 @@ func sortedUnique(values []string) []string {
 }
 
 func mergeImageRepository(copies []types.ImageSummary) types.ImageSummary {
+	if slices.ContainsFunc(copies, func(copy types.ImageSummary) bool { return copy.InUse }) {
+		copies = slices.DeleteFunc(copies, func(copy types.ImageSummary) bool { return !copy.InUse })
+	}
 	slices.SortFunc(copies, func(a, b types.ImageSummary) int {
 		if a.InUse != b.InUse {
 			if a.InUse {
@@ -178,6 +185,9 @@ func mergeImageRepository(copies []types.ImageSummary) types.ImageSummary {
 	})
 	row := copies[0]
 	row.LogicalID = "image-repository:" + row.Repo
+	if row.Repo == "<none>" || row.Repo == "" {
+		row.LogicalID = "image-local:" + row.ID
+	}
 	row.RepoTags, row.RepoDigests = nil, nil
 	group := &types.ImageRepositoryGroup{MinSize: row.Size, MaxSize: row.Size}
 	observed := map[string]struct{}{}

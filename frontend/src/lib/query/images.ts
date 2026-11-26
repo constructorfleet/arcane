@@ -28,6 +28,7 @@ export function imageLibraryQuery(
 		filters: {
 			...requestOptions.filters,
 			groupByRepository: true,
+			inUse: true,
 			...(repository ? { repository } : {})
 		}
 	});

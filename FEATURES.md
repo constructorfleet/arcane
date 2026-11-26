@@ -369,3 +369,9 @@ previously allowed fake Docker network/service creation and a success response
 without saved source. cf.34 returns the persistence error before deployment.
 The negative case and related stack-source/Swarm business coverage pass; normal
 release rollout acceptance and broader source/GitOps behavior remain separate.
+
+Harbor scan routing and in-use image report acceptance are tracked in #252.
+cf.106 consolidates image vulnerability reports around exact running platform
+digests and configured Harbor proxy caches, retaining local scanning only when
+no Harbor artifact/scanner applies. Native report reads and owning service tests
+are verified; authenticated scan submission and live UI acceptance remain open.

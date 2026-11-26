@@ -3,41 +3,34 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
-	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { ActionButtonGroup, type ActionButton } from '#lib/components/action-button-group/index.js';
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import ImageReleaseNotesDialog from '#lib/components/dialogs/image-release-notes-dialog.svelte';
-	import EnvironmentDestinationSelect from '#lib/components/form/environment-destination-select.svelte';
 	import ImageUpdateItem from '#lib/components/image-update-item.svelte';
 	import { DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { CopyButton } from '#lib/components/ui/copy-button/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
-	import VulnerabilityScanPanel from '#lib/components/vulnerability/vulnerability-scan-panel.svelte';
 	import { useUrlTab } from '#lib/hooks/use-url-tab.svelte.js';
 	import { TagIcon, ImagesIcon, LayersIcon, ShieldCheckIcon, InspectIcon, FileTextIcon } from '#lib/icons/index.js';
 	import TabbedPageLayout from '#lib/layouts/tabbed-page-layout.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { imageDetailQuery } from '#lib/query/images.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
+	import { imageScanResultQuery } from '#lib/query/vulnerabilities.js';
 	import { APIError } from '#lib/services/api-service.js';
 	import { imageService } from '#lib/services/image-service.js';
 	import { vulnerabilityService } from '#lib/services/vulnerability-service.js';
-	import { activityStore } from '#lib/stores/activity.store.svelte.js';
-	import { environmentStore } from '#lib/stores/environment.store.svelte.js';
 	import { featureStore } from '#lib/stores/features.store.svelte.js';
-	import type { ImageRepositoryCopy } from '#lib/types/image.js';
-	import type { VulnerabilityScanResult } from '#lib/types/vulnerability.js';
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
 	import { handleApiResultWithCallbacks, extractApiErrorMessage } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
-	import { stabilizeFailedVulnerabilitySummary, isVulnerabilityScanInProgress } from '#lib/utils/docker.js';
 	import { parseImageRef } from '#lib/utils/docker.js';
-	import { environmentName } from '#lib/utils/environments.js';
-	import { bytes, formatDateTimeShort, nowInstantString } from '#lib/utils/formatting.js';
+	import { bytes, formatDateTimeShort } from '#lib/utils/formatting.js';
+	import { inUseImageTargets } from '#lib/utils/image-scan.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 	import { toastVulnerabilityScanStatus } from '#lib/utils/vulnerability.js';
 
@@ -46,7 +39,7 @@
 	import HardenedImagePanel from './components/hardened-image-panel.svelte';
 	import ImageAttestationsPanel from './components/image-attestations-panel.svelte';
 	import ImageHistoryPanel from './components/image-history-panel.svelte';
-	import RegistryVulnerabilityPanel from './components/registry-vulnerability-panel.svelte';
+	import ImageScanReports from './components/image-scan-reports.svelte';
 
 	let { data } = $props();
 
@@ -58,25 +51,7 @@
 
 	const currentEnvId = $derived(data.envId);
 
-	function repositoryCopyKey(copy: ImageRepositoryCopy) {
-		return `${copy.environmentId}/${copy.id}`;
-	}
-
-	function selectRepositoryCopy(key: string) {
-		const copy = data.repositoryCopies.find((entry) => repositoryCopyKey(entry) === key);
-		if (!copy) return;
-		const params = new URLSearchParams(page.url.searchParams.toString());
-		params.set('env', copy.environmentId);
-		void goto(`${resolve('/(app)/images/[imageId]', { imageId: copy.id })}?${params}`);
-	}
-
 	const vulnerabilityManagementEnabled = $derived(featureStore.isEnabled('vulnerabilityManagement', currentEnvId));
-
-	const canViewRegistryScan = $derived(
-		hasPermission('registries:list', currentEnvId) &&
-			hasPermission('registries:browse', currentEnvId) &&
-			((image?.repoDigests?.length ?? 0) > 0 || (image?.pinnedReferences?.length ?? 0) > 0)
-	);
 
 	const urlTab = useUrlTab({
 		tabs: () => [
@@ -84,8 +59,7 @@
 			{ value: 'history', label: m.images_history_title(), icon: LayersIcon },
 			{ value: 'attestations', label: m.images_attestations_title(), icon: InspectIcon },
 			{ value: 'hardened', label: m.docker_hardened_image(), icon: ShieldCheckIcon, visible: !!image?.hardened },
-			{ value: 'vulnerabilities', label: m.vuln_title(), icon: ShieldCheckIcon, visible: vulnerabilityManagementEnabled },
-			{ value: 'registry-vulnerabilities', label: m.registry_scan_tab(), icon: ShieldCheckIcon, visible: canViewRegistryScan }
+			{ value: 'vulnerabilities', label: m.vuln_title(), icon: ShieldCheckIcon, visible: vulnerabilityManagementEnabled }
 		],
 		defaultTab: () => 'overview'
 	});
@@ -93,7 +67,10 @@
 
 	// fallow-ignore-next-line code-duplication -- permission $derived declarations; script-level, no shared render surface
 	const canDeleteImage = $derived(hasPermission('images:delete', currentEnvId));
-	const canScanImage = $derived(vulnerabilityManagementEnabled && hasPermission('vulnerabilities:scan', currentEnvId));
+	const scanTargets = $derived(
+		inUseImageTargets(data.repositoryCopies.filter((copy) => hasPermission('vulnerabilities:scan', copy.environmentId)))
+	);
+	const canScanImage = $derived(vulnerabilityManagementEnabled && scanTargets.length > 0);
 	const canPatchImage = $derived(hasPermission('images:patch', currentEnvId));
 	const canTagImage = $derived(hasPermission('images:tag', currentEnvId));
 	const canPullImage = $derived(hasPermission('images:pull', currentEnvId));
@@ -111,85 +88,25 @@
 	let pushDialogOpen = $state(false);
 	let releaseNotesOpen = $state(false);
 
-	let scanRequest = $state<{ scope: string; time: string } | null>(null);
-	let completionToastScope = $state<string | null>(null);
-
-	const scanQuery = createQuery(() => {
-		const environmentId = currentEnvId;
-		const imageId = image?.id ?? '';
-		const scope = `${environmentId}:${imageId}`;
-		const fetchScanResult = async (signal: AbortSignal) => {
-			await environmentStore.ready;
-			signal.throwIfAborted();
-			const result = await vulnerabilityService.getScanResult(imageId, environmentId);
-			if (result.status !== 'failed' || scanRequest?.scope !== scope) return result;
-			const { data: summary } = await tryCatch(
-				stabilizeFailedVulnerabilitySummary(imageId, result, (id) => vulnerabilityService.getScanSummary(id, environmentId), {
-					scanRequestedAt: scanRequest.time
-				})
-			);
-			if (!summary || summary.status === 'failed') return result;
-			if (!isVulnerabilityScanInProgress(summary.status)) return vulnerabilityService.getScanResult(imageId, environmentId);
-			return {
-				...result,
-				scanTime: summary.scanTime,
-				status: summary.status,
-				scanPhase: summary.scanPhase,
-				summary: summary.summary,
-				error: summary.error
-			};
-		};
-		return {
-			queryKey: queryKeys.vulnerabilities.scanResult(environmentId, imageId),
-			queryFn: async ({ signal }) => {
-				const result = await fetchScanResult(signal);
-				if (completionToastScope === scope && !isVulnerabilityScanInProgress(result.status)) {
-					completionToastScope = null;
-					toastVulnerabilityScanStatus(result);
-				}
-				return result;
-			},
-			enabled: vulnerabilityManagementEnabled && !!imageId && hasPermission('vulnerabilities:read', environmentId),
-			retry: false
-		};
-	});
-	const vulnerabilityScan = $derived(vulnerabilityManagementEnabled ? (scanQuery.data ?? null) : null);
-
-	onMount(() => {
-		let seen: string | undefined;
-		return activityStore.subscribeActivities((activities) => {
-			const next = activities
-				.filter(
-					(activity) =>
-						activity.type === 'vulnerability_scan' &&
-						activity.resourceId === image?.id &&
-						(activity.environmentId === currentEnvId || activity.sourceEnvironmentId === currentEnvId)
-				)
-				.map((activity) => `${activity.id}:${activity.status}:${activity.updatedAt}:${activity.latestMessage}`)
-				.join('|');
-			if (seen !== undefined && next !== seen) {
-				void queryClient.invalidateQueries({ queryKey: queryKeys.vulnerabilities.scanResult(currentEnvId, image?.id ?? '') });
-			}
-			seen = next;
-		});
-	});
-	const scanReportError = $derived(scanQuery.isError && scanQuery.data ? extractApiErrorMessage(scanQuery.error) : null);
+	const scanQuery = createQuery(() => ({
+		...imageScanResultQuery(currentEnvId, image?.id ?? ''),
+		enabled: vulnerabilityManagementEnabled && !!image?.id && hasPermission('vulnerabilities:read', currentEnvId)
+	}));
+	const vulnerabilityScan = $derived(scanQuery.data ?? null);
 
 	const scanMutation = createMutation(() => ({
 		mutationFn: ({ imageId, environmentId }: { imageId: string; environmentId: string }) =>
-			vulnerabilityService.scanImage(imageId, environmentId),
-		onSuccess: async (result, { imageId, environmentId }) => {
-			const scope = `${environmentId}:${imageId}`;
-			scanRequest = { scope, time: result.scanTime || nowInstantString() };
-			const inProgress = isVulnerabilityScanInProgress(result.status);
-			toastVulnerabilityScanStatus(result, { includeStarted: inProgress });
-			await queryClient.invalidateQueries({ queryKey: queryKeys.vulnerabilities.scanResult(environmentId, imageId) });
-			if (!inProgress) return;
-			const current = queryClient.getQueryData<VulnerabilityScanResult>(
-				queryKeys.vulnerabilities.scanResult(environmentId, imageId)
-			);
-			if (current && !isVulnerabilityScanInProgress(current.status)) toastVulnerabilityScanStatus(current);
-			else completionToastScope = scope;
+			Promise.all(
+				(scanTargets.length ? scanTargets : [{ id: imageId, environmentId }]).map(async (target) => ({
+					target,
+					result: await vulnerabilityService.scanImage(target.id, target.environmentId)
+				}))
+			),
+		onSuccess: async (results) => {
+			for (const { target, result } of results) {
+				toastVulnerabilityScanStatus(result, { includeStarted: true });
+				await queryClient.invalidateQueries({ queryKey: queryKeys.vulnerabilities.scanResult(target.environmentId, target.id) });
+			}
 		},
 		onError: (error) => {
 			toast.error(m.vuln_scan_failed(), { description: extractApiErrorMessage(error) });
@@ -414,30 +331,12 @@
 		{#snippet headerInfo()}
 			<div class="flex min-h-9 min-w-0 items-center gap-2">
 				<ImagesIcon class="size-5 shrink-0 text-primary" />
-				<EnvironmentDestinationSelect value={currentEnvId} variant="prefix" readonly />
+
 				<h1 class="min-w-0 truncate font-semibold" title={detailTitle}>{detailTitle}</h1>
 			</div>
 		{/snippet}
 		{#snippet headerActions()}<ActionButtonGroup buttons={actions} />{/snippet}
 		{#snippet tabContent()}
-			{#if data.repository && data.repositoryCopies.length > 0}
-				<label class="mb-4 flex max-w-full flex-wrap items-center gap-2 text-sm">
-					<span class="shrink-0 font-medium">{m.image_node_copy()}</span>
-					<select
-						class="max-w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm"
-						value={`${currentEnvId}/${data.imageId}`}
-						onchange={(e) => selectRepositoryCopy(e.currentTarget.value)}
-					>
-						{#each data.repositoryCopies as copy (repositoryCopyKey(copy))}
-							<option value={repositoryCopyKey(copy)}>
-								{copy.environmentName || environmentName(copy.environmentId)} ·
-								{copy.tags?.[0]?.split(':').at(-1) ?? m.images_untagged()} · {copy.id.replace(/^sha256:/, '').slice(0, 12)}
-								{copy.inUse ? ` · ${m.common_in_use()}` : ''}
-							</option>
-						{/each}
-					</select>
-				</label>
-			{/if}
 			{#snippet kvTile(label: string, value: string, wide = false)}
 				<KeyValueCard {label} class={wide ? 'sm:col-span-2 lg:col-span-3' : undefined} valueTitle={value}>
 					{value}
@@ -542,23 +441,10 @@
 					<HardenedImagePanel info={image.hardened} />
 				</Tabs.Content>
 			{/if}
-			{#if canViewRegistryScan && activeTab === 'registry-vulnerabilities'}
-				<Tabs.Content value="registry-vulnerabilities" layout="table">
-					{#key `${currentEnvId}/${image.id}`}
-						<RegistryVulnerabilityPanel {image} />
-					{/key}
-				</Tabs.Content>
-			{/if}
 
 			{#if vulnerabilityManagementEnabled}
 				<Tabs.Content value="vulnerabilities" layout="table">
-					<VulnerabilityScanPanel
-						environmentId={currentEnvId}
-						scan={vulnerabilityScan}
-						reportError={scanReportError}
-						isScanning={scanMutation.isPending}
-						onScan={handleScanImage}
-					/>
+					<ImageScanReports copies={data.repositoryCopies} isScanning={scanMutation.isPending} onScan={handleScanImage} />
 				</Tabs.Content>
 			{/if}
 		{/snippet}

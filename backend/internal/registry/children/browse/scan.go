@@ -65,7 +65,8 @@ func (p harborScanPlatform) matches(platform string) bool {
 	return platform == base || (p.Variant != "" && platform == base+"/"+p.Variant)
 }
 
-func (s *Service) ScanReport(ctx context.Context, id, repository, reference, platform string) (types.RegistryScanReport, error) {
+func (s *Service) ScanArtifact(ctx context.Context, options types.RegistryArtifactScanOptions) (types.RegistryScanReport, error) {
+	id, repository, reference, platform := options.RegistryID, options.Repository, options.Digest, options.Platform
 	ctx, cancel := s.lookupContext(ctx)
 	defer cancel()
 	target, err := s.target(ctx, id)
@@ -119,6 +120,23 @@ func (s *Service) ScanReport(ctx context.Context, id, repository, reference, pla
 		return types.RegistryScanReport{Digest: reference, Platform: platform, Status: "Platform unavailable"}, nil
 	}
 
+	if options.Trigger {
+		response, requestErr := s.harborRequest(ctx, target, scheme, path+artifact.Digest+"/scan", nil, harborVulnerabilityMediaType, http.MethodPost)
+		if requestErr != nil {
+			return types.RegistryScanReport{}, requestErr
+		}
+		defer func() { _ = response.Body.Close() }()
+		switch response.StatusCode {
+		case http.StatusAccepted, http.StatusConflict:
+			return types.RegistryScanReport{Digest: artifact.Digest, Platform: platform, Status: "Running", Scanner: "Harbor"}, nil
+		case http.StatusPreconditionFailed, http.StatusUnprocessableEntity, http.StatusNotImplemented:
+			return types.RegistryScanReport{Digest: artifact.Digest, Platform: platform, Status: "Unsupported"}, nil
+		case http.StatusUnauthorized, http.StatusForbidden:
+			return types.RegistryScanReport{}, common.Classify(common.ErrForbidden, errors.New("harbor denied the scan request; the saved credential needs artifact scan permission"))
+		default:
+			return types.RegistryScanReport{}, fmt.Errorf("harbor scan request returned HTTP %d", response.StatusCode)
+		}
+	}
 	overview, found := artifact.Overview[harborVulnerabilityMediaType]
 	if !found {
 		return types.RegistryScanReport{Digest: artifact.Digest, Platform: platform, Status: "Not scanned"}, nil
@@ -165,7 +183,7 @@ func (s *Service) readHarborScanArtifact(ctx context.Context, target *target, sc
 }
 
 func (s *Service) getHarborScanData(ctx context.Context, target *target, scheme, path string, query url.Values) ([]byte, error) {
-	response, err := s.harborGET(ctx, target, scheme, path, query, harborVulnerabilityMediaType)
+	response, err := s.harborRequest(ctx, target, scheme, path, query, harborVulnerabilityMediaType, http.MethodGet)
 	if err != nil {
 		return nil, err
 	}

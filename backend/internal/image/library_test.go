@@ -47,7 +47,7 @@ func TestImageLibraryGroupsBeforeSearchAndPagination(t *testing.T) {
 		Params:     pagination.Params{Limit: 1},
 		SortParams: pagination.SortParams{Sort: "repo", Order: pagination.SortAsc},
 		Filters:    map[string]string{"repository": "docker.io/library/alpine"},
-		Search:     "old",
+		Search:     "latest",
 	}
 	rows, response := service.libraryPage(pages, params)
 	require.Len(t, rows, 1)
@@ -55,18 +55,15 @@ func TestImageLibraryGroupsBeforeSearchAndPagination(t *testing.T) {
 	row := rows[0]
 	require.Equal(t, "active", row.ID)
 	require.Equal(t, "one", row.EnvironmentID)
-	require.Equal(t, []string{"docker.io/library/alpine:latest", "docker.io/library/alpine:old"}, row.RepoTags)
+	require.Equal(t, []string{"docker.io/library/alpine:latest"}, row.RepoTags)
 	require.False(t, row.UpdateInfo.HasUpdate)
 	require.Empty(t, row.RepositoryGroup.CheckErrorRef)
 	require.Equal(t, []string{digest}, row.RepositoryGroup.Digests)
 	require.EqualValues(t, 10, row.RepositoryGroup.MaxSize)
 	require.Equal(t, 1, row.RepositoryGroup.Variants)
 	require.Equal(t, 1, row.RepositoryGroup.ScannedVariants)
-	require.Len(t, row.RepositoryGroup.Copies, 2)
+	require.Len(t, row.RepositoryGroup.Copies, 1)
 	require.Equal(t, []string{"docker.io/library/alpine@" + digest}, row.RepositoryGroup.Copies[0].RepoDigests)
-	require.Empty(t, row.RepositoryGroup.Copies[1].RepoDigests)
-	require.Equal(t, "two", row.RepositoryGroup.Copies[1].EnvironmentID)
-	require.False(t, row.RepositoryGroup.Copies[1].InUse)
 
 	all := groupImageRepositories(pages, "")
 	require.Len(t, all, 4)

@@ -243,13 +243,13 @@ func (s *Service) harborScheme(ctx context.Context, target *target) (string, err
 }
 
 // The Harbor API accepts registry username/password, including CLI and robot secrets.
-func (s *Service) harborGET(ctx context.Context, target *target, scheme, path string, query url.Values, mediaType string) (*http.Response, error) {
+func (s *Service) harborRequest(ctx context.Context, target *target, scheme, path string, query url.Values, mediaType, method string) (*http.Response, error) {
 	auth, err := target.auth.Authorization()
 	if err != nil {
 		return nil, errors.New("failed to resolve Harbor credentials")
 	}
 	endpoint := url.URL{Scheme: scheme, Host: target.registry.RegistryStr(), Path: path, RawQuery: query.Encode()}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, method, endpoint.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +266,7 @@ func (s *Service) harborGET(ctx context.Context, target *target, scheme, path st
 
 func (s *Service) harborPage(ctx context.Context, target *target, path string, page int, scheme string) (harborPage, error) {
 	query := url.Values{"page": {strconv.Itoa(page)}, "page_size": {strconv.Itoa(harborPageSize)}}
-	response, err := s.harborGET(ctx, target, scheme, path, query, "")
+	response, err := s.harborRequest(ctx, target, scheme, path, query, "", http.MethodGet)
 	if err != nil {
 		return harborPage{}, err
 	}

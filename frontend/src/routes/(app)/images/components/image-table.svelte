@@ -58,6 +58,7 @@
 	import { environmentHref, type EnvironmentPage, type EnvironmentRow, hasShownPermission } from '#lib/utils/environments.js';
 	import { bytes, formatDate, formatDateTimeShort } from '#lib/utils/formatting.js';
 	import { hardenedImageDisplay, hardenedSupportSummary } from '#lib/utils/hardened-images.js';
+	import { inUseImageTargets } from '#lib/utils/image-scan.js';
 	import { blockedUpdateTitle } from '#lib/utils/image-updates.js';
 	import { inUseBadge } from '#lib/utils/mobile-card-badges.js';
 	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
@@ -109,7 +110,7 @@
 	function imageHref(item: ImageRow | ImageActionTarget, tab?: string) {
 		const copy = item.repositoryGroup?.copies.find((entry) => hasPermission('images:read', entry.environmentId));
 		const params = new URLSearchParams({ env: copy?.environmentId ?? item.environmentId });
-		if (item.repositoryGroup) params.set('repo', item.repo);
+		if (item.repo && item.repo !== '<none>') params.set('repo', item.repo);
 		if (tab) params.set('tab', tab);
 		return resourceTableHref(
 			`${resolve('/(app)/images/[imageId]', { imageId: copy?.id ?? item.id })}?${params}`,
@@ -735,7 +736,7 @@
 	/>
 {/snippet}
 
-{#snippet ImageActions(item: ImageActionTarget)}
+{#snippet ImageActions(item: ImageActionTarget, targets: ImageActionTarget[])}
 	{@const envId = item.environmentId}
 	{#if hasPermission('images:read', envId)}
 		<DropdownMenu.Item onclick={() => goto(imageHref(item))}><InspectIcon class="size-4" />{m.common_inspect()}</DropdownMenu.Item
@@ -749,14 +750,9 @@
 		{#if item.hardened}<DropdownMenu.Item onclick={() => goto(imageHref(item, 'hardened'))}
 				><ShieldCheckIcon class="size-4" />{m.docker_hardened_image()}</DropdownMenu.Item
 			>{/if}
-		{#if featureStore.isEnabled('vulnerabilityManagement', envId) && hasPermission('vulnerabilities:read', envId)}
+		{#if item.inUse && featureStore.isEnabled('vulnerabilityManagement', envId) && hasPermission('vulnerabilities:read', envId)}
 			<DropdownMenu.Item onclick={() => goto(imageHref(item, 'vulnerabilities'))}
 				><ShieldCheckIcon class="size-4" />{m.vuln_title()}</DropdownMenu.Item
-			>
-		{/if}
-		{#if hasPermission('registries:list', envId) && hasPermission('registries:browse', envId) && ((item.repoDigests?.length ?? 0) > 0 || (item.pinnedReferences?.length ?? 0) > 0)}
-			<DropdownMenu.Item onclick={() => goto(imageHref(item, 'registry-vulnerabilities'))}
-				><ShieldCheckIcon class="size-4" />{m.registry_scan_tab()}</DropdownMenu.Item
 			>
 		{/if}
 	{/if}
@@ -805,8 +801,15 @@
 		</DropdownMenu.Item>
 	{/if}
 
-	{#if canScanOn(envId)}
-		<DropdownMenu.Item onclick={() => handleInlineVulnerabilityScan(item.id, envId)}>
+	{#if targets.some((target) => canScanOn(target.environmentId))}
+		<DropdownMenu.Item
+			onclick={() =>
+				Promise.all(
+					targets
+						.filter((target) => canScanOn(target.environmentId))
+						.map((target) => handleInlineVulnerabilityScan(target.id, target.environmentId))
+				)}
+		>
 			<SearchIcon class="size-4" />
 			{m.vuln_scan()}
 		</DropdownMenu.Item>
@@ -840,29 +843,15 @@
 {/snippet}
 
 {#snippet RowActions({ item }: { item: ImageRow })}
-	{@const targets = imageActionTargets(item)}
+	{@const copies = imageActionTargets(item)}
+	{@const targets = inUseImageTargets(copies)}
+	{@const primary = targets[0] ?? copies[0]}
 	{@const errorHref = updateErrorHref(item)}
 	<RowActionsMenu name={item.repo && item.repo !== '<none>' ? item.repo : item.id}>
 		{#if errorHref}<DropdownMenu.Item onclick={() => goto(errorHref)}
 				><AlertIcon class="size-4" />{m.view_errors()}</DropdownMenu.Item
 			>{/if}
-		{#if targets.length > 1}
-			<DropdownMenu.Item onclick={() => goto(imageHref(item))}
-				><InspectIcon class="size-4" />{m.common_inspect()}</DropdownMenu.Item
-			>
-			{#each targets as target (target.environmentId + '/' + target.id)}
-				<DropdownMenu.Sub>
-					<DropdownMenu.SubTrigger
-						><span class="min-w-0 truncate">{target.environmentName}</span><span class="font-mono text-xs text-muted-foreground"
-							>{target.id.replace(/^sha256:/, '').slice(0, 12)}</span
-						></DropdownMenu.SubTrigger
-					>
-					<DropdownMenu.SubContent class="max-h-96 overflow-y-auto">{@render ImageActions(target)}</DropdownMenu.SubContent>
-				</DropdownMenu.Sub>
-			{/each}
-		{:else if targets[0]}
-			{@render ImageActions(targets[0])}
-		{/if}
+		{#if primary}{@render ImageActions(primary, targets)}{/if}
 	</RowActionsMenu>
 {/snippet}
 
