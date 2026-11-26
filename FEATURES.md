@@ -375,3 +375,7 @@ cf.106 consolidates image vulnerability reports around exact running platform
 digests and configured Harbor proxy caches, retaining local scanning only when
 no Harbor artifact/scanner applies. Native report reads and owning service tests
 are verified; authenticated scan submission and live UI acceptance remain open.
+
+cf.107 addresses #254 by removing remote report collection from inventory and
+Security page reads, selecting proxy platform digests, and retaining stored
+report views. Browser stability and fleet-scale load acceptance remain open.

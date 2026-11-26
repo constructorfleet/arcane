@@ -10,7 +10,9 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
+	"github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,6 +28,7 @@ func TestProxyScanResolvesUpstreamThroughHarbor(t *testing.T) {
 	var pulls atomic.Int32
 	var scans atomic.Int32
 	var denied atomic.Bool
+	var indexed atomic.Bool
 	distribution := registry.New()
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/v2/") {
@@ -53,6 +56,10 @@ func TestProxyScanResolvesUpstreamThroughHarbor(t *testing.T) {
 		case "/api/v2.0/projects/dockerhub/summary":
 			_, _ = w.Write([]byte(`{"registry":{"url":"https://hub.docker.com"}}`))
 		case "/api/v2.0/projects/dockerhub/repositories/library%2Ffixture/artifacts/" + digest.String():
+			if !indexed.Load() {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
 			_, _ = fmt.Fprintf(w, `{"digest":%q,"extra_attrs":{"os":"linux","architecture":"amd64"}}`, digest.String())
 		case "/api/v2.0/projects/dockerhub/repositories/library%2Ffixture/artifacts/" + digest.String() + "/scan":
 			assert.Equal(t, http.MethodPost, r.Method)
@@ -65,18 +72,23 @@ func TestProxyScanResolvesUpstreamThroughHarbor(t *testing.T) {
 	t.Cleanup(server.Close)
 	ref, err := name.NewTag(strings.TrimPrefix(server.URL, "https://") + "/dockerhub/library/fixture:live")
 	require.NoError(t, err)
-	require.NoError(t, remote.Write(ref, image, remote.WithTransport(server.Client().Transport)))
+	index := mutate.AppendManifests(empty.Index, mutate.IndexAddendum{Add: image, Descriptor: v1.Descriptor{Platform: &v1.Platform{OS: "linux", Architecture: "amd64"}}})
+	indexDigest, err := index.Digest()
+	require.NoError(t, err)
+	require.NoError(t, remote.WriteIndex(ref, index, remote.WithTransport(server.Client().Transport)))
 	profiles := testRegistries{}
 	id := profiles.add(server.URL, "robot", "fixture")
 	service := newTestService(profiles)
 	service.transport = server.Client().Transport
-	options := types.ImageRegistryScanOptions{References: []string{"docker.io/library/fixture@" + digest.String()}, Platform: "linux/amd64"}
+	options := types.ImageRegistryScanOptions{References: []string{"docker.io/library/fixture@" + indexDigest.String()}, Platform: "linux/amd64"}
 	report, err := service.ProxyScan(t.Context(), id, options)
 	require.NoError(t, err)
 	require.NotNil(t, report)
 	require.Equal(t, digest.String(), report.Digest)
 	require.Positive(t, pulls.Load())
 	require.Zero(t, scans.Load())
+	require.Equal(t, "Not scanned", report.Status)
+	indexed.Store(true)
 	report, err = service.ProxyScan(t.Context(), id, types.ImageRegistryScanOptions{References: options.References, Platform: options.Platform, Trigger: true})
 	require.NoError(t, err)
 	require.Equal(t, "Running", report.Status)

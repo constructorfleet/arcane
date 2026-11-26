@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/json/v2"
 	"errors"
-	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1"
@@ -162,7 +160,7 @@ func (s *Service) scanProxyDigest(ctx context.Context, target *target, repo name
 	if parseErr != nil {
 		return nil, parseErr
 	}
-	_, pullErr := remote.Image(repo.Digest(options.Digest), append(target.options, remote.WithPlatform(*platform))...)
+	image, pullErr := remote.Image(repo.Digest(options.Digest), append(target.options, remote.WithPlatform(*platform))...)
 	var transportErr *transport.Error
 	if errors.As(pullErr, &transportErr) && transportErr.StatusCode == 404 {
 		return nil, nil
@@ -170,22 +168,22 @@ func (s *Service) scanProxyDigest(ctx context.Context, target *target, repo name
 	if pullErr != nil {
 		return nil, classifyBrowseError(pullErr, "Harbor could not cache the running image digest")
 	}
-	for attempt := 0; attempt < 3; attempt++ {
-		report, scanErr := s.ScanArtifact(ctx, options)
-		if !errors.Is(scanErr, common.ErrNotFound) {
-			if scanErr != nil {
-				return nil, scanErr
-			}
-			if report.Status == "Unsupported" || report.Status == "Platform unavailable" {
-				return nil, nil
-			}
-			return &report, nil
-		}
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(time.Second):
-		}
+
+	digest, digestErr := image.Digest()
+	if digestErr != nil {
+		return nil, digestErr
 	}
-	return nil, fmt.Errorf("harbor cached %s but has not indexed the artifact", options.Repository)
+	report, scanErr := s.ScanArtifact(ctx, types.RegistryArtifactScanOptions{
+		RegistryID: options.RegistryID, Repository: options.Repository, Digest: digest.String(), Platform: options.Platform, Trigger: options.Trigger,
+	})
+	if errors.Is(scanErr, common.ErrNotFound) {
+		return &types.RegistryScanReport{Digest: digest.String(), Platform: options.Platform, Status: "Not scanned", Scanner: "Harbor"}, nil
+	}
+	if scanErr != nil {
+		return nil, scanErr
+	}
+	if report.Status == "Unsupported" || report.Status == "Platform unavailable" {
+		return nil, nil
+	}
+	return &report, nil
 }
