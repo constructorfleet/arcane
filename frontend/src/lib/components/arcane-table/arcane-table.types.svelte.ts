@@ -68,6 +68,7 @@ export function encodeColumnVisibility(visibility: ColumnVisibilityState, defaul
 	const hidden: string[] = [];
 	const visibleColumns: string[] = [];
 	for (const [id, visible] of Object.entries(visibility)) {
+		if (id === 'select' || id === 'actions') continue;
 		if (visible === false) hidden.push(id);
 		else if (visible === true && defaults[id] === false) visibleColumns.push(id);
 	}
@@ -75,8 +76,12 @@ export function encodeColumnVisibility(visibility: ColumnVisibilityState, defaul
 }
 
 export function applyColumnVisibilityPatch(target: ColumnVisibilityState, hidden: string[], visible: string[]) {
-	for (const id of hidden) target[id] = false;
-	for (const id of visible) target[id] = true;
+	for (const id of hidden) {
+		if (id !== 'select' && id !== 'actions') target[id] = false;
+	}
+	for (const id of visible) {
+		if (id !== 'select' && id !== 'actions') target[id] = true;
+	}
 }
 
 export function encodeFilters(filters: ColumnFiltersState): [string, unknown][] {

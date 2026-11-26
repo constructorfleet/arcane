@@ -19,8 +19,9 @@
 	import { goto } from '$app/navigation';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import type { ColumnVisibilityState } from '@tanstack/table-core';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
 	import InUseStatus from '#lib/components/arcane-table/cells/in-use-status.svelte';
@@ -54,7 +55,6 @@
 		type EnvironmentRow,
 		environmentRows,
 		hasShownPermission,
-		parseRowKey,
 		readableEnvironments,
 		readAcrossEnvironments,
 		readEachEnvironment,
@@ -280,12 +280,28 @@
 		});
 	}
 
-	function handleDeleteSelected(ids: string[]) {
-		// A volume id is its name, so selections across pages delete by id directly.
-		const idsToDelete = ids.filter((key) => {
-			const { environmentId, id } = parseRowKey(key);
-			return environmentId !== undefined && !isBackupVolumeName(id, environmentId);
+	const selectedVolumes = new SvelteMap<string, VolumeRow>();
+	$effect(() => {
+		const keys = new Set(selectedIds ?? []);
+		const rows = volumes.data;
+		untrack(() => {
+			for (const key of selectedVolumes.keys()) if (!keys.has(key)) selectedVolumes.delete(key);
+			for (const row of rows) if (keys.has(rowKey(row))) selectedVolumes.set(rowKey(row), row);
 		});
+	});
+	function canDeleteSelectedVolume(key: string) {
+		const volume = selectedVolumes.get(key);
+		return (
+			!!volume &&
+			!volume.logicalId &&
+			!volume.inUse &&
+			hasPermission('volumes:delete', volume.environmentId) &&
+			!isBackupVolume(volume)
+		);
+	}
+	function handleDeleteSelected(ids: string[]) {
+		// Retain selected metadata across pages and exclude unavailable or protected rows.
+		const idsToDelete = ids.filter(canDeleteSelectedVolume);
 
 		bulkConfirmAndRun({
 			ids: idsToDelete,
@@ -326,13 +342,8 @@
 		{ id: 'driver', label: m.common_driver(), defaultVisible: true }
 	];
 
-	// Volume id === name, so the backup-volume filter works on the id directly.
-	const deletableSelectedIds = $derived(
-		(selectedIds ?? []).filter((key) => {
-			const { environmentId, id } = parseRowKey(key);
-			return environmentId !== undefined && !isBackupVolumeName(id, environmentId);
-		})
-	);
+	// Keep bulk removal eligibility consistent with the row action.
+	const deletableSelectedIds = $derived((selectedIds ?? []).filter(canDeleteSelectedVolume));
 
 	const bulkActions = $derived.by<BulkAction[]>(() => [
 		{
@@ -453,6 +464,7 @@
 			{m.common_inspect()}
 		</DropdownMenu.Item>
 		{#if hasPermission('volumes:read', item.environmentId)}
+			<DropdownMenu.Item onclick={() => goto(volumeDetailHref(item, 'backups'))}>{m.volumes_nav_backups()}</DropdownMenu.Item>
 			<DropdownMenu.Item
 				disabled={!!item.logicalId && item.workspaceState !== 'active'}
 				onclick={() => goto(volumeDetailHref(item, 'workspace'))}

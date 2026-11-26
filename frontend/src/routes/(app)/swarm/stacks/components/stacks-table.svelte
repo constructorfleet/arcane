@@ -46,7 +46,7 @@
 
 	let isLoading = $state(false);
 
-	function stackHref(stack: StackRow, tab?: 'services' | 'source') {
+	function stackHref(stack: StackRow, tab?: 'services' | 'source' | 'tasks') {
 		const path = resolve('/(app)/swarm/stacks/[name]', { name: encodeURIComponent(stack.name) });
 		return resourceTableHref(
 			environmentHref(path + (tab ? `?tab=${tab}` : ''), stack.environmentId),
@@ -156,6 +156,8 @@
 
 {#snippet RowActions({ item }: { item: StackRow })}
 	<RowActionsMenu name={item.name}>
+		{#if item.services > 0}<DropdownMenu.Item onclick={() => goto(stackHref(item, 'tasks'))}>{m.view_tasks()}</DropdownMenu.Item
+			>{/if}
 		<DropdownMenu.Item onclick={() => goto(stackHref(item))}>
 			<InspectIcon class="size-4" />
 			{m.common_inspect()}

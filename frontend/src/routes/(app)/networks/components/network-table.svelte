@@ -25,6 +25,7 @@
 	import { toast } from 'svelte-sonner';
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
+	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
 	import type { ColumnSpec, BulkAction } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
@@ -320,6 +321,15 @@
 
 {#snippet RowActions({ item }: { item: NetworkRow })}
 	<RowActionsMenu name={item.name}>
+		<DetailLinksMenu
+			href={networkDetailHref(item)}
+			tabs={[
+				{ value: 'overview', label: m.common_overview() },
+				{ value: 'services', label: m.services(), visible: item.scope === 'swarm' },
+				{ value: 'tasks', label: m.view_tasks(), visible: item.scope === 'swarm' }
+			]}
+		/>
+
 		<DropdownMenu.Item onclick={() => goto(networkDetailHref(item))} disabled={isAnyLoading}>
 			<InspectIcon class="size-4" />
 			{m.common_inspect()}

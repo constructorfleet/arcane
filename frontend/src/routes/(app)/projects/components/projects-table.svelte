@@ -8,6 +8,7 @@
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
 	import ActionMenuItem from '#lib/components/arcane-table/cells/action-menu-item.svelte';
+	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
 	import type { ColumnSpec, MobileFieldVisibility, BulkAction } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
@@ -49,6 +50,7 @@
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { hasAnyLoadingState } from '#lib/utils/bulk-actions.js';
+	import { createDashboardWidget, pinDashboardWidget } from '#lib/utils/dashboard-layout.js';
 	import { getStatusVariant, getThemedIconUrl } from '#lib/utils/docker.js';
 	import {
 		getProjectUpdateStatus,
@@ -517,6 +519,25 @@
 	{@const lifecycleDisabled = item.isArchived || isBulkActionRunning || !!status || configurationBlocked}
 	{@const archivedTitle = getRowArchivedTitle(item, configurationBlocked)}
 	<RowActionsMenu name={item.name}>
+		<DropdownMenu.Item
+			onclick={() =>
+				pinDashboardWidget(
+					createDashboardWidget('resource', { resourceKind: 'projects', environmentIds: [envId], resourceId: item.id })
+				)}>{m.pin_to_dashboard()}</DropdownMenu.Item
+		>
+		<DetailLinksMenu
+			href={resolve(`/(app)/projects/[projectId]?env=${encodeURIComponent(envId)}`, { projectId: item.id })}
+			tabs={[
+				{ value: 'services', label: m.services() },
+				{ value: 'compose', label: m.common_configuration() },
+				{
+					value: 'backup',
+					label: item.gitOpsSyncMode === 'bidirectional' ? m.git_sync() : m.git_backup(),
+					visible: !item.gitOpsManagedBy || item.gitOpsSyncMode === 'bidirectional'
+				}
+			]}
+		/>
+
 		<DropdownMenu.Item
 			onclick={() => goto(resolve(`/(app)/projects/[projectId]?env=${encodeURIComponent(envId)}`, { projectId: item.id }))}
 			disabled={isBulkActionRunning || !!status}

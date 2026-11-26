@@ -14,6 +14,7 @@
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
 	import { HardenedImageBadge } from '#lib/components/badges/index.js';
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
+	import ImageReleaseNotesDialog from '#lib/components/dialogs/image-release-notes-dialog.svelte';
 	import ImageUpdateItem from '#lib/components/image-update-item.svelte';
 	import { EmptyState } from '#lib/components/states/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -34,7 +35,10 @@
 		ContainersIcon,
 		TagIcon,
 		AlertIcon,
-		RefreshIcon
+		RefreshIcon,
+		UploadIcon,
+		FileTextIcon,
+		LayersIcon
 	} from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
@@ -51,13 +55,7 @@
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { bulkConfirmAndRun } from '#lib/utils/bulk-actions.js';
-	import {
-		environmentHref,
-		environmentName,
-		type EnvironmentPage,
-		type EnvironmentRow,
-		hasShownPermission
-	} from '#lib/utils/environments.js';
+	import { environmentHref, type EnvironmentPage, type EnvironmentRow, hasShownPermission } from '#lib/utils/environments.js';
 	import { bytes, formatDate, formatDateTimeShort } from '#lib/utils/formatting.js';
 	import { hardenedImageDisplay, hardenedSupportSummary } from '#lib/utils/hardened-images.js';
 	import { blockedUpdateTitle } from '#lib/utils/image-updates.js';
@@ -66,6 +64,8 @@
 	import { tryCatch } from '#lib/utils/try-catch.js';
 	import { toastVulnerabilityScanStatus } from '#lib/utils/vulnerability.js';
 
+	import { imageActionTargets, type ImageActionTarget } from '../image-table.helpers.js';
+	import ImagePushDialog from './image-push-dialog.svelte';
 	import ImageTagDialog from './image-tag-dialog.svelte';
 
 	type ImageRow = EnvironmentRow<ImageSummary>;
@@ -106,10 +106,11 @@
 
 	const canViewEvents = $derived(hasPermission('events:list', GLOBAL_SCOPE));
 
-	function imageHref(item: ImageRow) {
+	function imageHref(item: ImageRow | ImageActionTarget, tab?: string) {
 		const copy = item.repositoryGroup?.copies.find((entry) => hasPermission('images:read', entry.environmentId));
 		const params = new URLSearchParams({ env: copy?.environmentId ?? item.environmentId });
 		if (item.repositoryGroup) params.set('repo', item.repo);
+		if (tab) params.set('tab', tab);
 		return resourceTableHref(
 			`${resolve('/(app)/images/[imageId]', { imageId: copy?.id ?? item.id })}?${params}`,
 			requestOptions.pagination?.page
@@ -128,7 +129,9 @@
 		return resourceTableHref(`${resolve('/(app)/events')}?${params}`, requestOptions.pagination?.page);
 	}
 
-	let tagDialogImage = $state<ImageRow | null>(null);
+	let tagDialogImage = $state<ImageActionTarget | null>(null);
+	let pushDialogImage = $state<ImageActionTarget | null>(null);
+	let releaseNotesImage = $state<{ environmentId: string; imageRef: string } | null>(null);
 
 	function invalidateImages() {
 		return queryClient.invalidateQueries({ queryKey: queryKeys.images.listPrefix(scope) });
@@ -192,7 +195,7 @@
 			}
 		});
 	}
-	async function recheckImage(item: ImageRow) {
+	async function recheckImage(item: ImageActionTarget) {
 		if (isLoading.checking) return;
 		isLoading.checking = true;
 		const result = await tryCatch(imageService.checkImageUpdateByID(item.id, item.environmentId));
@@ -732,114 +735,133 @@
 	/>
 {/snippet}
 
-{#snippet RowActions({ item }: { item: ImageRow })}
+{#snippet ImageActions(item: ImageActionTarget)}
 	{@const envId = item.environmentId}
-	{@const errorHref = updateErrorHref(item)}
-	{@const scanCopies = item.repositoryGroup?.copies.filter((copy) => canScanOn(copy.environmentId)) ?? []}
-	{@const scanCopy = scanCopies[0]}
-	<RowActionsMenu name={item.repo && item.repo !== '<none>' ? `${item.repo}:${item.tag}` : item.id}>
-		<DropdownMenu.Item onclick={() => goto(imageHref(item))}>
-			<InspectIcon class="size-4" />
-			{m.common_inspect()}
+	{#if hasPermission('images:read', envId)}
+		<DropdownMenu.Item onclick={() => goto(imageHref(item))}><InspectIcon class="size-4" />{m.common_inspect()}</DropdownMenu.Item
+		>
+		<DropdownMenu.Item onclick={() => goto(imageHref(item, 'history'))}
+			><LayersIcon class="size-4" />{m.images_history_title()}</DropdownMenu.Item
+		>
+		<DropdownMenu.Item onclick={() => goto(imageHref(item, 'attestations'))}
+			><InspectIcon class="size-4" />{m.images_attestations_title()}</DropdownMenu.Item
+		>
+		{#if item.hardened}<DropdownMenu.Item onclick={() => goto(imageHref(item, 'hardened'))}
+				><ShieldCheckIcon class="size-4" />{m.docker_hardened_image()}</DropdownMenu.Item
+			>{/if}
+		{#if featureStore.isEnabled('vulnerabilityManagement', envId) && hasPermission('vulnerabilities:read', envId)}
+			<DropdownMenu.Item onclick={() => goto(imageHref(item, 'vulnerabilities'))}
+				><ShieldCheckIcon class="size-4" />{m.vuln_title()}</DropdownMenu.Item
+			>
+		{/if}
+		{#if hasPermission('registries:list', envId) && hasPermission('registries:browse', envId) && ((item.repoDigests?.length ?? 0) > 0 || (item.pinnedReferences?.length ?? 0) > 0)}
+			<DropdownMenu.Item onclick={() => goto(imageHref(item, 'registry-vulnerabilities'))}
+				><ShieldCheckIcon class="size-4" />{m.registry_scan_tab()}</DropdownMenu.Item
+			>
+		{/if}
+	{/if}
+	{@const releaseTag = item.repoTags.find((tag) => tag !== '<none>:<none>')}
+	{#if releaseTag && hasPermission('image-updates:read', envId)}
+		<DropdownMenu.Item onclick={() => (releaseNotesImage = { environmentId: envId, imageRef: releaseTag })}
+			><FileTextIcon class="size-4" />{m.image_update_release_notes_button()}</DropdownMenu.Item
+		>
+	{/if}
+	{#if hasPermission('image-updates:check', envId)}
+		<DropdownMenu.Item onclick={() => recheckImage(item)} disabled={isLoading.checking}
+			><RefreshIcon class="size-4" />{m.image_update_recheck_button()}</DropdownMenu.Item
+		>
+	{/if}
+	{#if canPullImage || canScanOn(envId) || canTagImage || canReadImage || hasPermission('images:push', envId)}
+		<DropdownMenu.Separator />
+	{/if}
+
+	{#if canTagImage && hasPermission('images:tag', envId)}
+		<DropdownMenu.Item onclick={() => (tagDialogImage = item)}>
+			<TagIcon class="size-4" />
+			{m.images_tag_image()}
 		</DropdownMenu.Item>
+	{/if}
 
-		{#if errorHref}
-			<DropdownMenu.Item onclick={() => goto(errorHref)}>
-				<AlertIcon class="size-4 text-destructive" />
-				{m.view_errors()}
-			</DropdownMenu.Item>
-			{#if !item.repositoryGroup && hasPermission('image-updates:check', envId)}
-				<DropdownMenu.Item onclick={() => recheckImage(item)} disabled={isLoading.checking}>
-					<RefreshIcon class="size-4" />
-					{m.image_update_recheck_button()}
-				</DropdownMenu.Item>
+	{#if hasPermission('images:push', envId)}
+		<DropdownMenu.Item onclick={() => (pushDialogImage = item)}>
+			<UploadIcon class="size-4" />{m.push_image()}
+		</DropdownMenu.Item>
+	{/if}
+
+	{#if canReadImage && hasPermission('images:read', envId)}
+		<DropdownMenu.Item onclick={() => handleExportImage(item.id, envId)}>
+			<DownloadIcon class="size-4" />
+			{m.images_export()}
+		</DropdownMenu.Item>
+	{/if}
+
+	{@const usableTags = item.repoTags?.filter((tag) => tag !== '<none>:<none>') ?? []}
+	<!-- Prefer a real tag: a digest name kept beside it would pull the old pinned image. -->
+	{@const usableTag = usableTags.find((tag) => !tag.includes('@')) ?? usableTags[0]}
+	{#if canPullImage && hasPermission('images:pull', envId)}
+		<DropdownMenu.Item onclick={() => handleInlineImagePull(usableTag || '', envId)} disabled={!usableTag}>
+			<DownloadIcon class="size-4" />
+			{m.pull()}
+		</DropdownMenu.Item>
+	{/if}
+
+	{#if canScanOn(envId)}
+		<DropdownMenu.Item onclick={() => handleInlineVulnerabilityScan(item.id, envId)}>
+			<SearchIcon class="size-4" />
+			{m.vuln_scan()}
+		</DropdownMenu.Item>
+	{/if}
+
+	{#if canPatchImage && hasPermission('images:patch', envId)}
+		{@const imageIsLocal = item.repoDigests?.length === 0}
+		<DropdownMenu.Item onclick={() => handleInlineImagePatch(item.id, envId)} disabled={imageIsLocal || !usableTag}>
+			<ShieldCheckIcon class="size-4" />
+			<div class="flex flex-col items-start">
+				<span>{m.images_patch()}</span>
+				{#if imageIsLocal}
+					<span class="text-xs text-muted-foreground">{m.security_local_image_unpatchable()}</span>
+				{/if}
+			</div>
+		</DropdownMenu.Item>
+	{/if}
+
+	{#if canDeleteImage && hasPermission('images:delete', envId)}
+		<DropdownMenu.Separator />
+
+		<DropdownMenu.Item variant="destructive" onclick={() => deleteImage(item.id, envId)} disabled={isLoading.removing}>
+			{#if isLoading.removing}
+				<Spinner class="size-4" />
+			{:else}
+				<TrashIcon class="size-4" />
 			{/if}
-		{/if}
+			{m.common_remove()}
+		</DropdownMenu.Item>
+	{/if}
+{/snippet}
 
-		{#if scanCopies.length > 1}
-			<DropdownMenu.Sub>
-				<DropdownMenu.SubTrigger>
-					<SearchIcon class="size-4" />
-					{m.vuln_scan()}
-				</DropdownMenu.SubTrigger>
-				<DropdownMenu.SubContent class="max-h-72 overflow-y-auto">
-					{#each scanCopies as copy (`${copy.environmentId}/${copy.id}`)}
-						<DropdownMenu.Item onclick={() => handleInlineVulnerabilityScan(copy.id, copy.environmentId)}>
-							<span class="min-w-0 truncate">{copy.environmentName || environmentName(copy.environmentId)}</span>
-							<span class="font-mono text-xs text-muted-foreground">{copy.id.replace(/^sha256:/, '').slice(0, 12)}</span>
-							{#if copy.inUse}<Badge variant="outline">{m.common_in_use()}</Badge>{/if}
-						</DropdownMenu.Item>
-					{/each}
-				</DropdownMenu.SubContent>
-			</DropdownMenu.Sub>
-		{:else if scanCopy}
-			<DropdownMenu.Item onclick={() => handleInlineVulnerabilityScan(scanCopy.id, scanCopy.environmentId)}>
-				<SearchIcon class="size-4" />
-				{m.vuln_scan()}
-			</DropdownMenu.Item>
-		{/if}
-
-		{#if !item.repositoryGroup}
-			{#if canPullImage || canScanOn(envId) || canTagImage || canReadImage}
-				<DropdownMenu.Separator />
-			{/if}
-
-			{#if canTagImage && hasPermission('images:tag', envId)}
-				<DropdownMenu.Item onclick={() => (tagDialogImage = item)}>
-					<TagIcon class="size-4" />
-					{m.images_tag_image()}
-				</DropdownMenu.Item>
-			{/if}
-
-			{#if canReadImage && hasPermission('images:read', envId)}
-				<DropdownMenu.Item onclick={() => handleExportImage(item.id, envId)}>
-					<DownloadIcon class="size-4" />
-					{m.images_export()}
-				</DropdownMenu.Item>
-			{/if}
-
-			{@const usableTags = item.repoTags?.filter((tag) => tag !== '<none>:<none>') ?? []}
-			<!-- Prefer a real tag: a digest name kept beside it would pull the old pinned image. -->
-			{@const usableTag = usableTags.find((tag) => !tag.includes('@')) ?? usableTags[0]}
-			{#if canPullImage && hasPermission('images:pull', envId)}
-				<DropdownMenu.Item onclick={() => handleInlineImagePull(usableTag || '', envId)} disabled={!usableTag}>
-					<DownloadIcon class="size-4" />
-					{m.pull()}
-				</DropdownMenu.Item>
-			{/if}
-
-			{#if canScanOn(envId)}
-				<DropdownMenu.Item onclick={() => handleInlineVulnerabilityScan(item.id, envId)}>
-					<SearchIcon class="size-4" />
-					{m.vuln_scan()}
-				</DropdownMenu.Item>
-			{/if}
-
-			{#if canPatchImage && hasPermission('images:patch', envId)}
-				{@const imageIsLocal = !item.repoDigests || item.repoDigests.length === 0}
-				<DropdownMenu.Item onclick={() => handleInlineImagePatch(item.id, envId)} disabled={imageIsLocal || !usableTag}>
-					<ShieldCheckIcon class="size-4" />
-					<div class="flex flex-col items-start">
-						<span>{m.images_patch()}</span>
-						{#if imageIsLocal}
-							<span class="text-xs text-muted-foreground">{m.security_local_image_unpatchable()}</span>
-						{/if}
-					</div>
-				</DropdownMenu.Item>
-			{/if}
-
-			{#if canDeleteImage && hasPermission('images:delete', envId)}
-				<DropdownMenu.Separator />
-
-				<DropdownMenu.Item variant="destructive" onclick={() => deleteImage(item.id, envId)} disabled={isLoading.removing}>
-					{#if isLoading.removing}
-						<Spinner class="size-4" />
-					{:else}
-						<TrashIcon class="size-4" />
-					{/if}
-					{m.common_remove()}
-				</DropdownMenu.Item>
-			{/if}
+{#snippet RowActions({ item }: { item: ImageRow })}
+	{@const targets = imageActionTargets(item)}
+	{@const errorHref = updateErrorHref(item)}
+	<RowActionsMenu name={item.repo && item.repo !== '<none>' ? item.repo : item.id}>
+		{#if errorHref}<DropdownMenu.Item onclick={() => goto(errorHref)}
+				><AlertIcon class="size-4" />{m.view_errors()}</DropdownMenu.Item
+			>{/if}
+		{#if targets.length > 1}
+			<DropdownMenu.Item onclick={() => goto(imageHref(item))}
+				><InspectIcon class="size-4" />{m.common_inspect()}</DropdownMenu.Item
+			>
+			{#each targets as target (target.environmentId + '/' + target.id)}
+				<DropdownMenu.Sub>
+					<DropdownMenu.SubTrigger
+						><span class="min-w-0 truncate">{target.environmentName}</span><span class="font-mono text-xs text-muted-foreground"
+							>{target.id.replace(/^sha256:/, '').slice(0, 12)}</span
+						></DropdownMenu.SubTrigger
+					>
+					<DropdownMenu.SubContent class="max-h-96 overflow-y-auto">{@render ImageActions(target)}</DropdownMenu.SubContent>
+				</DropdownMenu.Sub>
+			{/each}
+		{:else if targets[0]}
+			{@render ImageActions(targets[0])}
 		{/if}
 	</RowActionsMenu>
 {/snippet}
@@ -874,5 +896,31 @@
 			if (!open) tagDialogImage = null;
 		}}
 		onTagged={invalidateImages}
+	/>
+{/if}
+
+{#if pushDialogImage}
+	<ImagePushDialog
+		imageId={pushDialogImage.id}
+		environmentId={pushDialogImage.environmentId}
+		repoTags={pushDialogImage.repoTags}
+		bind:open={
+			() => pushDialogImage !== null,
+			(open) => {
+				if (!open) pushDialogImage = null;
+			}
+		}
+	/>
+{/if}
+{#if releaseNotesImage}
+	<ImageReleaseNotesDialog
+		bind:open={
+			() => releaseNotesImage !== null,
+			(open) => {
+				if (!open) releaseNotesImage = null;
+			}
+		}
+		environmentId={releaseNotesImage.environmentId}
+		imageRef={releaseNotesImage.imageRef}
 	/>
 {/if}

@@ -516,7 +516,12 @@
 	}
 
 	const defaultColumnVisibility = $derived(getInitialHiddenColumns(columns));
-	const effectiveColumnVisibility = $derived({ ...defaultColumnVisibility, ...columnVisibility });
+	const effectiveColumnVisibility = $derived({
+		...defaultColumnVisibility,
+		...columnVisibility,
+		select: !selectionDisabled,
+		actions: !!rowActions
+	});
 
 	const columnsDef = $derived(buildColumns(columns, selectionDisabled));
 

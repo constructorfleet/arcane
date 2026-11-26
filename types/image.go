@@ -111,9 +111,12 @@ type (
 
 	ImageRepositoryCopy struct {
 		EnvironmentTag
-		ID    string   `json:"id"`
-		Tags  []string `json:"tags"`
-		InUse bool     `json:"inUse"`
+		Hardened         *HardenedImageInfo `json:"hardened,omitempty"`
+		ID               string             `json:"id"`
+		Tags             []string           `json:"tags"`
+		RepoDigests      []string           `json:"repoDigests"`
+		PinnedReferences []string           `json:"pinnedReferences"`
+		InUse            bool               `json:"inUse"`
 	}
 
 	ImageAttestationList struct {

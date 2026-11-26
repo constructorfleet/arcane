@@ -281,6 +281,7 @@
 
 		void replaceState('', state);
 		if (swarmServiceAction === 'edit' && canUpdateService) openEdit();
+		if (swarmServiceAction === 'rollback' && canUpdateService) handleRollback();
 		if (swarmServiceAction === 'scale' && canScaleService) scaleDialogOpen = true;
 	});
 

@@ -413,6 +413,8 @@
 					>
 				{/if}
 			{/each}
+			<DropdownMenu.Item onclick={() => goto(detailsHref + '&tab=host')}>{m.swarm_node_hardware_host()}</DropdownMenu.Item>
+			<DropdownMenu.Item onclick={() => goto(detailsHref + '&tab=docker')}>{m.engine()}</DropdownMenu.Item>
 			<DropdownMenu.Item onclick={() => goto(detailsHref + '&tab=agent')}
 				><AgentConnectionIcon />{m.resource_view_agent()}</DropdownMenu.Item
 			>

@@ -4,6 +4,7 @@
 	import { useQueryClient } from '@tanstack/svelte-query';
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
+	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
 	import type { ColumnSpec, MobileFieldVisibility } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
@@ -145,6 +146,18 @@
 
 {#snippet RowActions({ item }: { item: QuadletRow })}
 	<RowActionsMenu name={item.name}>
+		<DetailLinksMenu
+			href={resolve(`/(app)/podman/quadlets/[name]?env=${encodeURIComponent(item.environmentId)}`, {
+				name: encodeURIComponent(item.name)
+			})}
+			tabs={[
+				{ value: 'overview', label: m.common_overview() },
+				{ value: 'files', label: m.podman_quadlet_files() },
+				{ value: 'containers', label: m.containers() },
+				{ value: 'logs', label: m.common_logs(), visible: hasPermission('containers:logs', item.environmentId) }
+			]}
+		/>
+
 		<DropdownMenu.Item
 			onclick={() =>
 				goto(

@@ -4,6 +4,7 @@
 	import { useQueryClient } from '@tanstack/svelte-query';
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
+	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
 	import type { ColumnSpec, MobileFieldVisibility } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
@@ -123,6 +124,19 @@
 
 {#snippet RowActions({ item }: { item: PodRow })}
 	<RowActionsMenu name={item.name}>
+		<DetailLinksMenu
+			href={resolve(`/(app)/podman/pods/[id]?env=${encodeURIComponent(item.environmentId)}`, { id: encodeURIComponent(item.id) })}
+			tabs={[
+				{ value: 'overview', label: m.common_overview() },
+				{ value: 'containers', label: m.containers() },
+				{ value: 'network', label: m.resource_networks_cap() },
+				{ value: 'resources', label: m.common_resources() },
+				{ value: 'stats', label: m.containers_nav_metrics() },
+				{ value: 'processes', label: m.containers_processes_title() },
+				{ value: 'inspect', label: m.common_inspect() }
+			]}
+		/>
+
 		<DropdownMenu.Item
 			onclick={() =>
 				goto(

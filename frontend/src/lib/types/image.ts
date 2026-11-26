@@ -36,6 +36,9 @@ export interface ImageRepositoryCopy {
 	environmentId: string;
 	environmentName?: string;
 	tags: string[] | null;
+	repoDigests: string[];
+	pinnedReferences: string[];
+	hardened?: HardenedImageInfo;
 	inUse: boolean;
 }
 

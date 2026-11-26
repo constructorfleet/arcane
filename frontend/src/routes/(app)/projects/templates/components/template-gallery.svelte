@@ -8,6 +8,7 @@
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
 	import type { ColumnSpec, TableViewMode } from '#lib/components/arcane-table/arcane-table.types.svelte.js';
 	import { templateTypeFilters } from '#lib/components/arcane-table/data.js';
+	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import IconImage from '#lib/components/icon-image.svelte';
@@ -145,7 +146,23 @@
 {/snippet}
 
 {#snippet TemplateActions({ item }: { item: Template })}
+	{@const localVersion =
+		item.isRemote && item.metadata?.remoteUrl
+			? templates.data.find((template) => !template.isRemote && template.metadata?.remoteUrl === item.metadata?.remoteUrl)
+			: undefined}
 	<RowActionsMenu name={item.name}>
+		{#if localVersion}<DropdownMenu.Item
+				onclick={() => goto(resourceDetailHref(resolve('/(app)/projects/templates/[id]', { id: localVersion.id })))}
+				>{m.templates_view_local_version()}</DropdownMenu.Item
+			>{/if}
+		<DetailLinksMenu
+			href={resourceDetailHref(resolve('/(app)/projects/templates/[id]', { id: item.id }))}
+			tabs={[
+				{ value: 'overview', label: m.common_overview() },
+				{ value: 'compose', label: m.compose() },
+				{ value: 'env', label: m.common_environment_variables(), visible: !!item.envContent || !!item.metadata?.envUrl }
+			]}
+		/>
 		<DropdownMenu.Item onclick={() => goto(resourceDetailHref(resolve('/(app)/projects/templates/[id]', { id: item.id })))}>
 			<InspectIcon class="size-4" />
 			{m.common_view_details()}
@@ -162,7 +179,7 @@
 			<DropdownMenu.Separator />
 		{/if}
 
-		{#if item.isRemote && canCreateTemplate}
+		{#if item.isRemote && canCreateTemplate && !localVersion}
 			<DropdownMenu.Item onclick={() => handleDownloadTemplate(item)} disabled={downloadingId === item.id}>
 				{#if downloadingId === item.id}
 					<Spinner class="size-4" />

@@ -11,11 +11,13 @@
 	import type { SortState, TableViewMode } from '#lib/components/arcane-table/arcane-table.types.svelte';
 	import { iconBgClass, iconTextClass } from '#lib/components/arcane-table/cards/icon-variants.js';
 	import ActionMenuItem from '#lib/components/arcane-table/cells/action-menu-item.svelte';
+	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
 	import type { ColumnSpec, BulkAction } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
 	import { PortBadge } from '#lib/components/badges/index.js';
+	import ImageReleaseNotesDialog from '#lib/components/dialogs/image-release-notes-dialog.svelte';
 	import IconImage from '#lib/components/icon-image.svelte';
 	import IfPermitted from '#lib/components/if-permitted.svelte';
 	import ImageUpdateItem from '#lib/components/image-update-item.svelte';
@@ -56,6 +58,7 @@
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { hasAnyLoadingState } from '#lib/utils/bulk-actions.js';
 	import { createContainerUpdateActivityTracker } from '#lib/utils/container-update-activities.js';
+	import { createDashboardWidget, pinDashboardWidget } from '#lib/utils/dashboard-layout.js';
 	import { COMPOSE_PROJECT_LABEL, getContainerIpAddresses, getThemedIconUrl, parseImageRef } from '#lib/utils/docker.js';
 	import { type EnvironmentPage, type EnvironmentRow, hasShownPermission, listScopes, rowKey } from '#lib/utils/environments.js';
 	import { formatDateTimeShort } from '#lib/utils/formatting.js';
@@ -74,12 +77,15 @@
 		getContainerStatusLabel,
 		type ActionStatus
 	} from '../container-table.helpers';
+	import ContainerCommitDialog from './container-commit-dialog.svelte';
 	import { ContainerResourcePoller } from './container-resource-poller.svelte';
 	import ContainerStatsCell from './container-stats-cell.svelte';
 	import { ContainerStatsManager } from './container-stats-manager.svelte';
 	import ContainerStatsSync from './container-stats-sync.svelte';
 	import KillContainerDialog from './kill-container-dialog.svelte';
 
+	let releaseNotesTarget = $state<ContainerRow | null>(null);
+	let commitTarget = $state<ContainerRow | null>(null);
 	type FieldVisibility = Record<string, boolean>;
 	type ContainerRow = EnvironmentRow<ContainerSummary>;
 	type ContainerPage = EnvironmentPage<ContainerPaginatedResponse>;
@@ -1040,6 +1046,57 @@
 			{@render StateActions(item, getRowActionStatus(item))}
 		{/if}
 		<RowActionsMenu name={getContainerDisplayName(item)}>
+			{#if hasPermission('image-updates:read', envId) && item.image && !item.image.startsWith('sha256:')}
+				<DropdownMenu.Item onclick={() => (releaseNotesTarget = item)}>{m.image_update_release_notes_button()}</DropdownMenu.Item>
+			{/if}
+			{#if hasPermission('images:commit', envId)}
+				<DropdownMenu.Item onclick={() => (commitTarget = item)}>{m.commit()}</DropdownMenu.Item>
+			{/if}
+			<DropdownMenu.Item
+				onclick={() =>
+					pinDashboardWidget(
+						createDashboardWidget('resource', { resourceKind: 'containers', environmentIds: [envId], resourceId: item.id })
+					)}>{m.pin_to_dashboard()}</DropdownMenu.Item
+			>
+			{#if item.state === 'running'}<DropdownMenu.Item
+					onclick={() =>
+						pinDashboardWidget(
+							createDashboardWidget('containerStats', {
+								resourceKind: 'containers',
+								environmentIds: [envId],
+								resourceId: item.id
+							})
+						)}>{m.pin_stats_to_dashboard()}</DropdownMenu.Item
+				>{/if}
+			{#if hasPermission('containers:logs', envId)}<DropdownMenu.Item
+					onclick={() =>
+						pinDashboardWidget(
+							createDashboardWidget('containerLogs', { resourceKind: 'containers', environmentIds: [envId], resourceId: item.id })
+						)}>{m.pin_logs_to_dashboard()}</DropdownMenu.Item
+				>{/if}
+			<DetailLinksMenu
+				href={resourceDetailHref(
+					resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(envId)}`, { containerId: item.id })
+				)}
+				tabs={[
+					{ value: 'overview', label: m.common_overview() },
+					{ value: 'stats', label: m.containers_nav_metrics(), visible: item.state === 'running' },
+					{ value: 'processes', label: m.containers_processes_title() },
+					{ value: 'logs', label: m.common_logs(), visible: hasPermission('containers:logs', envId) },
+					{
+						value: 'shell',
+						label: m.common_shell(),
+						visible: item.state === 'running' && hasPermission('containers:exec', envId)
+					},
+					{ value: 'healthcheck', label: m.containers_nav_healthcheck() },
+					{ value: 'config', label: m.common_configuration() },
+					{ value: 'network', label: m.resource_networks_cap() },
+					{ value: 'storage', label: m.storage(), visible: !!item.mounts?.length },
+					{ value: 'compose', label: m.compose(), visible: !!item.labels?.[COMPOSE_PROJECT_LABEL] },
+					{ value: 'inspect', label: m.common_inspect() }
+				]}
+			/>
+
 			<DropdownMenu.Item
 				onclick={() =>
 					goto(
@@ -1260,3 +1317,29 @@
 		onComplete={invalidateContainers}
 	/>
 {/if}
+
+{#if commitTarget}
+	<ContainerCommitDialog
+		bind:open={
+			() => commitTarget !== null,
+			(open) => {
+				if (!open) commitTarget = null;
+			}
+		}
+		containerId={commitTarget.id}
+		containerName={getContainerDisplayName(commitTarget)}
+		environmentId={commitTarget.environmentId}
+		onCommitted={invalidateContainers}
+	/>
+{/if}
+
+{#if releaseNotesTarget}<ImageReleaseNotesDialog
+		bind:open={
+			() => releaseNotesTarget !== null,
+			(open) => {
+				if (!open) releaseNotesTarget = null;
+			}
+		}
+		environmentId={releaseNotesTarget.environmentId}
+		imageRef={releaseNotesTarget.image}
+	/>{/if}

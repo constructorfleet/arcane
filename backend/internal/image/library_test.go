@@ -63,6 +63,8 @@ func TestImageLibraryGroupsBeforeSearchAndPagination(t *testing.T) {
 	require.Equal(t, 1, row.RepositoryGroup.Variants)
 	require.Equal(t, 1, row.RepositoryGroup.ScannedVariants)
 	require.Len(t, row.RepositoryGroup.Copies, 2)
+	require.Equal(t, []string{"docker.io/library/alpine@" + digest}, row.RepositoryGroup.Copies[0].RepoDigests)
+	require.Empty(t, row.RepositoryGroup.Copies[1].RepoDigests)
 	require.Equal(t, "two", row.RepositoryGroup.Copies[1].EnvironmentID)
 	require.False(t, row.RepositoryGroup.Copies[1].InUse)
 

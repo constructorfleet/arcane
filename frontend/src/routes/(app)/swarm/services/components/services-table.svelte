@@ -78,7 +78,11 @@
 
 	const isAnyLoading = $derived(Object.values(isLoading).some(Boolean));
 
-	function openService(service: ServiceRow, action?: App.PageState['swarmServiceAction'], tab?: 'tasks' | 'network' | 'storage') {
+	function openService(
+		service: ServiceRow,
+		action?: App.PageState['swarmServiceAction'],
+		tab?: 'tasks' | 'network' | 'storage' | 'logs' | 'config'
+	) {
 		goto(
 			resourceTableHref(
 				environmentHref(
@@ -246,6 +250,10 @@
 			{m.common_inspect()}
 		</DropdownMenu.Item>
 		<IfPermitted perm="swarm-services:read" envId={item.environmentId}>
+			<DropdownMenu.Item onclick={() => openService(item, undefined, 'config')}>{m.common_configuration()}</DropdownMenu.Item>
+			{#if hasPermission('swarm-services:logs', item.environmentId)}<DropdownMenu.Item
+					onclick={() => openService(item, undefined, 'logs')}>{m.common_logs()}</DropdownMenu.Item
+				>{/if}
 			<DropdownMenu.Item onclick={() => openService(item, undefined, 'tasks')}
 				><ContainersIcon />{m.view_tasks()}</DropdownMenu.Item
 			>
@@ -259,6 +267,7 @@
 		<IfPermitted perm="swarm-services:update" envId={item.environmentId}>
 			<DropdownMenu.Separator />
 			<IfPermitted perm="swarm-services:read" envId={item.environmentId}>
+				<DropdownMenu.Item onclick={() => openService(item, 'rollback')}>{m.swarm_service_rollback()}</DropdownMenu.Item>
 				<DropdownMenu.Item onclick={() => openService(item, 'edit')}>
 					<EditIcon class="size-4" />
 					{m.common_edit()}

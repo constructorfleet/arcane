@@ -187,6 +187,7 @@ func mergeImageRepository(copies []types.ImageSummary) types.ImageSummary {
 	for i, observation := range copies {
 		group.Copies = append(group.Copies, types.ImageRepositoryCopy{
 			EnvironmentTag: observation.EnvironmentTag, ID: observation.ID, Tags: observation.RepoTags, InUse: observation.InUse,
+			RepoDigests: observation.RepoDigests, PinnedReferences: observation.PinnedReferences, Hardened: observation.Hardened,
 		})
 		row.RepoTags = append(row.RepoTags, observation.RepoTags...)
 		row.RepoDigests = append(row.RepoDigests, observation.RepoDigests...)

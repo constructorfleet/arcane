@@ -6,6 +6,7 @@
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
 	import type { FilterOption } from '#lib/components/arcane-table/arcane-table.types.svelte.js';
+	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import type { ColumnSpec, MobileFieldVisibility, BulkAction } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
@@ -35,6 +36,7 @@
 	import type { VersionInfo } from '#lib/types/version.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
+	import { createDashboardWidget, pinDashboardWidget } from '#lib/utils/dashboard-layout.js';
 	import { getEnvironmentStatusVariant, isEnvironmentOnline, resolveEnvironmentStatus } from '#lib/utils/docker.js';
 	import { getEnvironmentTypeLabel, resolveEnvironmentTransport } from '#lib/utils/environments.js';
 	import { capitalizeFirstLetter } from '#lib/utils/formatting.js';
@@ -120,6 +122,21 @@
 		});
 	}
 
+	let syncingIds = $state<string[]>([]);
+	async function handleSync(id: string) {
+		syncingIds = [...syncingIds, id];
+		await handleApiResultWithCallbacks({
+			result: await tryCatch(environmentManagementService.sync(id)),
+			message: m.sync_environment_failed(),
+			setLoadingState: (loading) => {
+				if (!loading) syncingIds = syncingIds.filter((value) => value !== id);
+			},
+			onSuccess: async () => {
+				toast.success(m.sync_environment_success());
+				await queryClient.invalidateQueries({ queryKey: queryKeys.environments.all });
+			}
+		});
+	}
 	async function handleTest(id: string) {
 		isLoading.testing = true;
 		const result = await tryCatch(environmentManagementService.testConnection(id));
@@ -322,6 +339,28 @@
 
 {#snippet RowActions({ item }: { item: Environment })}
 	<RowActionsMenu name={item.name || item.id}>
+		{#if item.enabled && hasPermission('environment-settings:read', item.id)}<DropdownMenu.Item
+				onclick={() => goto(resolve(`/(app)/settings/docker?env=${encodeURIComponent(item.id)}`))}
+				>{m.settings()}</DropdownMenu.Item
+			>{/if}
+		<DropdownMenu.Item onclick={() => pinDashboardWidget(createDashboardWidget('environment', { environmentIds: [item.id] }))}
+			>{m.pin_to_dashboard()}</DropdownMenu.Item
+		>
+		{#if item.id !== '0' && hasPermission('environments:sync', item.id)}
+			<DropdownMenu.Item disabled={syncingIds.includes(item.id)} onclick={() => handleSync(item.id)}
+				>{m.resource_sync_cap()}</DropdownMenu.Item
+			>
+		{/if}
+		<DetailLinksMenu
+			href={resolve('/(app)/agents/[id]', { id: item.id })}
+			tabs={[
+				{ value: 'connection', label: m.connection_agent(), visible: item.id !== '0' },
+				{ value: 'features', label: m.features_title() },
+				{ value: 'engine', label: m.engine(), visible: item.enabled && hasPermission('system:read', item.id) },
+				{ value: 'history', label: m.history(), visible: item.enabled && hasPermission('jobs:list', item.id) }
+			]}
+		/>
+
 		<DropdownMenu.Item onclick={() => goto(resolve('/(app)/agents/[id]', { id: item.id }))}>
 			<InspectIcon class="size-4" />
 			{m.common_view_details()}
