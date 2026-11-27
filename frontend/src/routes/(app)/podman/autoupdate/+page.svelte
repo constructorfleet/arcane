@@ -85,7 +85,7 @@
 					<Table.Root aria-label={m.auto_update()}>
 						<Table.Header>
 							<Table.Row>
-								<Table.Head scope="col">{m.resource_environment_cap()}</Table.Head>
+								<Table.Head scope="col">{m.swarm_node()}</Table.Head>
 								<Table.Head scope="col">{m.common_version()}</Table.Head>
 								<Table.Head scope="col">{m.common_mode()}</Table.Head>
 								<Table.Head scope="col">{m.common_status()}</Table.Head>

@@ -9,7 +9,7 @@ describe('resource table column preferences', () => {
 		expect(visibility).toEqual({ environment: false, status: false });
 	});
 
-	it('restores a default-hidden Agent column after the user enables it', () => {
+	it('restores a default-hidden Node column after the user enables it', () => {
 		const defaults = { environment: false };
 		const saved = encodeColumnVisibility(
 			{ environment: true, name: true, status: false, select: false, actions: false },
@@ -20,7 +20,7 @@ describe('resource table column preferences', () => {
 		expect(restored).toEqual({ environment: true, status: false });
 	});
 
-	it('persists hiding the Agent column again', () => {
+	it('persists hiding the Node column again', () => {
 		const defaults = { environment: false };
 		const saved = encodeColumnVisibility(defaults, defaults);
 		expect(saved).toEqual({ v: ['environment'], visibleColumns: [] });

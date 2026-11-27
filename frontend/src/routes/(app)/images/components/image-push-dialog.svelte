@@ -76,7 +76,7 @@
 >
 	<div class="grid gap-4 py-4">
 		<p class="text-sm text-muted-foreground">
-			{m.agent()}: {agent?.name ?? m.common_unknown()} <span class="font-mono text-xs">{target.environmentId}</span>
+			{m.swarm_node()}: {agent?.name ?? m.common_unknown()} <span class="font-mono text-xs">{target.environmentId}</span>
 		</p>
 		<p class="font-mono text-xs break-all">{m.source_image()}: {target.imageId}</p>
 		<SelectWithLabel

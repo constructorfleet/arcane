@@ -56,6 +56,14 @@ Record commit/release, commands, results and runtime acceptance per implementati
 
 [PR #243](https://gitea.home.prettybaked.com/constructorfleet/arcane/pulls/243) is squash-merged as `64e60f124`. Conflicts with cf.109 were limited to release metadata and were resolved without dropping newer image/security/volume behavior. Local full format/lint, backend and CLI race/coverage suites, 25 frontend unit tests, and production frontend build passed; all three required Gitea checks passed on `39c8e6697`. Both cf.110 manager/agent tags and latest were verified in Harbor against the published release digests. The live manager now reports cf.110; its manifest names HiveMind and the logo endpoint returns PNG successfully. These are native HTTP checks, not authenticated browser acceptance or proof that every agent has converged.
 
-### Initial list cleanup · cf.111 target
+### Initial list cleanup · cf.111
 
 UX-02 implementation batch removes label columns/mobile label summaries across the discovered list owners, all five list-page pin actions, and agent/container/project row pins. Container Release notes/Commit entries and unused list dialogs are removed; Convert to Compose remains. No relationship, task history, Overview landing or menu grouping implementation is claimed by this batch. Existing detail pin actions remain for the detail/menu alignment stage. Frontend unit tests and production build passed locally; required formatting/lint and deployed authenticated acceptance are recorded per release.
+
+Authenticated cf.111 checks after browser access recovered: container mobile row actions omit Release notes, Commit and pin; lifecycle entries remain. Container and project desktop column pickers omit Labels; Projects has no deployed rows, so project row actions were not exercised. Swarm Configs/Secrets desktop headers and pickers omit Labels, and grid cards omit raw label summaries. Image actions still expose vulnerability details and Scan. The dashboard reports all five connected agents at cf.111. This is selected interactive coverage, not full acceptance of every checklist item or Podman behavior. QA #263 remains closed at the maintainer's request.
+
+### Resource node terminology · cf.112 target
+
+QA finding: [#264](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues/264), UX-02.
+
+The shared resource table filter and optional scope column now say Node, independent of name/dot appearance. Resource destination and prune selectors and scoped-list return actions say All Nodes. Image pull/push, container update targets and active mount records use Node. Shared fleet coverage/count/confirmation messages, resource-scope errors and appearance/limit settings use nodes. Agents registration, connection/software controls and administration retain Agent. Filter keys, stored preferences, route identity and authorization are unchanged. No new resource queries or per-row fan-out are introduced. Menu grouping and detail/Overview alignment remain the following implementation stages.

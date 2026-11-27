@@ -74,7 +74,7 @@
 <DetailSection title={m.active_mount_information()} icon={GlobeIcon}>
 	{#each records as record (rowKey(record))}
 		<KeyValueGrid>
-			<KeyValueCard label={m.agent()}>{record.environmentName}</KeyValueCard>
+			<KeyValueCard label={m.swarm_node()}>{record.environmentName}</KeyValueCard>
 			<KeyValueCard label={m.common_mountpoint()}>{record.mountpoint}</KeyValueCard>
 		</KeyValueGrid>
 	{:else}

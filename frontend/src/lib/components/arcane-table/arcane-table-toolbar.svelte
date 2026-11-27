@@ -154,7 +154,7 @@
 
 {#snippet filterList()}
 	{#if environmentColumn}
-		<DataTableFacetedFilter column={environmentColumn} title={m.resource_environment_cap()} options={environmentFilterOptions} />
+		<DataTableFacetedFilter column={environmentColumn} title={m.swarm_node()} options={environmentFilterOptions} />
 	{/if}
 	{#if typeColumn && typeColumnFilterOptions.length > 0}
 		<DataTableFacetedFilter column={typeColumn} title={m.common_type()} options={typeColumnFilterOptions} />

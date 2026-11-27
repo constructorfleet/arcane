@@ -29,7 +29,7 @@
 	}: Props = $props();
 
 	const selectedEnvironmentName = $derived(
-		environments.find((environment) => environment.id === environmentId)?.name ?? m.all_environments()
+		environments.find((environment) => environment.id === environmentId)?.name ?? m.all_nodes()
 	);
 
 	function handleCancelInternal() {
@@ -49,13 +49,13 @@
 	{#if open}
 		{#if environments.length > 1}
 			<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-				<span class="text-sm font-medium">{m.resource_environment_cap()}</span>
+				<span class="text-sm font-medium">{m.swarm_node()}</span>
 				<Select.Root type="single" value={environmentId ?? 'all'} disabled={isPruning} onValueChange={onEnvironmentChange}>
 					<Select.Trigger class="h-8 min-w-48">
 						<span class="truncate">{selectedEnvironmentName}</span>
 					</Select.Trigger>
 					<Select.Content>
-						<Select.Item value="all">{m.all_environments()}</Select.Item>
+						<Select.Item value="all">{m.all_nodes()}</Select.Item>
 						{#each environments as environment (environment.id)}
 							<Select.Item value={environment.id}>{environment.name}</Select.Item>
 						{/each}

@@ -120,7 +120,7 @@
 						id: 'all-agents',
 						action: 'base',
 						placement: 'secondary',
-						label: m.all_environments(),
+						label: m.all_nodes(),
 						href: resolve('/(app)/containers')
 					}
 				: null,

@@ -80,7 +80,7 @@ export function resolveLinkedListAgent(url: URL, permission: string): string | u
 	const agent = url.searchParams.get('env');
 	if (agent === null) return undefined;
 	if (!agent || !environmentStore.shown.some((env) => env.id === agent)) {
-		error(404, m.common_not_found_title({ resource: m.resource_environment_cap() }));
+		error(404, m.common_not_found_title({ resource: m.swarm_node() }));
 	}
 	if (!hasPermission(permission, agent)) error(403, m.common_access_denied());
 	return agent;
@@ -99,7 +99,7 @@ export async function resolveDetailEnvironmentId(url: URL): Promise<string> {
 	await environmentStore.ready;
 	const requested = url.searchParams.get('env');
 	if (!requested || !environmentStore.available.some((env) => env.id === requested))
-		error(404, m.common_not_found_title({ resource: m.resource_environment_cap() }));
+		error(404, m.common_not_found_title({ resource: m.swarm_node() }));
 	return requested;
 }
 

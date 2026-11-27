@@ -34,7 +34,7 @@
 		(environments ?? environmentStore.shown).filter((env) => !permission || hasPermission(permission, env.id))
 	);
 	const options = $derived([
-		...(allOption ? [{ value: '', label: m.all_environments() }] : []),
+		...(allOption ? [{ value: '', label: m.all_nodes() }] : []),
 		...permitted.map((env) => ({ value: env.id, label: env.name }))
 	]);
 	const currentId = $derived(value ?? options[0]?.value ?? '');
@@ -67,15 +67,10 @@
 
 {#if variant === 'field'}
 	{#if hasChoice || (showSingle && !readonly && permitted.length > 0)}
-		<SelectWithLabel
-			id="destination-environment"
-			label={m.resource_environment_cap()}
-			bind:value={() => currentId, pick}
-			{options}
-		/>
+		<SelectWithLabel id="destination-environment" label={m.swarm_node()} bind:value={() => currentId, pick} {options} />
 	{/if}
 {:else if hasChoice}
-	<Label for="page-environment" class="sr-only">{m.resource_environment_cap()}</Label>
+	<Label for="page-environment" class="sr-only">{m.swarm_node()}</Label>
 	<div class={variant === 'prefix' ? 'flex shrink-0 items-center gap-1 pr-2' : 'flex shrink-0 items-center'}>
 		<Select.Root type="single" bind:value={() => currentId, pick}>
 			<SelectPrimitive.Trigger id="page-environment">
@@ -95,7 +90,7 @@
 							<span class="hidden max-w-48 truncate sm:inline">{current.name}</span>
 						{:else if allOption}
 							<EnvironmentsIcon class="size-4 text-muted-foreground" />
-							<span class="hidden max-w-48 truncate sm:inline">{m.all_environments()}</span>
+							<span class="hidden max-w-48 truncate sm:inline">{m.all_nodes()}</span>
 						{/if}
 						<ArrowDownIcon class="size-3.5 opacity-60" />
 					</ArcaneButton>
@@ -103,9 +98,9 @@
 			</SelectPrimitive.Trigger>
 			<Select.Content class="w-auto max-w-72 min-w-48">
 				{#if allOption}
-					<Select.Item value="" label={m.all_environments()}>
+					<Select.Item value="" label={m.all_nodes()}>
 						<EnvironmentsIcon class="size-4 text-muted-foreground" />
-						<span class="truncate">{m.all_environments()}</span>
+						<span class="truncate">{m.all_nodes()}</span>
 					</Select.Item>
 				{/if}
 				{#each permitted as env (env.id)}

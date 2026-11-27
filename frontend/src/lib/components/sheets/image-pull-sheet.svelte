@@ -128,7 +128,7 @@
 			variant="field"
 		/>
 		<p class="text-sm text-muted-foreground">
-			{m.agent()}: {target?.name ?? m.common_unknown()} <span class="font-mono text-xs">{environmentId}</span>
+			{m.swarm_node()}: {target?.name ?? m.common_unknown()} <span class="font-mono text-xs">{environmentId}</span>
 		</p>
 		{#if !canPull}<p class="text-sm text-destructive">{m.select_connected_image_pull_agent()}</p>{/if}
 		<FormInput

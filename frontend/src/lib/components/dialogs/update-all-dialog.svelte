@@ -401,7 +401,7 @@
 							<table class="w-full text-sm">
 								<thead>
 									<tr class="text-left text-xs text-muted-foreground">
-										<th class="pb-2 font-normal">{m.agent()}</th>
+										<th class="pb-2 font-normal">{m.swarm_node()}</th>
 										<th class="pb-2 text-right font-normal">{m.common_version()}</th>
 									</tr>
 								</thead>
