@@ -1,6 +1,6 @@
 {
-	"name": "Arcane",
-	"short_name": "Arcane",
+	"name": "HiveMind",
+	"short_name": "HiveMind",
 	"description": "Modern Docker container management platform",
 	"theme_color": "oklch(0.141 0.005 285.823)",
 	"background_color": "oklch(0.141 0.005 285.823)",

@@ -183,7 +183,7 @@ func NewPasskeyService(db *database.DB, cfg *config.Config) *PasskeyService {
 
 	s.webAuthn, s.initErr = webauthn.New(&webauthn.Config{
 		RPID:          s.rpID,
-		RPDisplayName: "Arcane",
+		RPDisplayName: "HiveMind",
 		RPOrigins:     []string{origin},
 		RPTopOrigins:  []string{origin},
 		AuthenticatorSelection: protocol.AuthenticatorSelection{

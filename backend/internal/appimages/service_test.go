@@ -24,11 +24,8 @@ import (
 
 const testSVG = `<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect width="1" height="1"/></svg>`
 
-func newServiceForVersion(t *testing.T, version string) (*ApplicationImagesService, *settings.SettingsService) {
+func newService(t *testing.T) (*ApplicationImagesService, *settings.SettingsService) {
 	t.Helper()
-	original := config.Version
-	config.Version = version
-	t.Cleanup(func() { config.Version = original })
 
 	gdb, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
@@ -71,91 +68,50 @@ func publicSettingValue(settingsSvc *settings.SettingsService, key string) (stri
 	return snapshot.Settings[idx].Value, true
 }
 
-func TestNewApplicationImagesService_StableBuildUsesStandardBranding(t *testing.T) {
-	svc, _ := newServiceForVersion(t, "v1.2.3")
-
-	for _, name := range []string{"logo", "logo-animated"} {
-		_, mimeType, err := svc.GetImageWithColor(t.Context(), name, "", false)
-		require.NoError(t, err)
-		assert.Equal(t, "image/svg+xml", mimeType, name)
-	}
-
-	data, _, err := svc.GetImageWithColor(t.Context(), "favicon", "", false)
-	require.NoError(t, err)
-	assert.Equal(t, readEmbedded(t, "images/favicon.ico"), data)
-}
-
-func TestNewApplicationImagesService_NonStableBuildUsesDevelopmentBranding(t *testing.T) {
-	svc, _ := newServiceForVersion(t, "1.2.3-next.1")
-	mark := readEmbedded(t, "images/development/icon-512x512.png")
+func TestGetImage_ReturnsEmbeddedBranding(t *testing.T) {
+	svc, _ := newService(t)
 
 	for _, tc := range []struct {
-		name  string
-		color string
-		loop  bool
+		name string
+		file string
+		mime string
 	}{
-		{"logo", "", false},
-		{"logo", "#ff0000", false},
-		{"logo-animated", "", false},
-		{"logo-animated", "#ff0000", true},
+		{"logo", "images/logo.png", pngMimeType},
+		{"logo-full", "images/logo-full.png", pngMimeType},
+		{"logo-full-dark", "images/logo-full-dark.png", pngMimeType},
+		{"favicon", "images/favicon.ico", iconMimeType},
+		{"profile", "images/profile.webp", webpMimeType},
 	} {
-		data, mimeType, err := svc.GetImageWithColor(t.Context(), tc.name, tc.color, tc.loop)
-		require.NoError(t, err)
-		assert.Equal(t, "image/png", mimeType, tc.name)
-		assert.Equal(t, mark, data, tc.name)
+		data, mimeType, err := svc.GetImage(t.Context(), tc.name)
+		require.NoError(t, err, tc.name)
+		assert.Equal(t, tc.mime, mimeType, tc.name)
+		assert.Equal(t, readEmbedded(t, tc.file), data, tc.name)
 	}
-
-	for _, name := range []string{"logo-full", "logo-full-animated"} {
-		data, mimeType, err := svc.GetImageWithColor(t.Context(), name, "#ff0000", false)
-		require.NoError(t, err)
-		assert.Equal(t, "image/svg+xml", mimeType, name)
-		assert.Contains(t, string(data), "#ff0000", name)
-	}
-
-	data, mimeType, err := svc.GetImageWithColor(t.Context(), "favicon", "", false)
-	require.NoError(t, err)
-	assert.Equal(t, readEmbedded(t, "images/development/favicon.ico"), data)
-	assert.Equal(t, []byte{0, 0, 1, 0}, data[:4])
-	assert.NotEmpty(t, mimeType)
-
-	data, _, err = svc.GetImageWithColor(t.Context(), "profile", "", false)
-	require.NoError(t, err)
-	assert.Equal(t, readEmbedded(t, "images/profile.webp"), data)
 
 	for _, size := range []int{72, 96, 128, 144, 152, 192, 384, 512} {
 		name := fmt.Sprintf("icon-%dx%d", size, size)
-		icon, iconMimeType, iconErr := svc.GetImageWithColor(t.Context(), name, "", false)
-		require.NoError(t, iconErr)
-		assert.Equal(t, "image/png", iconMimeType, name)
-		assert.Equal(t, readEmbedded(t, "images/development/"+name+".png"), icon, name)
+		icon, mimeType, err := svc.GetImage(t.Context(), name)
+		require.NoError(t, err, name)
+		assert.Equal(t, pngMimeType, mimeType, name)
+		assert.Equal(t, readEmbedded(t, "images/"+name+".png"), icon, name)
 
 		cfg, decodeErr := png.DecodeConfig(bytes.NewReader(icon))
-		require.NoError(t, decodeErr)
+		require.NoError(t, decodeErr, name)
 		assert.Equal(t, size, cfg.Width, name)
 		assert.Equal(t, size, cfg.Height, name)
 	}
 }
 
-func TestGetImageWithColor_DevelopmentBrandingDisabledUsesStandardBranding(t *testing.T) {
-	svc, settingsSvc := newServiceForVersion(t, "dev")
-	require.NoError(t, settingsSvc.SetBoolSetting(t.Context(), "developmentBrandingEnabled", false))
+func TestGetImage_UnknownNameReturnsNotFound(t *testing.T) {
+	svc, _ := newService(t)
 
-	_, mimeType, err := svc.GetImageWithColor(t.Context(), "logo", "", false)
-	require.NoError(t, err)
-	assert.Equal(t, "image/svg+xml", mimeType)
-
-	for name, file := range map[string]string{
-		"favicon":      "images/favicon.ico",
-		"icon-192x192": "images/icon-192x192.png",
-	} {
-		data, _, getErr := svc.GetImageWithColor(t.Context(), name, "", false)
-		require.NoError(t, getErr)
-		assert.Equal(t, readEmbedded(t, file), data, name)
-	}
+	_, _, err := svc.GetImage(t.Context(), "banner")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, common.ErrNotFound)
 }
 
 func TestUploadImage_LogoTakesPrecedenceUntilDeleted(t *testing.T) {
-	svc, settingsSvc := newServiceForVersion(t, "1.2.3-next.1")
+	svc, settingsSvc := newService(t)
 	ctx := t.Context()
 	markPNG := encodePNG(t, 4, 4)
 
@@ -164,55 +120,50 @@ func TestUploadImage_LogoTakesPrecedenceUntilDeleted(t *testing.T) {
 	require.True(t, ok)
 	assert.NotEmpty(t, firstHash)
 
-	for _, tc := range []struct {
-		name  string
-		color string
-		loop  bool
-	}{
-		{"logo", "", false},
-		{"logo", "#ff0000", false},
-		{"logo-animated", "#ff0000", true},
-	} {
-		data, mimeType, err := svc.GetImageWithColor(ctx, tc.name, tc.color, tc.loop)
-		require.NoError(t, err)
-		assert.Equal(t, "image/png", mimeType, tc.name)
-		assert.Equal(t, markPNG, data, tc.name)
-	}
-
-	_, fullMimeType, err := svc.GetImageWithColor(ctx, "logo-full", "", false)
+	data, mimeType, err := svc.GetImage(ctx, "logo")
 	require.NoError(t, err)
-	assert.Equal(t, "image/svg+xml", fullMimeType)
+	assert.Equal(t, pngMimeType, mimeType)
+	assert.Equal(t, markPNG, data)
+
+	for _, name := range []string{"logo-full", "logo-full-dark"} {
+		data, mimeType, err = svc.GetImage(ctx, name)
+		require.NoError(t, err, name)
+		assert.Equal(t, pngMimeType, mimeType, name)
+		assert.Equal(t, readEmbedded(t, "images/"+name+".png"), data, name)
+	}
 	fullHash, _ := publicSettingValue(settingsSvc, "customLogoFullHash")
 	assert.Empty(t, fullHash)
 
 	require.NoError(t, svc.UploadImage(ctx, ImageSlotMark, bytes.NewReader([]byte(testSVG))))
-	data, mimeType, err := svc.GetImageWithColor(ctx, "logo-animated", "#ff0000", false)
+	data, mimeType, err = svc.GetImage(ctx, "logo")
 	require.NoError(t, err)
-	assert.Equal(t, "image/svg+xml", mimeType)
+	assert.Equal(t, svgMimeType, mimeType)
 	assert.Equal(t, testSVG, string(data))
 	replacedHash, _ := publicSettingValue(settingsSvc, "customLogoHash")
 	assert.NotEqual(t, firstHash, replacedHash)
 
 	require.NoError(t, svc.UploadImage(ctx, ImageSlotFull, bytes.NewReader([]byte(testSVG))))
-	data, _, err = svc.GetImageWithColor(ctx, "logo-full-animated", "", true)
-	require.NoError(t, err)
-	assert.Equal(t, testSVG, string(data))
+	for _, name := range []string{"logo-full", "logo-full-dark"} {
+		data, _, err = svc.GetImage(ctx, name)
+		require.NoError(t, err, name)
+		assert.Equal(t, testSVG, string(data), name)
+	}
 
 	require.NoError(t, svc.DeleteImage(ctx, ImageSlotMark))
-	data, mimeType, err = svc.GetImageWithColor(ctx, "logo", "", false)
+	data, mimeType, err = svc.GetImage(ctx, "logo")
 	require.NoError(t, err)
-	assert.Equal(t, "image/png", mimeType)
-	assert.Equal(t, readEmbedded(t, "images/development/icon-512x512.png"), data)
+	assert.Equal(t, pngMimeType, mimeType)
+	assert.Equal(t, readEmbedded(t, "images/logo.png"), data)
 	clearedHash, _ := publicSettingValue(settingsSvc, "customLogoHash")
 	assert.Empty(t, clearedHash)
 
-	data, _, err = svc.GetImageWithColor(ctx, "logo-full", "", false)
+	data, _, err = svc.GetImage(ctx, "logo-full")
 	require.NoError(t, err)
 	assert.Equal(t, testSVG, string(data))
 }
 
 func TestUploadImage_FaviconAcceptsIcoPngAndSvg(t *testing.T) {
-	svc, settingsSvc := newServiceForVersion(t, "1.2.3-next.1")
+	svc, settingsSvc := newService(t)
 	ctx := t.Context()
 
 	for _, tc := range []struct {
@@ -224,7 +175,7 @@ func TestUploadImage_FaviconAcceptsIcoPngAndSvg(t *testing.T) {
 		{mimeType: "image/svg+xml", data: []byte(testSVG)},
 	} {
 		require.NoError(t, svc.UploadImage(ctx, ImageSlotFavicon, bytes.NewReader(tc.data)), tc.mimeType)
-		data, mimeType, err := svc.GetImageWithColor(ctx, "favicon", "", false)
+		data, mimeType, err := svc.GetImage(ctx, "favicon")
 		require.NoError(t, err)
 		assert.Equal(t, tc.mimeType, mimeType)
 		assert.Equal(t, tc.data, data, tc.mimeType)
@@ -233,13 +184,13 @@ func TestUploadImage_FaviconAcceptsIcoPngAndSvg(t *testing.T) {
 	}
 
 	require.NoError(t, svc.DeleteImage(ctx, ImageSlotFavicon))
-	data, _, err := svc.GetImageWithColor(ctx, "favicon", "", false)
+	data, _, err := svc.GetImage(ctx, "favicon")
 	require.NoError(t, err)
-	assert.Equal(t, readEmbedded(t, "images/development/favicon.ico"), data)
+	assert.Equal(t, readEmbedded(t, "images/favicon.ico"), data)
 }
 
 func TestUploadImage_PWAIconIsResizedToEverySize(t *testing.T) {
-	svc, settingsSvc := newServiceForVersion(t, "v1.2.3")
+	svc, settingsSvc := newService(t)
 	ctx := t.Context()
 
 	require.NoError(t, svc.UploadImage(ctx, ImageSlotPWA, bytes.NewReader(encodePNG(t, 600, 600))))
@@ -248,19 +199,19 @@ func TestUploadImage_PWAIconIsResizedToEverySize(t *testing.T) {
 
 	for _, size := range []int{72, 96, 128, 144, 152, 192, 384, 512} {
 		name := fmt.Sprintf("icon-%dx%d", size, size)
-		icon, mimeType, err := svc.GetImageWithColor(ctx, name, "", false)
-		require.NoError(t, err)
-		assert.Equal(t, "image/png", mimeType, name)
+		icon, mimeType, err := svc.GetImage(ctx, name)
+		require.NoError(t, err, name)
+		assert.Equal(t, pngMimeType, mimeType, name)
 		assert.NotEqual(t, readEmbedded(t, "images/"+name+".png"), icon, name)
 
 		cfg, decodeErr := png.DecodeConfig(bytes.NewReader(icon))
-		require.NoError(t, decodeErr)
+		require.NoError(t, decodeErr, name)
 		assert.Equal(t, size, cfg.Width, name)
 		assert.Equal(t, size, cfg.Height, name)
 	}
 
 	require.NoError(t, svc.DeleteImage(ctx, ImageSlotPWA))
-	icon, _, err := svc.GetImageWithColor(ctx, "icon-192x192", "", false)
+	icon, _, err := svc.GetImage(ctx, "icon-192x192")
 	require.NoError(t, err)
 	assert.Equal(t, readEmbedded(t, "images/icon-192x192.png"), icon)
 	clearedHash, _ := publicSettingValue(settingsSvc, "customPwaIconHash")
@@ -268,7 +219,7 @@ func TestUploadImage_PWAIconIsResizedToEverySize(t *testing.T) {
 }
 
 func TestUploadImage_RejectsInvalidUploads(t *testing.T) {
-	svc, settingsSvc := newServiceForVersion(t, "v1.2.3")
+	svc, settingsSvc := newService(t)
 	ctx := t.Context()
 
 	for _, tc := range []struct {
@@ -302,7 +253,7 @@ func TestUploadImage_RejectsInvalidUploads(t *testing.T) {
 }
 
 func TestCustomImageHashes_AreNotWritableThroughSettingsUpdate(t *testing.T) {
-	_, settingsSvc := newServiceForVersion(t, "v1.2.3")
+	_, settingsSvc := newService(t)
 
 	err := settingsSvc.UpdateSettings(t.Context(), types.SettingsUpdate{"customLogoHash": "forged"})
 	require.ErrorIs(t, err, common.ErrValidation)

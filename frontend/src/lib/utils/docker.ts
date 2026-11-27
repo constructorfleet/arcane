@@ -282,41 +282,19 @@ export function getThemedIconUrl(source?: ThemedIconSource | null, themeMode?: s
 	return source.iconLightUrl?.trim() || null;
 }
 
-export function getApplicationLogo(
-	full = false,
-	colorOverride?: string,
-	version?: string,
-	opts?: { animated?: boolean; loop?: boolean; development?: boolean; custom?: string }
-): string {
+export function getApplicationLogo(full = false, dark = false, opts?: { custom?: string }): string {
 	const params = new URLSearchParams();
 
 	if (full) {
 		params.set('full', 'true');
 	}
 
-	if (colorOverride) {
-		params.set('color', colorOverride);
-	}
-
-	if (opts?.animated) {
-		params.set('animated', 'true');
-	}
-
-	if (opts?.loop) {
-		params.set('loop', 'true');
-	}
-
-	// Cache-busts open pages when development branding is toggled.
-	if (opts?.development) {
-		params.set('branding', 'development');
+	if (dark) {
+		params.set('dark', 'true');
 	}
 
 	if (opts?.custom) {
 		params.set('custom', opts.custom);
-	}
-
-	if (version) {
-		params.set('v', version);
 	}
 
 	const query = params.toString();

@@ -120,7 +120,7 @@ const (
 
 	systemBackupHistoryUnion = "SELECT id, size, created_at, status, trigger, destination, '' AS format, local_snapshot_id, " +
 		"remote_snapshot_id, '' AS remote_instance_id, s3_destination_id, policy_id, error, 'system' AS type, 'system' AS " +
-		"resource_type, 'Arcane' AS resource_name FROM system_backup_runs UNION ALL SELECT id, size, " +
+		"resource_type, 'HiveMind' AS resource_name FROM system_backup_runs UNION ALL SELECT id, size, " +
 		"created_at, status, trigger, destination, format, local_snapshot_id, remote_snapshot_id, COALESCE(remote_instance_id, '') AS remote_instance_id, " +
 		"s3_destination_id, policy_id, error, CASE WHEN policy_id LIKE 'system-volume:%' THEN 'system' ELSE " +
 		"'volume' END AS type, 'volume' AS resource_type, volume_name AS resource_name FROM volume_backups"

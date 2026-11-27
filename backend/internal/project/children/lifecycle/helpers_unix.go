@@ -17,7 +17,7 @@ import (
 
 func describeLifecyclePathAccess(ctx context.Context, projectPath, resolvedScriptPath string) string {
 	lines := []string{
-		fmt.Sprintf("Arcane process identity: uid=%d gid=%d.", os.Geteuid(), os.Getegid()),
+		fmt.Sprintf("HiveMind process identity: uid=%d gid=%d.", os.Geteuid(), os.Getegid()),
 		"Path inspection:",
 	}
 
@@ -69,7 +69,7 @@ func describeLifecyclePathAccess(ctx context.Context, projectPath, resolvedScrip
 	}
 
 	return strings.Join(append(lines,
-		"Ensure the Arcane process can traverse every parent directory and inspect the script.",
+		"Ensure the HiveMind process can traverse every parent directory and inspect the script.",
 		"A script mode of 0755 is not sufficient when a parent directory lacks execute permission or ownership, ACLs, or mount permissions block access.",
 	), " ")
 }

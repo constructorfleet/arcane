@@ -38,10 +38,10 @@ var (
 
 	UpgradeCmd = &cobra.Command{
 		Use:   "upgrade",
-		Short: "Upgrade an Arcane container to the latest version",
-		Long: `Upgrade an Arcane container by pulling the latest image and recreating the container.
+		Short: "Upgrade a HiveMind container to the latest version",
+		Long: `Upgrade a HiveMind container by pulling the latest image and recreating the container.
 This command should be run from outside the container (e.g., from the host or another container).`,
-		Example: `  # Auto-detect and upgrade the Arcane container
+		Example: `  # Auto-detect and upgrade the HiveMind container
   arcane upgrade --auto
 
   # Upgrade a specific container
@@ -57,7 +57,7 @@ func init() {
 	UpgradeCmd.Flags().StringVarP(&containerName, "container", "c", "", "Name of the container to upgrade")
 	UpgradeCmd.Flags().StringVarP(&targetImage, "image", "i", "", "Target image to upgrade to (defaults to current tag)")
 	UpgradeCmd.Flags().StringVar(&pullImageRef, "pull-image", "", "Immutable reference to pull and tag as --image (defaults to --image)")
-	UpgradeCmd.Flags().BoolVarP(&autoDetect, "auto", "a", false, "Auto-detect Arcane container")
+	UpgradeCmd.Flags().BoolVarP(&autoDetect, "auto", "a", false, "Auto-detect HiveMind container")
 }
 
 func runUpgrade(cmd *cobra.Command, args []string) error {
@@ -78,13 +78,13 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 
 	var targetContainer container.InspectResponse
 	if autoDetect || containerName == "" {
-		slog.InfoContext(ctx, "Auto-detecting Arcane container...")
+		slog.InfoContext(ctx, "Auto-detecting HiveMind container...")
 		targetContainer, err = findArcaneContainer(ctx, dockerClient)
 		if err != nil {
-			return fmt.Errorf("failed to find Arcane container: %w", err)
+			return fmt.Errorf("failed to find HiveMind container: %w", err)
 		}
 		containerName = strings.TrimPrefix(targetContainer.Name, "/")
-		slog.InfoContext(ctx, "Found Arcane container", "name", containerName, "id", targetContainer.ID[:12])
+		slog.InfoContext(ctx, "Found HiveMind container", "name", containerName, "id", targetContainer.ID[:12])
 	} else {
 		inspectResult, inspectErr := compat.ContainerInspectWithCompatibility(ctx, dockerClient, containerName, client.ContainerInspectOptions{})
 		if inspectErr != nil {
@@ -158,7 +158,7 @@ func findArcaneContainer(ctx context.Context, dockerClient *client.Client) (cont
 	}
 
 	selfID, _ := cgroup.CurrentContainerID()
-	slog.InfoContext(ctx, "Searching for Arcane container", "selfId", selfID, "totalContainers", len(containers.Items))
+	slog.InfoContext(ctx, "Searching for HiveMind container", "selfId", selfID, "totalContainers", len(containers.Items))
 
 	now := time.Now()
 
@@ -184,12 +184,12 @@ func findArcaneContainer(ctx context.Context, dockerClient *client.Client) (cont
 		}
 
 		if labels.IsArcaneContainer(containerLabels) {
-			slog.InfoContext(ctx, "Found Arcane container by label", "id", c.ID[:12], "image", c.Image, "names", c.Names)
+			slog.InfoContext(ctx, "Found HiveMind container by label", "id", c.ID[:12], "image", c.Image, "names", c.Names)
 			return inspect, nil
 		}
 
 		if isLegacyServerLabel(containerLabels) {
-			slog.InfoContext(ctx, "Found Arcane container by legacy label", "id", c.ID[:12], "image", c.Image, "names", c.Names)
+			slog.InfoContext(ctx, "Found HiveMind container by legacy label", "id", c.ID[:12], "image", c.Image, "names", c.Names)
 			return inspect, nil
 		}
 
@@ -199,7 +199,7 @@ func findArcaneContainer(ctx context.Context, dockerClient *client.Client) (cont
 		}
 	}
 
-	return container.InspectResponse{}, errors.New("no running Arcane container found")
+	return container.InspectResponse{}, errors.New("no running HiveMind container found")
 }
 
 func isLegacyServerLabel(containerLabels map[string]string) bool {

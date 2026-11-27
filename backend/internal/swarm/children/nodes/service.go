@@ -296,11 +296,11 @@ func (s *Service) enrollNodeAgent(ctx context.Context, p EnrollNodeAgentParams) 
 	s.applyNodeAgentCoverage(node, coverage)
 	switch {
 	case node.Agent.State == types.NodeAgentStateConnected, node.Agent.State == types.NodeAgentStateMismatched:
-		return nil, common.Classify(common.ErrConflict, errors.New("this swarm node is already covered by a connected Arcane agent"))
+		return nil, common.Classify(common.ErrConflict, errors.New("this swarm node is already covered by a connected HiveMind agent"))
 	case node.Agent.State == types.NodeAgentStateAmbiguous, len(node.Agent.Candidates) > 0:
-		return nil, common.Classify(common.ErrConflict, errors.New("this swarm node is already covered by an unbound Arcane agent; reconcile node agents to bind it"))
+		return nil, common.Classify(common.ErrConflict, errors.New("this swarm node is already covered by an unbound HiveMind agent; reconcile node agents to bind it"))
 	case nodeEnvironments > 0:
-		return nil, common.Classify(common.ErrConflict, errors.New("this swarm node already has an Arcane environment; enroll it with that environment's enrollment token"))
+		return nil, common.Classify(common.ErrConflict, errors.New("this swarm node already has a HiveMind environment; enroll it with that environment's enrollment token"))
 	}
 
 	env, err := s.environmentService.EnsureSwarmNodeAgentEnvironment(ctx, environment.SwarmNodeAgentEnvironmentParams{
@@ -678,7 +678,7 @@ func (s *Service) buildNodeAgentStatus(nodeID string, env *environment.Environme
 		// Only a live tunnel with a completed identity probe can authoritatively detect a node-ID mismatch.
 		case runtime.connected && runtime.identity != nil:
 			return kit.Ternary(identity.SwarmActive && reportedNodeID == strings.TrimSpace(nodeID), types.NodeAgentStateConnected, types.NodeAgentStateMismatched)
-		// A fresh check-in proves the agent Arcane mapped to this node at deploy time is reachable.
+		// A fresh check-in proves the agent HiveMind mapped to this node at deploy time is reachable.
 		case live:
 			return types.NodeAgentStateConnected
 		// No live evidence: an unpaired agent stays pending; one seen before is offline.

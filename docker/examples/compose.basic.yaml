@@ -14,15 +14,15 @@ services:
       - ARCANE_PROJECTS_DIRECTORY=/host/path/to/projects
       # Optional: extra directories scanned for Compose projects. Mount each one into the container too.
       # - 'ARCANE_PROJECTS_DIRECTORIES=[{"path":"/host/path/to/more-projects","enabled":true}]'
-      # Optional: run Arcane as a specific host UID/GID instead of the default runtime user.
-      # When using the mounted Docker socket, Arcane will map the socket group automatically.
+      # Optional: run HiveMind as a specific host UID/GID instead of the default runtime user.
+      # When using the mounted Docker socket, HiveMind will map the socket group automatically.
       # - PUID=1000
       # - PGID=1000
       # Timezone for cron job scheduling (e.g., America/New_York, Europe/London, UTC)
       # See: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
       - TZ=UTC
     # Use host cgroup namespace for better container self-detection
-    # This allows Arcane to detect its own container ID more reliably
+    # This allows HiveMind to detect its own container ID more reliably
     cgroup: host
     healthcheck:
       test: ['CMD', './arcane', 'health', '--timeout', '2s']

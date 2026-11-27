@@ -61,7 +61,7 @@ func TestDockerConnection(ctx context.Context, testFunc func(context.Context) er
 func WarnDeprecatedImage(ctx context.Context, imageFunc func(context.Context) (string, error)) {
 	imageRef, err := imageFunc(ctx)
 	if err != nil {
-		slog.DebugContext(ctx, "Could not detect Arcane container image for deprecation check", "error", err)
+		slog.DebugContext(ctx, "Could not detect HiveMind container image for deprecation check", "error", err)
 		return
 	}
 
@@ -71,7 +71,7 @@ func WarnDeprecatedImage(ctx context.Context, imageFunc func(context.Context) (s
 	}
 
 	if replacement, ok := deprecatedImageReplacements[named.Name()]; ok {
-		slog.WarnContext(ctx, "This Arcane image is deprecated and will be removed in v3; switch to the replacement image", "image", imageRef, "replacement", replacement)
+		slog.WarnContext(ctx, "This HiveMind image is deprecated and will be removed in v3; switch to the replacement image", "image", imageRef, "replacement", replacement)
 	}
 }
 

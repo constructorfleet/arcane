@@ -1,4 +1,4 @@
-name: Release New Arcane Version
+name: Release New HiveMind Version
 
 on:
   workflow_dispatch:

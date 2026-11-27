@@ -1,10 +1,10 @@
 # Rootless Podman. Save as ~/.config/containers/systemd/arcane.container, then run
 # `systemctl --user daemon-reload` and `systemctl --user start arcane`.
-# Run `loginctl enable-linger <user>` so Arcane, the Podman socket, and the session bus survive logout.
-# keep-id maps your uid into the container unchanged. Arcane starts as root, then switches to PUID/PGID,
+# Run `loginctl enable-linger <user>` so HiveMind, the Podman socket, and the session bus survive logout.
+# keep-id maps your uid into the container unchanged. HiveMind starts as root, then switches to PUID/PGID,
 # so it reaches the Podman socket and the session bus as their owner.
 [Unit]
-Description=Arcane
+Description=HiveMind
 Requires=podman.socket
 After=podman.socket
 

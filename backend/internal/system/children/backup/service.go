@@ -172,7 +172,7 @@ const (
 	systemRecoveryHelperPath    = "/app/arcane-recovery-helper"
 )
 
-var ErrSystemBackupAlreadyRunning = common.Classify(common.ErrConflict, errors.New("an Arcane system backup is already running"))
+var ErrSystemBackupAlreadyRunning = common.Classify(common.ErrConflict, errors.New("a HiveMind system backup is already running"))
 
 func NewService(deps Dependencies) *Service {
 	operations, counterErr := otel.Meter(logging.InstrumentationName).Int64Counter("arcane.backups",
@@ -309,7 +309,7 @@ func (s *Service) RegisterWorkflows(engine *flow.Engine, environments *environme
 			Type:          types.ActivityTypeResourceAction,
 			EnvironmentID: "0",
 			ResourceType:  new("system_backup"),
-			ResourceName:  new("Arcane"),
+			ResourceName:  new("HiveMind"),
 		},
 		Labels: map[string]string{"backup": "Creating system backup"},
 		Steps:  []workflow.StepSpec{workflow.Step("backup", engine.Handler(s.runManualBackup), workflow.WithMaxAttempts(1))},
@@ -327,10 +327,10 @@ func (s *Service) RegisterWorkflows(engine *flow.Engine, environments *environme
 			Type:          types.ActivityTypeResourceAction,
 			EnvironmentID: "0",
 			ResourceType:  new("system_backup"),
-			ResourceName:  new("Arcane"),
+			ResourceName:  new("HiveMind"),
 			StartedBy:     &types.SystemUser,
 			Step:          "Creating scheduled system backup",
-			LatestMessage: "Creating scheduled Arcane system backup",
+			LatestMessage: "Creating scheduled HiveMind system backup",
 		},
 		Labels: map[string]string{"backup": "Creating scheduled system backup"},
 		Steps: []workflow.StepSpec{workflow.Step("backup", engine.Handler(func(ctx context.Context, t flow.Task) (any, error) {
@@ -361,11 +361,11 @@ func (s *Service) databaseFile() (string, error) {
 		return "", fmt.Errorf("failed to parse database URL: %w", err)
 	}
 	if strings.TrimSpace(databasePath) == "" {
-		return "", errors.New("cannot resolve the Arcane data directory from the database URL")
+		return "", errors.New("cannot resolve the HiveMind data directory from the database URL")
 	}
 	absolute, err := filepath.Abs(databasePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve the Arcane data directory: %w", err)
+		return "", fmt.Errorf("failed to resolve the HiveMind data directory: %w", err)
 	}
 	return absolute, nil
 }
@@ -1127,13 +1127,13 @@ func (s *Service) RestoreBackup(ctx context.Context, id, recoveryKey string) (op
 	}
 	containerID, err := cgroup.CurrentContainerID()
 	if err != nil {
-		return errors.New("arcane system restore requires Arcane to run in Docker")
+		return errors.New("arcane system restore requires HiveMind to run in Docker")
 	}
 	inspectResult, err := s.dockerService.Call(ctx, func(ctx context.Context, cli *client.Client) (client.ContainerInspectResult, error) {
 		return compat.ContainerInspectWithCompatibility(ctx, cli, containerID, client.ContainerInspectOptions{})
 	})
 	if err != nil {
-		return fmt.Errorf("inspect Arcane container: %w", err)
+		return fmt.Errorf("inspect HiveMind container: %w", err)
 	}
 	current := inspectResult.Container
 	// The helper reads the restored manifest and database through /app/data.
@@ -1151,7 +1151,7 @@ func (s *Service) RestoreBackup(ctx context.Context, id, recoveryKey string) (op
 	if err != nil {
 		return err
 	}
-	// A local safety snapshot is created before the detached helper is allowed to stop Arcane and replace its data.
+	// A local safety snapshot is created before the detached helper is allowed to stop HiveMind and replace its data.
 	prepared, prepareErr := s.prepareBackup(ctx, types.SystemBackupTriggerSafety, types.CreateSystemBackupRequest{
 		Destination: types.SystemBackupDestinationLocal,
 		RecoveryKey: key,
@@ -1177,7 +1177,7 @@ func (s *Service) RestoreBackup(ctx context.Context, id, recoveryKey string) (op
 		RemoteSnapshotID: run.RemoteSnapshotID,
 		S3DestinationID:  run.S3DestinationID,
 		Size:             run.Size,
-		// Rustic needs a named network to reach network-local S3 once Arcane stops; bridge and none carry no DNS.
+		// Rustic needs a named network to reach network-local S3 once HiveMind stops; bridge and none carry no DNS.
 		NetworkMode: func() string {
 			names := slices.Sorted(maps.Keys(kit.FromPtr(current.NetworkSettings).Networks))
 			if index := slices.IndexFunc(names, func(name string) bool { return name != "bridge" && name != "none" }); index >= 0 {
@@ -1226,11 +1226,11 @@ func (s *Service) RestoreBackup(ctx context.Context, id, recoveryKey string) (op
 	}
 	executablePath, err := os.Executable()
 	if err != nil {
-		return fmt.Errorf("resolve Arcane executable: %w", err)
+		return fmt.Errorf("resolve HiveMind executable: %w", err)
 	}
 	executableMount := docker.MountForSubpath(current.Mounts, executablePath, systemRecoveryHelperPath)
 	if executableMount != nil && executableMount.Type != mount.TypeBind {
-		return errors.New("resolve recovery helper executable: the Arcane executable must come from the image or a bind mount")
+		return errors.New("resolve recovery helper executable: the HiveMind executable must come from the image or a bind mount")
 	}
 	mounts := append(slices.Clone(runtimeMounts), *appDataMount)
 	if executableMount != nil {
@@ -1515,11 +1515,11 @@ func (s *Service) runScheduledBackup(ctx context.Context, policyID string) (type
 	}
 	run, runErr := s.CreateBackup(ctx, types.SystemUser, types.SystemBackupTriggerScheduled, types.CreateSystemBackupRequest{PolicyID: policy.ID})
 	if errors.Is(runErr, ErrSystemBackupAlreadyRunning) {
-		slog.InfoContext(ctx, "Scheduled Arcane system backup skipped; another backup is running", "policyId", policy.ID)
+		slog.InfoContext(ctx, "Scheduled HiveMind system backup skipped; another backup is running", "policyId", policy.ID)
 		return types.SchedulerOutcome{Status: types.RunStatusSkipped, Message: "Skipped: another system backup is running"}, nil
 	}
 	if runErr != nil {
-		slog.ErrorContext(ctx, "Scheduled Arcane system backup failed", "policyId", policy.ID, "error", runErr)
+		slog.ErrorContext(ctx, "Scheduled HiveMind system backup failed", "policyId", policy.ID, "error", runErr)
 		if policy.RetentionCount > 0 {
 			if retentionErr := s.applyRetention(ctx, policy.ID, policy.RetentionCount, policy.S3Enabled); retentionErr != nil {
 				slog.ErrorContext(ctx, "System backup retention failed", "policyId", policy.ID, "error", retentionErr)
@@ -1535,11 +1535,11 @@ func (s *Service) runScheduledBackup(ctx context.Context, policyID string) (type
 			return types.SchedulerOutcome{Status: types.RunStatusPartial, Message: "Backup completed but retention failed"}, retentionErr
 		}
 	}
-	slog.InfoContext(ctx, "Scheduled Arcane system backup completed", "backupId", run.ID, "policyId", policy.ID)
+	slog.InfoContext(ctx, "Scheduled HiveMind system backup completed", "backupId", run.ID, "policyId", policy.ID)
 	if remoteDisabled {
 		return types.SchedulerOutcome{Status: types.RunStatusPartial, Message: backup.RemoteDisabledMessage}, nil
 	}
-	return types.SchedulerOutcome{Status: types.RunStatusSucceeded, Message: "Scheduled Arcane system backup created successfully"}, nil
+	return types.SchedulerOutcome{Status: types.RunStatusSucceeded, Message: "Scheduled HiveMind system backup created successfully"}, nil
 }
 
 func (s *Service) resumeScheduledBackup(ctx context.Context, previous types.SchedulerRun, policyID string) (types.SchedulerOutcome, error) {
@@ -1638,7 +1638,7 @@ func (s *Service) rescheduleSystemBackupPolicy(ctx context.Context, policy *type
 func (s *Service) RegisterBackupJobOnStartup(ctx context.Context) {
 	policies, err := s.store.Policies(ctx)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to load Arcane system backup policies", "error", err)
+		slog.ErrorContext(ctx, "Failed to load HiveMind system backup policies", "error", err)
 		return
 	}
 	for i := range policies {
@@ -1762,7 +1762,7 @@ func (s *Service) StartBackup(ctx context.Context, user types.Actor, request typ
 		ResourceID:    new("arcane"),
 		StartedBy:     &user,
 		Step:          "Creating system backup",
-		LatestMessage: "Creating Arcane system backup",
+		LatestMessage: "Creating HiveMind system backup",
 		Metadata: database.JSON{
 			"action":          "create_system_backup",
 			"backupId":        run.ID,
@@ -2042,7 +2042,7 @@ func (s *Service) runManualBackup(ctx context.Context, t flow.Task) (_ any, err 
 	if authorizeErr := s.engine.Authorize(ctx, input.Requester); authorizeErr != nil {
 		return nil, authorizeErr
 	}
-	succeeded := types.SchedulerOutcome{Status: types.RunStatusSucceeded, Message: "Arcane system backup created successfully"}
+	succeeded := types.SchedulerOutcome{Status: types.RunStatusSucceeded, Message: "HiveMind system backup created successfully"}
 	run, err := s.store.Run(ctx, runID)
 	if err != nil {
 		return nil, err

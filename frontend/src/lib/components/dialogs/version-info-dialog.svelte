@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { mode } from 'mode-watcher';
 	import { toast } from 'svelte-sonner';
 
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
@@ -14,9 +13,8 @@
 	import type { VersionInfo } from '#lib/types/version.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
-	import { logoBranding } from '#lib/utils/branding.js';
+	import { customLogoHash } from '#lib/utils/branding.js';
 	import { getApplicationLogo } from '#lib/utils/docker.js';
-	import { resolveLogoColor } from '#lib/utils/theme.svelte.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	interface Props {
@@ -45,9 +43,7 @@
 	const displayInfo = $derived(debugMode ? mockVersionInfo : versionInfo);
 
 	const enabledFeatures = $derived((displayInfo.enabledFeatures ?? []).filter(Boolean).join(', '));
-	const logoColor = $derived(resolveLogoColor(mode.current === 'dark'));
-	const branding = $derived(logoBranding());
-	const logoUrl = $derived(getApplicationLogo(false, logoColor, logoColor, branding));
+	const logoUrl = $derived(getApplicationLogo(false, false, { custom: customLogoHash() }));
 
 	const canToggleSettings = $derived(hasPermission('settings:update', GLOBAL_SCOPE));
 	let savingSetting = $state(false);
@@ -84,7 +80,7 @@
 <ResponsiveDialog {open} {onOpenChange} contentClass="sm:max-w-xl">
 	{#snippet title()}
 		<div class="flex items-center gap-3">
-			<img src={logoUrl} alt="Arcane" class={branding.development ? 'size-10' : 'size-7 object-contain'} />
+			<img src={logoUrl} alt={m.layout_title()} class="size-7 object-contain" />
 			<div class="flex flex-col gap-0.5">
 				<span class="text-xl leading-none">{m.version_info_title()}</span>
 				<span class="text-sm font-normal text-muted-foreground">{displayInfo.displayVersion || displayInfo.currentVersion}</span>

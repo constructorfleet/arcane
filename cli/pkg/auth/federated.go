@@ -44,9 +44,9 @@ func newFederatedCmd() *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:          "federated",
-		Short:        "Exchange a CI OIDC token for a short-lived Arcane token",
+		Short:        "Exchange a CI OIDC token for a short-lived HiveMind token",
 		SilenceUsage: true,
-		Long: `Exchange an external OIDC token for a short-lived Arcane bearer token.
+		Long: `Exchange an external OIDC token for a short-lived HiveMind bearer token.
 
 GitHub Actions example:
   permissions: { id-token: write, contents: read }
@@ -140,14 +140,14 @@ GitHub Actions example:
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&opts.server, "server", "", "Arcane server URL for this exchange")
+	cmd.Flags().StringVar(&opts.server, "server", "", "HiveMind server URL for this exchange")
 	cmd.Flags().StringVar(&opts.audience, "audience", "", "Audience to request from the external OIDC provider")
 	cmd.Flags().StringVar(&opts.token, "token", "", "External OIDC token to exchange")
 	cmd.Flags().StringVar(&opts.tokenFile, "token-file", "", "Path to a file containing the external OIDC token")
 	cmd.Flags().BoolVar(&opts.tokenStdin, "token-stdin", false, "Read the external OIDC token from stdin")
 	cmdutil.EnumVarP(cmd, cmd.Flags(), &opts.provider, "provider", "", ci.ProviderAuto, "OIDC token source",
 		ci.ProviderAuto, ci.ProviderGitHub, ci.ProviderGitLab, ci.ProviderGeneric)
-	cmd.Flags().BoolVar(&opts.persist, "persist", false, "Persist the exchanged Arcane token in CLI config")
+	cmd.Flags().BoolVar(&opts.persist, "persist", false, "Persist the exchanged HiveMind token in CLI config")
 	cmd.Flags().BoolVar(&opts.export, "export", false, "Print shell exports for ARCANE_TOKEN and ARCANE_TOKEN_EXPIRES_AT")
 	return cmd
 }

@@ -431,7 +431,7 @@ func TestUpdaterService_TriggerSelfUpdateViaCLI(t *testing.T) {
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "not an Arcane self-update target")
+		assert.Contains(t, err.Error(), "not a HiveMind self-update target")
 		assert.False(t, mockUpgrade.triggerCalled)
 	})
 

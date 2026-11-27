@@ -52,7 +52,7 @@ func BuildNtfyURL(config NtfyConfig) (string, error) {
 		q.Set("icon", config.Icon)
 	}
 
-	// Arcane notification bodies use Markdown for improved readability.
+	// HiveMind notification bodies use Markdown for improved readability.
 	q.Set("markdown", "yes")
 
 	// Always send explicit cache/firebase params to avoid ambiguity

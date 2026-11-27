@@ -1,5 +1,5 @@
 name: QA bug report
-about: Flag a problem found while testing Constructorfleet Arcane.
+about: Flag a problem found while testing Constructorfleet HiveMind.
 title: '[QA] '
 labels: ['bug', 'qa', 'needs-triage']
 body:

@@ -47,7 +47,7 @@ var (
 
 	RestoreCmd = &cobra.Command{
 		Use:    "recovery-restore",
-		Short:  "Apply a prepared Arcane recovery snapshot",
+		Short:  "Apply a prepared HiveMind recovery snapshot",
 		Hidden: true,
 		RunE:   runRestore,
 	}
@@ -82,32 +82,32 @@ func runRestore(cmd *cobra.Command, _ []string) error {
 	defer func() { _ = dockerClient.Close() }()
 	inspect, err := compat.ContainerInspectWithCompatibility(ctx, dockerClient, request.ContainerID, client.ContainerInspectOptions{})
 	if err != nil {
-		return fmt.Errorf("inspect Arcane container: %w", err)
+		return fmt.Errorf("inspect HiveMind container: %w", err)
 	}
 	if _, imageInspectErr := dockerClient.ImageInspect(ctx, rusticImage); imageInspectErr != nil {
 		reader, pullErr := dockerClient.ImagePull(ctx, rusticImage, client.ImagePullOptions{})
 		if pullErr != nil {
-			return fmt.Errorf("pull Arcane tools image for Rustic: %w", pullErr)
+			return fmt.Errorf("pull HiveMind tools image for Rustic: %w", pullErr)
 		}
 		if pullErr = docker.RenderJSONMessageStream(reader, nil); pullErr != nil {
 			_ = reader.Close()
-			return fmt.Errorf("pull Arcane tools image for Rustic: %w", pullErr)
+			return fmt.Errorf("pull HiveMind tools image for Rustic: %w", pullErr)
 		}
 		_ = reader.Close()
 	}
 	if _, containerStopErr := dockerClient.ContainerStop(ctx, request.ContainerID, client.ContainerStopOptions{Timeout: new(30)}); containerStopErr != nil {
-		return fmt.Errorf("stop Arcane container: %w", containerStopErr)
+		return fmt.Errorf("stop HiveMind container: %w", containerStopErr)
 	}
 	restart := func() { _, _ = dockerClient.ContainerStart(ctx, request.ContainerID, client.ContainerStartOptions{}) }
 	if runStagesErr := runStages(ctx, dockerClient, request, request.Stages); runStagesErr != nil {
-		// Arcane restarts only when the rollback succeeds; otherwise it stays
+		// HiveMind restarts only when the rollback succeeds; otherwise it stays
 		// stopped rather than running with mismatched data and projects.
 		runStagesErr = fmt.Errorf("rustic system restore failed: %w", runStagesErr)
 		if len(request.RollbackStages) == 0 {
-			return errors.Join(runStagesErr, errors.New("no pre-restore system backup is available for rollback; Arcane was left stopped"))
+			return errors.Join(runStagesErr, errors.New("no pre-restore system backup is available for rollback; HiveMind was left stopped"))
 		}
 		if rollbackErr := runStages(context.WithoutCancel(ctx), dockerClient, request, request.RollbackStages); rollbackErr != nil {
-			return errors.Join(runStagesErr, fmt.Errorf("restoring the pre-restore system backup failed; Arcane was left stopped: %w", rollbackErr))
+			return errors.Join(runStagesErr, fmt.Errorf("restoring the pre-restore system backup failed; HiveMind was left stopped: %w", rollbackErr))
 		}
 		rollbackManifest, readErr := acfs.Root{Path: "/app/data"}.ReadFile(context.WithoutCancel(ctx), "/.arcane-recovery.json")
 		var rollback types.RecoveryManifest
@@ -118,7 +118,7 @@ func runRestore(cmd *cobra.Command, _ []string) error {
 			readErr = francis.ClearRestoredHosts(context.WithoutCancel(ctx), schema.ManifestEnvironment(rollback)["ARCANE_DATABASE_URL"])
 		}
 		if readErr != nil {
-			return errors.Join(runStagesErr, fmt.Errorf("clear restored actor ownership; Arcane was left stopped: %w", readErr))
+			return errors.Join(runStagesErr, fmt.Errorf("clear restored actor ownership; HiveMind was left stopped: %w", readErr))
 		}
 		restart()
 		return fmt.Errorf("%w; the pre-restore system backup was restored", runStagesErr)
@@ -139,14 +139,14 @@ func runRestore(cmd *cobra.Command, _ []string) error {
 	_ = acfs.Root{Path: "/app/data"}.Remove(ctx, "/.arcane-recovery.json")
 	if !slices.Contains([]int{1, 2, types.RecoveryManifestFormatVersion}, manifest.FormatVersion) || len(manifest.Environment) == 0 {
 		restart()
-		return errors.New("unsupported or incomplete Arcane recovery manifest")
+		return errors.New("unsupported or incomplete HiveMind recovery manifest")
 	}
 	manifest.Environment = schema.ManifestEnvironment(manifest)
 	if config.DirectAgentRequested(func(name string) string {
 		return manifest.Environment[name]
 	}) && manifest.Environment["ARCANE_AGENT"] != "true" {
 		restart()
-		return fmt.Errorf("refusing to recover Arcane container: %w", config.ErrDirectAgentRemoved)
+		return fmt.Errorf("refusing to recover HiveMind container: %w", config.ErrDirectAgentRemoved)
 	}
 	// Projects were restored into the current directory, so the recovered
 	// configuration must keep pointing there rather than at the backup-time path.
@@ -155,7 +155,7 @@ func runRestore(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("finalize restored system backup: %w", finalizeRestoredBackupErr)
 	}
 	if upgradeContainerErr := upgrade.UpgradeContainer(ctx, dockerClient, inspect.Container, request.ContainerImage, "", manifest.Environment); upgradeContainerErr != nil {
-		return fmt.Errorf("recreate Arcane container with recovered configuration: %w", upgradeContainerErr)
+		return fmt.Errorf("recreate HiveMind container with recovered configuration: %w", upgradeContainerErr)
 	}
 	return nil
 }
@@ -163,7 +163,7 @@ func runRestore(cmd *cobra.Command, _ []string) error {
 func finalizeRestoredBackup(ctx context.Context, environment map[string]string, manifestBackupID, manifestActivityID string, request types.RecoveryRestoreRequest) error {
 	databaseURL := environment["ARCANE_DATABASE_URL"]
 	if !strings.HasPrefix(databaseURL, "file:") {
-		return errors.New("restored Arcane database is not SQLite")
+		return errors.New("restored HiveMind database is not SQLite")
 	}
 	dsn, err := database.ParseSQLiteConnectionString(databaseURL)
 	if err != nil {
@@ -296,7 +296,7 @@ func finalizeRestoredActivity(db *gorm.DB, activityID string) error {
 	now := time.Now().UTC()
 	return db.Model(&activity.Activity{}).Where("id = ?", entry.ID).Updates(map[string]any{
 		"status": types.ActivityStatusSuccess, "progress": 100, "step": "System backup completed",
-		"latest_message": "Arcane system backup created successfully", "error": nil,
+		"latest_message": "HiveMind system backup created successfully", "error": nil,
 		"ended_at": now, "duration_ms": now.Sub(entry.StartedAt).Milliseconds(),
 	}).Error
 }

@@ -117,9 +117,9 @@ func Bootstrap(ctx context.Context) error {
 
 	SetupSlogLogger(cfg, nil)
 	database.SetGormLogger(BuildGormLogger(cfg))
-	slog.InfoContext(ctx, "Arcane is starting...", "version", config.Version)
+	slog.InfoContext(ctx, "HiveMind is starting...", "version", config.Version)
 	startup.ApplyMemoryLimit(ctx)
-	slog.InfoContext(ctx, "Arcane Identity Configuration", "puid", os.Getuid(), "pgid", os.Getgid())
+	slog.InfoContext(ctx, "HiveMind Identity Configuration", "puid", os.Getuid(), "pgid", os.Getgid())
 
 	appCtx, cancelApp := context.WithCancelCause(ctx)
 	appCtx = activitylib.WithAppLifecycleContext(appCtx)
@@ -196,7 +196,7 @@ func Bootstrap(ctx context.Context) error {
 		return errors.Join(runErr, fmt.Errorf("stop application: %w", stopErr))
 	}
 
-	slog.InfoContext(context.WithoutCancel(appCtx), "Arcane shutdown complete")
+	slog.InfoContext(context.WithoutCancel(appCtx), "HiveMind shutdown complete")
 	return runErr
 }
 

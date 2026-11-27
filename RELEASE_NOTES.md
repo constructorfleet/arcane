@@ -1,8 +1,7 @@
-# 3.0.1-cf.109
+# 3.0.1-cf.110
 
-- Remove the global volume list's misleading Swarm global volume expansion and the detail title's workspace attachment subtext. Preserve existing logical volume identity and owning-agent workspace routing.
-- Prefer the driver's creation-time size option in the Size column, including on mobile. Show a dash for plugin volumes without that option; retain Docker's existing size reporting for local volumes.
-- Rename the list's Backing filesystem column to Filesystem disk usage and show compact used / total values, or a dash when unavailable. Keep workspace access in actions and the detail page. Usage probes read existing helpers without creating a mount.
-- Order the overview as Volume details, Driver options, Labels, Active mount information, then Containers using this volume. Include filesystem usage in Volume details only when available. Active mounts show the agent and mountpoint for running application or helper consumers; empty and stopped-only agent records are excluded.
-- Validation: required formatting and lint, frontend production build and unit tests, and owning volume/workspace Go tests on the combined cf.108 main and volume branch.
-- QA #260 (VOL-03 and VOL-09) remains open for authenticated browser acceptance and deployed-release verification. The dev stack was not started or rebuilt. No live RBD failover or attachment behavior is claimed.
+- Rebrand the displayed product as HiveMind across the app, CLI, documentation and release metadata. Apply the HiveMind logo, Barnabee wordmark, app icons, favicon, PWA manifest and honey-yellow default accent. The OIDC loading screen respects reduced motion.
+- Remove the development-branding artwork and toggle so fork prereleases display the HiveMind brand. Preserve custom uploaded branding through the existing logo slots.
+- Preserve repository, image, deployed service, environment-variable, header, import-path and CLI binary names for the upgrade path.
+- Reconcile the rebrand with cf.109, preserving running-artifact image identity, Harbor-backed stored-report reads, replicated mixed-image warnings and the volume overview/capacity cleanup.
+- Validation: full formatting and lint, backend and CLI race/coverage suites, 25 frontend unit tests and the production frontend build passed on the integrated branch. Authenticated browser acceptance will follow the normal main release and SwarmCD rollout; no dev stack was started or rebuilt.

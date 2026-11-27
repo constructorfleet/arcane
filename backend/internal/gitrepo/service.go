@@ -44,7 +44,7 @@ type (
 )
 
 const (
-	defaultCommitAuthorName  = "Arcane"
+	defaultCommitAuthorName  = "HiveMind"
 	defaultCommitAuthorEmail = "arcane@localhost"
 )
 

@@ -120,7 +120,7 @@ type (
 
 	projectsRestoreDestination struct {
 		directory string
-		dataPath  string // project-relative path of Arcane's data directory when the projects bind contains it on the host
+		dataPath  string // project-relative path of HiveMind's data directory when the projects bind contains it on the host
 		target    types.RecoveryRestoreTarget
 	}
 )
@@ -136,9 +136,9 @@ const (
 )
 
 var (
-	errProjectsOutsideData = errors.New("the backup-time projects directory is outside Arcane's system backup data")
+	errProjectsOutsideData = errors.New("the backup-time projects directory is outside HiveMind's system backup data")
 	errProjectsNotInBackup = errors.New(
-		"this system backup does not include the projects directory because it was created before Arcane " +
+		"this system backup does not include the projects directory because it was created before HiveMind " +
 			"backed up separately mounted projects; create a new system backup to restore project files",
 	)
 	manifestCandidateRoots = []string{snapshotDataPath, "/", "/app/data"}
@@ -527,7 +527,7 @@ func (s *Service) RestoreFiles(
 	if err != nil {
 		return err
 	}
-	// Entries inside Arcane's host-nested data directory, or directories enclosing
+	// Entries inside HiveMind's host-nested data directory, or directories enclosing
 	// it, would overwrite or delete the live database through --delete.
 	for _, entry := range selected {
 		if destination.dataPath == "" {
@@ -536,7 +536,7 @@ func (s *Service) RestoreFiles(
 		encloses := entry.IsDirectory && (entry.Path == "" || kit.FilePathMatches(destination.dataPath, entry.Path))
 		if kit.FilePathMatches(entry.Path, destination.dataPath) || encloses {
 			return fmt.Errorf(
-				"%w: %s contains Arcane's data directory on the host and cannot be restored as a project file; select other entries individually",
+				"%w: %s contains HiveMind's data directory on the host and cannot be restored as a project file; select other entries individually",
 				common.ErrInvalidBackupSelection, cmp.Or(entry.Path, "the projects directory"),
 			)
 		}
@@ -627,7 +627,7 @@ func projectsSnapshotPath(dataDirectory, projectsDirectory string) (projectsPath
 	case kit.FilePathMatches(projectsDir, data):
 		return path.Join(snapshotDataPath, strings.TrimPrefix(projectsDir, data+"/")), false, nil
 	case kit.FilePathMatches(data, projectsDir):
-		return "", false, fmt.Errorf("the projects directory %s contains Arcane's data directory %s; move it inside or outside the data directory before creating system backups", projectsDir, data)
+		return "", false, fmt.Errorf("the projects directory %s contains HiveMind's data directory %s; move it inside or outside the data directory before creating system backups", projectsDir, data)
 	default:
 		return snapshotProjectsPath, true, nil
 	}
@@ -640,7 +640,7 @@ func currentMounts(ctx context.Context, dockerClient *client.Client) (mounts []c
 	}
 	inspect, err := selfcontainer.InspectCurrentArcaneContainer(ctx, dockerClient)
 	if err != nil {
-		return nil, true, fmt.Errorf("failed to inspect Arcane container mounts: %w", err)
+		return nil, true, fmt.Errorf("failed to inspect HiveMind container mounts: %w", err)
 	}
 	return inspect.Mounts, true, nil
 }
@@ -651,7 +651,7 @@ func sourceMounts(mounts []container.MountPoint, inContainer bool, containerPath
 	}
 	primary := docker.MountForSubpath(mounts, containerPath, target)
 	if primary == nil {
-		return nil, fmt.Errorf("%s must be mounted into the Arcane container from a bind or named volume for system backups", containerPath)
+		return nil, fmt.Errorf("%s must be mounted into the HiveMind container from a bind or named volume for system backups", containerPath)
 	}
 	result := make([]mount.Mount, 0, 1+len(docker.NestedMounts(mounts, containerPath, target)))
 	for _, resolved := range append([]mount.Mount{*primary}, docker.NestedMounts(mounts, containerPath, target)...) {
@@ -694,7 +694,7 @@ func nestedDataPath(mounts []container.MountPoint, dataDirectory, projectsDirect
 	}
 	if dataSource == projectsSource {
 		return "", true, fmt.Errorf(
-			"the projects directory %s and Arcane's data directory %s are the same host directory; move one before backing up or restoring",
+			"the projects directory %s and HiveMind's data directory %s are the same host directory; move one before backing up or restoring",
 			projectsDirectory, dataDirectory,
 		)
 	}
@@ -733,7 +733,7 @@ func (s *Service) backupSourceLayout(ctx context.Context, dockerClient *client.C
 	}
 	dataMounts, err := sourceMounts(mounts, inContainer, dataDirectory, snapshotDataPath)
 	if err != nil {
-		return backupSourceLayout{}, fmt.Errorf("resolve Arcane data source: %w", err)
+		return backupSourceLayout{}, fmt.Errorf("resolve HiveMind data source: %w", err)
 	}
 	if !external {
 		return backupSourceLayout{
@@ -776,7 +776,7 @@ func (layout snapshotLayout) projectsDataRelative() (string, bool) {
 	return snapshotRelativePath(layout.projectsPath, layout.dataPath)
 }
 
-// protected reports whether a project-relative path is an Arcane data
+// protected reports whether a project-relative path is a HiveMind data
 // file that must never be listed or restored as a project file.
 func (layout snapshotLayout) protected(projectRelative string) bool {
 	relative, inside := layout.projectsDataRelative()
@@ -939,10 +939,10 @@ func projectsRelativePathFromManifest(manifest types.RecoveryManifest) (string, 
 func restoreTarget(mounts []container.MountPoint, containerPath, target, exclude string) (types.RecoveryRestoreTarget, error) {
 	enclosing, relative := docker.MountForEnclosingPath(mounts, containerPath, target)
 	if enclosing == nil {
-		return types.RecoveryRestoreTarget{}, fmt.Errorf("%s must be mounted into the Arcane container from a bind or named volume to restore into it", containerPath)
+		return types.RecoveryRestoreTarget{}, fmt.Errorf("%s must be mounted into the HiveMind container from a bind or named volume to restore into it", containerPath)
 	}
 	if enclosing.ReadOnly {
-		return types.RecoveryRestoreTarget{}, fmt.Errorf("%s is mounted read-only into the Arcane container", containerPath)
+		return types.RecoveryRestoreTarget{}, fmt.Errorf("%s is mounted read-only into the HiveMind container", containerPath)
 	}
 	destination := path.Join(target, relative)
 	candidates := slices.DeleteFunc(slices.Clone(mounts), func(m container.MountPoint) bool {
@@ -1004,7 +1004,7 @@ func restoreStages(
 ) {
 	separate := (layout.projectsPath != "") && !layout.projectsCoveredByData(dataDirectory, projectsDirectory)
 	if separate && layout.projectsPath == layout.dataPath {
-		return nil, fmt.Errorf("the backup keeps projects in Arcane's data directory; set the projects directory to %s before a full restore, or restore individual project files instead", dataDirectory)
+		return nil, fmt.Errorf("the backup keeps projects in HiveMind's data directory; set the projects directory to %s before a full restore, or restore individual project files instead", dataDirectory)
 	}
 	exclude := kit.Ternary(separate, projectsDirectory, "")
 	dataTarget, err := restoreTarget(mounts, dataDirectory, recoveryDataRestoreTarget, exclude)
@@ -1019,7 +1019,7 @@ func restoreStages(
 	}
 	if nested {
 		return nil, fmt.Errorf(
-			"the projects directory %s contains Arcane's data directory %s on the host; a full restore would delete it, so restore individual project files instead",
+			"the projects directory %s contains HiveMind's data directory %s on the host; a full restore would delete it, so restore individual project files instead",
 			projectsDirectory, dataDirectory,
 		)
 	}
@@ -1232,7 +1232,7 @@ func stageDatabase(ctx context.Context, db *sql.DB, databasePath, stagedDatabase
 		return err
 	}
 	if _, err = db.ExecContext(ctx, "VACUUM INTO ?", stagedDatabase); err != nil {
-		return fmt.Errorf("stage Arcane database: %w", err)
+		return fmt.Errorf("stage HiveMind database: %w", err)
 	}
 	if err = (acfs.Host{}).Chown(ctx, stagedDatabase, entry.UID, entry.GID); err != nil {
 		return fmt.Errorf("preserve staged database ownership: %w", err)

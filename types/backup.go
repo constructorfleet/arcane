@@ -45,7 +45,7 @@ type (
 		Region           string     `json:"region" required:"false" doc:"Bucket region; required when endpoint is empty, otherwise empty signs requests for us-east-1"`
 		AccessKeyID      string     `json:"accessKeyId" required:"false" doc:"Access key ID; must not be empty"`
 		SecretAccessKey  string     `json:"secretAccessKey,omitempty" writeOnly:"true" doc:"Stored encrypted; required on create, empty on update keeps it if no connection field changes"`
-		Prefix           string     `json:"prefix,omitempty" doc:"Key prefix for Arcane's backups in the bucket; leading and trailing slashes are dropped"`
+		Prefix           string     `json:"prefix,omitempty" doc:"Key prefix for HiveMind's backups in the bucket; leading and trailing slashes are dropped"`
 		UseSSL           bool       `json:"useSsl" required:"false" doc:"https or http for a custom endpoint; AWS S3 (no endpoint) always uses https"`
 		ForcePathStyle   bool       `json:"forcePathStyle" required:"false" doc:"Put the bucket in the path, as most self-hosted stores need; false uses virtual-hosted style"`
 		SecretConfigured bool       `json:"secretConfigured" readOnly:"true"`

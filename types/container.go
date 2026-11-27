@@ -86,7 +86,7 @@ type (
 	}
 
 	Container struct {
-		Labels       map[string]string   `json:"labels,omitempty" doc:"Container labels; Arcane also sets com.arcane.created"`
+		Labels       map[string]string   `json:"labels,omitempty" doc:"Container labels; HiveMind also sets com.arcane.created"`
 		ExposedPorts map[string]struct{} `json:"exposedPorts,omitempty" doc:"Ports to expose unpublished, keyed port or port/protocol (tcp by default), each an empty object"`
 
 		Healthcheck      *ContainerHealthcheckCreate      `json:"healthcheck,omitempty" doc:"Overrides the image healthcheck; durations in seconds, test NONE disables it"`

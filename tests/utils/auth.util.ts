@@ -34,7 +34,7 @@ async function login(page: Page): Promise<string> {
 				response.request().method() === 'POST' &&
 				new URL(response.url()).pathname === '/api/auth/login'
 		);
-		await page.getByRole('button', { name: 'Sign in to Arcane', exact: true }).click();
+		await page.getByRole('button', { name: 'Sign in to HiveMind', exact: true }).click();
 		const response = await responsePromise;
 		if (response.status() === 401) {
 			await expect(

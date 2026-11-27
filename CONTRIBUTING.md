@@ -1,8 +1,8 @@
-# Contributing to Arcane
+# Contributing to HiveMind
 
 Constructorfleet fork: follow [RELEASING.md](RELEASING.md) for feature branches, atomic commits, required checks, squash PRs, releases, and [QA issue reports](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues/new/choose). Gitea owns fork changes; upstream-specific development guidance follows.
 
-Thanks for helping make Arcane better! We've built a modern, streamlined development experience that gets you up and running in minutes.
+Thanks for helping make HiveMind better! We've built a modern, streamlined development experience that gets you up and running in minutes.
 
 > **Using AI tools?** Please read our [AI Usage Policy](AI_POLICY.md) before contributing.
 
@@ -341,4 +341,4 @@ docker system prune -f
 - **Fork Feature / Development Question**: [Gitea issues](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues)
 - **Upstream-only requests**: [getarcaneapp issues](https://github.com/getarcaneapp/arcane/issues) and [Discussions](https://github.com/getarcaneapp/arcane/discussions/new?category=feature-requests)
 
-Thank you for contributing to Arcane! Your help makes this project better for everyone. 🚀
+Thank you for contributing to HiveMind! Your help makes this project better for everyone. 🚀

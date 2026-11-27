@@ -33,8 +33,8 @@ let composeSchemaContext: ComposeSchemaContext | null = null;
 const ARCANE_ROOT_EXTENSION_COMPLETIONS: ArcaneCompletionSpec[] = [
 	{
 		label: 'x-arcane',
-		detail: 'Arcane extension',
-		info: 'Arcane compose metadata block for project-level theme icons, URLs, and tags.'
+		detail: 'HiveMind extension',
+		info: 'HiveMind compose metadata block for project-level theme icons, URLs, and tags.'
 	}
 ];
 
@@ -50,28 +50,28 @@ const ARCANE_BLOCK_COMPLETIONS: ArcaneCompletionSpec[] = [
 	},
 	{
 		label: 'icon',
-		detail: 'Arcane project fallback icon',
+		detail: 'HiveMind project fallback icon',
 		info: 'Fallback project icon URL or catalog slug used only when icon-light and icon-dark are not set.'
 	},
 	{
 		label: 'icon-light',
-		detail: 'Arcane project icon for dark theme',
+		detail: 'HiveMind project icon for dark theme',
 		info: 'Light project icon URL or catalog slug used in dark theme.'
 	},
 	{
 		label: 'icon-dark',
-		detail: 'Arcane project icon for light theme',
+		detail: 'HiveMind project icon for light theme',
 		info: 'Dark project icon URL or catalog slug used in light theme.'
 	},
 	{
 		label: 'urls',
-		detail: 'Arcane project URLs',
+		detail: 'HiveMind project URLs',
 		info: 'Additional project URLs (for example docs or homepage links).'
 	},
 	{
 		label: 'tags',
-		detail: 'Arcane project tags',
-		info: 'A tag or list of tags used to group and filter projects. Compose-defined tags are read-only in Arcane.'
+		detail: 'HiveMind project tags',
+		info: 'A tag or list of tags used to group and filter projects. Compose-defined tags are read-only in HiveMind.'
 	},
 	{
 		label: 'update-check',
@@ -87,8 +87,8 @@ const ARCANE_BLOCK_COMPLETIONS: ArcaneCompletionSpec[] = [
 const ARCANE_SERVICE_EXTENSION_COMPLETIONS: ArcaneCompletionSpec[] = [
 	{
 		label: 'x-arcane',
-		detail: 'Arcane service extension',
-		info: 'Arcane service metadata block for service theme icon overrides.'
+		detail: 'HiveMind service extension',
+		info: 'HiveMind service metadata block for service theme icon overrides.'
 	}
 ];
 
@@ -104,17 +104,17 @@ const ARCANE_SERVICE_BLOCK_COMPLETIONS: ArcaneCompletionSpec[] = [
 	},
 	{
 		label: 'icon',
-		detail: 'Arcane service fallback icon',
+		detail: 'HiveMind service fallback icon',
 		info: 'Fallback service icon URL or catalog slug used only when icon-light and icon-dark are not set.'
 	},
 	{
 		label: 'icon-light',
-		detail: 'Arcane service icon for dark theme',
+		detail: 'HiveMind service icon for dark theme',
 		info: 'Light service icon URL or catalog slug used in dark theme.'
 	},
 	{
 		label: 'icon-dark',
-		detail: 'Arcane service icon for light theme',
+		detail: 'HiveMind service icon for light theme',
 		info: 'Dark service icon URL or catalog slug used in light theme.'
 	},
 	{
@@ -131,12 +131,12 @@ const ARCANE_SERVICE_BLOCK_COMPLETIONS: ArcaneCompletionSpec[] = [
 const ARCANE_TAG_COMPLETIONS: ArcaneCompletionSpec[] = [
 	{
 		label: 'name',
-		detail: 'Arcane project tag name',
+		detail: 'HiveMind project tag name',
 		info: 'Normalized project tag name used for grouping and filtering.'
 	},
 	{
 		label: 'color',
-		detail: 'Arcane project tag color',
+		detail: 'HiveMind project tag color',
 		info: 'Tag color: gray, purple, blue, green, yellow, orange, red, or pink.'
 	}
 ];
@@ -378,7 +378,7 @@ function getArcaneCompletionOptionsForPath(path: Array<string | number>, prefix 
 const ARCANE_SCHEMA_DOCS: Record<string, SchemaDoc> = {
 	'x-arcane': {
 		title: 'x-arcane',
-		description: 'Arcane extension block for project-level metadata such as theme icons, custom URLs, and tags.'
+		description: 'HiveMind extension block for project-level metadata such as theme icons, custom URLs, and tags.'
 	},
 	'x-arcane.icon-light': {
 		title: 'x-arcane.icon-light',
@@ -411,7 +411,7 @@ const ARCANE_SCHEMA_DOCS: Record<string, SchemaDoc> = {
 	'x-arcane.tags': {
 		title: 'x-arcane.tags',
 		description:
-			'A list of project tag objects. Each tag requires a name and color and is read-only in Arcane while defined here.',
+			'A list of project tag objects. Each tag requires a name and color and is read-only in HiveMind while defined here.',
 		examples: ['[{ name: database, color: purple }]']
 	},
 	'x-arcane.tags[].name': {
@@ -424,7 +424,7 @@ const ARCANE_SCHEMA_DOCS: Record<string, SchemaDoc> = {
 	},
 	'services.<name>.x-arcane': {
 		title: 'services.<name>.x-arcane',
-		description: 'Arcane extension block for service-level metadata.'
+		description: 'HiveMind extension block for service-level metadata.'
 	}
 };
 

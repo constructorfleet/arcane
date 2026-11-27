@@ -197,8 +197,8 @@ nfpms:
       - arcane-cli
     vendor: getarcaneapp
     description: |-
-      Arcane CLI - {{ .Metadata.Description }}
-      This is the command-line interface for Arcane.
+      HiveMind CLI - {{ .Metadata.Description }}
+      This is the command-line interface for HiveMind.
     formats:
       - apk
       - deb
@@ -258,7 +258,7 @@ homebrew_casks:
         - zsh
         - fish
         - pwsh
-    description: 'Arcane CLI - {{ .Metadata.Description }}'
+    description: 'HiveMind CLI - {{ .Metadata.Description }}'
     skip_upload: '{{ if eq (index .Env "BUILD_NEXT") "true" }}true{{ end }}'
     repository:
       owner: getarcaneapp
@@ -286,14 +286,14 @@ dockers_v2:
       - linux/arm/v7
       - linux/riscv64
     labels:
-      'org.opencontainers.image.authors': 'Arcane Organization'
+      'org.opencontainers.image.authors': 'HiveMind'
       'org.opencontainers.image.url': 'https://github.com/getarcaneapp/arcane'
       'org.opencontainers.image.documentation': 'https://github.com/getarcaneapp/arcane/blob/main/README.md'
       'org.opencontainers.image.source': 'https://github.com/getarcaneapp/arcane'
       'org.opencontainers.image.version': 'v{{.Version}}'
       'org.opencontainers.image.revision': '{{.FullCommit}}'
       'org.opencontainers.image.licenses': '{{ .Metadata.License }}'
-      'org.opencontainers.image.title': 'Arcane'
+      'org.opencontainers.image.title': 'HiveMind'
       'org.opencontainers.image.description': '{{ .Metadata.Description }}'
       'com.getarcaneapp.arcane': 'true'
     sbom: '{{ if eq (index .Env "BUILD_NEXT") "true" }}false{{ else }}true{{ end }}'
@@ -318,15 +318,15 @@ dockers_v2:
       - linux/arm/v7
       - linux/riscv64
     labels:
-      'org.opencontainers.image.authors': 'Arcane Organization'
+      'org.opencontainers.image.authors': 'HiveMind'
       'org.opencontainers.image.url': 'https://github.com/getarcaneapp/arcane'
       'org.opencontainers.image.documentation': 'https://github.com/getarcaneapp/arcane/blob/main/README.md'
       'org.opencontainers.image.source': 'https://github.com/getarcaneapp/arcane'
       'org.opencontainers.image.version': 'v{{.Version}}'
       'org.opencontainers.image.revision': '{{.FullCommit}}'
       'org.opencontainers.image.licenses': '{{ .Metadata.License }}'
-      'org.opencontainers.image.title': 'Arcane Agent'
-      'org.opencontainers.image.description': 'Arcanes Remote Agent'
+      'org.opencontainers.image.title': 'HiveMind Agent'
+      'org.opencontainers.image.description': 'HiveMind Remote Agent'
       'com.getarcaneapp.arcane.agent': 'true'
     sbom: '{{ if eq (index .Env "BUILD_NEXT") "true" }}false{{ else }}true{{ end }}'
 
@@ -393,7 +393,7 @@ changelog:
     use: openai
     model: anthropic/claude-haiku-5.5
     prompt: |
-      Rewrite these release notes for Arcane, a Docker management app.
+      Rewrite these release notes for HiveMind, a Docker management app.
       Start with a short intro highlighting the most notable changes, wrapped
       in a GitHub alert blockquote (a "> [!NOTE]" line followed by "> " prefixed
       lines). The intro's first sentence must begin with "This release adds" or
@@ -405,7 +405,7 @@ changelog:
 announce:
   discord:
     enabled: true
-    message_template: 'Arcane version {{.Tag}} has been released! Checkout the changelog at {{ .ReleaseURL }}'
+    message_template: 'HiveMind version {{.Tag}} has been released! Checkout the changelog at {{ .ReleaseURL }}'
     author: 'Github Actions'
     # Color code of the embed. You have to use decimal numeral system, not hexadecimal.
     color: '9320959'

@@ -91,7 +91,7 @@ func TestMigrateDatabase_BlocksDowngradeWithoutFlag(t *testing.T) {
 	err := migrateDatabase(ctx, rawDB, dbProviderSQLite, MigrationOptions{}, targetVersion)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "ARCANE_ALLOW_DOWNGRADE=true")
-	require.ErrorContains(t, err, "newer than this Arcane binary supports")
+	require.ErrorContains(t, err, "newer than this HiveMind binary supports")
 
 	highestVersionVersions := sqliteMigrationVersions(t)
 	highestVersion := highestVersionVersions[len(highestVersionVersions)-1]
@@ -921,7 +921,7 @@ func TestMigrateDatabase_BlocksFutureGooseVersionWithoutFlag(t *testing.T) {
 
 	err = migrateDatabase(ctx, rawDB, dbProviderSQLite, MigrationOptions{}, latestMigrationVersion)
 	require.Error(t, err)
-	require.ErrorContains(t, err, "newer than this Arcane binary supports")
+	require.ErrorContains(t, err, "newer than this HiveMind binary supports")
 	assert.Equal(t, highestVersion+1, readGooseSQLiteVersion(t, dsn))
 }
 

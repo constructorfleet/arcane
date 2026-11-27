@@ -23,10 +23,8 @@ type (
 	}
 
 	GetLogoInput struct {
-		Color    string `query:"color" doc:"Optional accent color override for preview (e.g., 'oklch(0.65 0.2 150)')"`
-		Full     bool   `query:"full" default:"false" doc:"Return full logo instead of icon"`
-		Animated bool   `query:"animated" default:"false" doc:"Return trace-and-fill animated logo variant"`
-		Loop     bool   `query:"loop" default:"false" doc:"Loop the animated icon indefinitely (loader mode; animated icon only)"`
+		Full bool `query:"full" default:"false" doc:"Return full logo instead of icon"`
+		Dark bool `query:"dark" default:"false" doc:"Return the full logo variant for dark surfaces"`
 	}
 
 	UploadLogoInput struct {
@@ -67,12 +65,12 @@ var allowedPWAIconFilenames = map[string]struct{}{
 }
 
 func (h *AppImagesHandler) GetLogo(ctx context.Context, input *GetLogoInput) (*GetAppImageOutput, error) {
-	name := kit.Ternary(input.Full, "logo-full", "logo")
-	if input.Animated {
-		name += "-animated"
+	name := "logo"
+	if input.Full {
+		name = kit.Ternary(input.Dark, "logo-full-dark", "logo-full")
 	}
 
-	return h.getImageWithColor(ctx, name, input.Color, input.Loop)
+	return h.getImage(ctx, name)
 }
 
 func (h *AppImagesHandler) UploadLogo(ctx context.Context, input *UploadLogoInput) (*handlerutil.Out[types.MessageResponse], error) {
@@ -100,11 +98,11 @@ func (h *AppImagesHandler) DeletePWAIcon(ctx context.Context, input *struct{}) (
 }
 
 func (h *AppImagesHandler) GetFavicon(ctx context.Context, input *struct{}) (*GetAppImageOutput, error) {
-	return h.getImageWithColor(ctx, "favicon", "", false)
+	return h.getImage(ctx, "favicon")
 }
 
 func (h *AppImagesHandler) GetDefaultProfile(ctx context.Context, input *struct{}) (*GetAppImageOutput, error) {
-	return h.getImageWithColor(ctx, "profile", "", false)
+	return h.getImage(ctx, "profile")
 }
 
 func (h *AppImagesHandler) GetPWAIcon(ctx context.Context, input *GetPWAIconInput) (*GetAppImageOutput, error) {
@@ -112,7 +110,7 @@ func (h *AppImagesHandler) GetPWAIcon(ctx context.Context, input *GetPWAIconInpu
 		return nil, huma.Error400BadRequest("invalid PWA icon filename")
 	}
 
-	return h.getImageWithColor(ctx, strings.TrimSuffix(input.Filename, filepath.Ext(input.Filename)), "", false)
+	return h.getImage(ctx, strings.TrimSuffix(input.Filename, filepath.Ext(input.Filename)))
 }
 
 func (h *AppImagesHandler) uploadImage(ctx context.Context, slot ImageSlot, form multipart.Form) (*handlerutil.Out[types.MessageResponse], error) {
@@ -147,8 +145,8 @@ func (h *AppImagesHandler) deleteImage(ctx context.Context, slot ImageSlot) (*ha
 	return handlerutil.MessageOutput("Image reset successfully", ""), nil
 }
 
-func (h *AppImagesHandler) getImageWithColor(ctx context.Context, name, colorOverride string, loop bool) (*GetAppImageOutput, error) {
-	imageData, mimeType, err := h.appImagesService.GetImageWithColor(ctx, name, colorOverride, loop)
+func (h *AppImagesHandler) getImage(ctx context.Context, name string) (*GetAppImageOutput, error) {
+	imageData, mimeType, err := h.appImagesService.GetImage(ctx, name)
 	if err != nil {
 		if errors.Is(err, common.ErrNotFound) {
 			return nil, huma.Error404NotFound(err.Error())
@@ -156,11 +154,11 @@ func (h *AppImagesHandler) getImageWithColor(ctx context.Context, name, colorOve
 		return nil, huma.Error500InternalServerError("Failed to retrieve image: " + err.Error())
 	}
 
-	// Disable branding caching so theme and build-channel artwork is reflected immediately.
+	// Disable branding caching so uploaded artwork is reflected immediately.
 	_, isPWAIcon := allowedPWAIconFilenames[name+".png"]
 	isBranding := IsLogoVariant(name) || isPWAIcon || name == "favicon"
 	cacheControl := kit.Ternary(
-		isBranding || colorOverride != "",
+		isBranding,
 		"no-cache, no-store, must-revalidate",
 		"public, max-age=900, stale-while-revalidate=86400",
 	)

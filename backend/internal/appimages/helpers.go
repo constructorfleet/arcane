@@ -10,15 +10,8 @@ import (
 	"net/http"
 	"slices"
 
-	"golang.org/x/mod/semver"
-
 	"kit.getarcane.app"
 )
-
-func isStableVersion(version string) bool {
-	v := kit.EnsurePrefix(version, "v")
-	return semver.IsValid(v) && semver.Prerelease(v) == ""
-}
 
 func detectImageMimeType(data []byte) string {
 	if mimeType := http.DetectContentType(data); slices.Contains([]string{pngMimeType, jpegMimeType, webpMimeType, iconMimeType}, mimeType) {

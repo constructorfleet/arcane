@@ -126,7 +126,7 @@ type (
 	NodeAgentBindingRequest struct {
 		EnvironmentID     string `json:"environmentId" doc:"Visible environment to attach; it must report this swarm node"`
 		Rebind            bool   `json:"rebind,omitempty" doc:"Move an existing binding of the node or environment instead of failing"`
-		ReplaceDeployment bool   `json:"replaceDeployment,omitempty" doc:"Also delete the dedicated agent environment Arcane deployed for this node"`
+		ReplaceDeployment bool   `json:"replaceDeployment,omitempty" doc:"Also delete the dedicated agent environment HiveMind deployed for this node"`
 	}
 
 	SwarmJoinEnvironmentRole string
@@ -393,7 +393,7 @@ type (
 
 		WorkingDir       string          `json:"-"`
 		Files            []SwarmSyncFile `json:"files,omitempty" doc:"Extra files the compose file uses, such as env files, configs and secrets"`
-		WithRegistryAuth bool            `json:"withRegistryAuth,omitempty" doc:"Send the credentials of Arcane's registries with the service specs"`
+		WithRegistryAuth bool            `json:"withRegistryAuth,omitempty" doc:"Send the credentials of HiveMind's registries with the service specs"`
 		Prune            bool            `json:"prune,omitempty" doc:"Remove stack services the compose file no longer defines"`
 		// KeepSavedEnv deploys with the stack's saved .env when EnvContent is empty, for callers that supply no variables of their own.
 		KeepSavedEnv bool `json:"-"`

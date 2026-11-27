@@ -12,7 +12,7 @@ func Command() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "generate",
 		Aliases: []string{"gen", "g"},
-		Short:   "Generate secrets and bootstrap credentials for Arcane",
+		Short:   "Generate secrets and bootstrap credentials for HiveMind",
 	}
 	cmd.AddCommand(newAPIKeyCmd(), newMTLSCmd(), newTLSCmd(), newSecretCmd())
 	return cmd

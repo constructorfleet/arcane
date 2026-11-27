@@ -316,7 +316,7 @@ func (s *TunnelServer) serveConnectedTunnel(ctx context.Context, tunnel *AgentTu
 		return errAgentMuxRequired
 	}
 	if !slices.Contains(tunnel.Capabilities, TunnelCapabilityForwardedPermissions) {
-		slog.WarnContext(ctx, "Rejected agent older than Arcane v3", "environmentId", envID, "agentInstanceId", tunnel.AgentInstance)
+		slog.WarnContext(ctx, "Rejected agent older than HiveMind v3", "environmentId", envID, "agentInstanceId", tunnel.AgentInstance)
 		_ = tunnel.Conn.Send(&TunnelMessage{Type: MessageTypeRegisterResponse, EnvironmentID: envID, Error: errAgentV3Required.Error()})
 		_ = tunnel.CloseWithReason(errAgentV3Required.Error())
 		return errAgentV3Required

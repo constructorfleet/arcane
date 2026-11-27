@@ -759,18 +759,18 @@ func (h *EnvironmentHandler) GetEnvironmentVersion(ctx context.Context, input *G
 func (h *EnvironmentHandler) DownloadAgentMTLSCA(ctx context.Context, _ *DownloadAgentMTLSCAInput) (*huma.StreamResponse, error) {
 	caPath, err := h.mtls.CAPath(ctx)
 	if err != nil {
-		return nil, huma.Error404NotFound("Arcane-managed agent mTLS CA is not available")
+		return nil, huma.Error404NotFound("HiveMind-managed agent mTLS CA is not available")
 	}
 
 	caAbs, err := filepath.Abs(caPath)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to read generated agent mTLS CA", "path", caPath, "error", err.Error())
-		return nil, huma.Error500InternalServerError("Failed to read Arcane-generated agent mTLS CA")
+		return nil, huma.Error500InternalServerError("Failed to read HiveMind-generated agent mTLS CA")
 	}
 	caPEM, err := acfs.Host{}.ReadFile(ctx, caAbs)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to read generated agent mTLS CA", "path", caPath, "error", err.Error())
-		return nil, huma.Error500InternalServerError("Failed to read Arcane-generated agent mTLS CA")
+		return nil, huma.Error500InternalServerError("Failed to read HiveMind-generated agent mTLS CA")
 	}
 
 	fileName := cmp.Or(strings.TrimSpace(filepath.Base(caPath)), "ca.crt")

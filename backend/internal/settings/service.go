@@ -951,10 +951,10 @@ func (s *SettingsService) ValidateBuildsDirectory(root string) error {
 	for _, dataDirectory := range reserved {
 		resolvedData, dataErr := resolveSymlinks(dataDirectory)
 		if dataErr != nil {
-			return fmt.Errorf("failed to resolve the Arcane data directory: %w", dataErr)
+			return fmt.Errorf("failed to resolve the HiveMind data directory: %w", dataErr)
 		}
 		if projects.IsSafeSubdirectory(resolvedData, resolvedRoot) || projects.IsSafeSubdirectory(resolvedRoot, resolvedData) {
-			return fmt.Errorf("builds directory %q overlaps the Arcane data directory", root)
+			return fmt.Errorf("builds directory %q overlaps the HiveMind data directory", root)
 		}
 	}
 	return nil

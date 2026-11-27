@@ -26,7 +26,7 @@ reap:
     done
     pkill -KILL -xf "$bin" || true
 
-# Local Arcane agent against a running manager (requires ARCANE_AGENT_TOKEN)
+# Local HiveMind agent against a running manager (requires ARCANE_AGENT_TOKEN)
 [script('bash')]
 agent:
     set -euo pipefail

@@ -399,7 +399,7 @@ test.describe('Workspace restore', () => {
 							localSnapshotId: 'system-snapshot',
 							type: 'system',
 							resourceType: 'system',
-							resourceName: 'Arcane system'
+							resourceName: 'HiveMind system'
 						}
 					],
 					pagination: { currentPage: 1, totalPages: 1, totalItems: 1, itemsPerPage: 20 }

@@ -285,7 +285,7 @@ func migrateDatabase(ctx context.Context, db *sql.DB, dbProvider string, options
 		return nil
 	case !options.AllowDowngrade:
 		return fmt.Errorf(
-			"database schema version %d is newer than this Arcane binary supports (target %d for %s); downgrade "+
+			"database schema version %d is newer than this HiveMind binary supports (target %d for %s); downgrade "+
 				"requires ARCANE_ALLOW_DOWNGRADE=true and a database backup before startup",
 			currentVersion, requiredVersion, dbProvider,
 		)
@@ -311,7 +311,7 @@ func migrateDatabase(ctx context.Context, db *sql.DB, dbProvider string, options
 	}
 	if len(missingVersions) > 0 {
 		return fmt.Errorf("cannot downgrade database from version %d to %d for %s: embedded Goose migrations are missing for "+
-			"applied version(s) %v, so the rollback migrations are unavailable in this Arcane binary; "+
+			"applied version(s) %v, so the rollback migrations are unavailable in this HiveMind binary; "+
 			"ARCANE_ALLOW_DOWNGRADE=true is not sufficient, restore the database from a backup taken before the newer "+
 			"schema was applied",
 			currentVersion, requiredVersion, dbProvider, missingVersions,

@@ -1,6 +1,6 @@
-# Arcane agent guide
+# HiveMind agent guide
 
-Arcane is a Docker management platform.
+HiveMind is a Docker management platform.
 
 - **Backend:** Go
 - **Frontend:** SvelteKit

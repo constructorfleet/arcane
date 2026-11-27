@@ -307,7 +307,7 @@ func TestProjectsSnapshotPath(t *testing.T) {
 		{name: "equal to data", data: "/app/data", projects: "/app/data", expected: "/data"},
 		{name: "external bind", data: "/app/data", projects: "/host/path/to/projects", expected: "/projects", external: true},
 		{name: "sibling with shared prefix", data: "/app/data", projects: "/app/datasets", expected: "/projects", external: true},
-		{name: "ancestor of data", data: "/app/data", projects: "/app", errorContains: "contains Arcane's data directory"},
+		{name: "ancestor of data", data: "/app/data", projects: "/app", errorContains: "contains HiveMind's data directory"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -341,7 +341,7 @@ func TestSourceMounts(t *testing.T) {
 	require.Equal(t, []mount.Mount{{Type: mount.TypeBind, Source: "/host/external", Target: "/projects", ReadOnly: true}}, external)
 
 	_, err = sourceMounts(mounts, true, "/opt/projects", "/projects")
-	require.ErrorContains(t, err, "/opt/projects must be mounted into the Arcane container")
+	require.ErrorContains(t, err, "/opt/projects must be mounted into the HiveMind container")
 
 	host, err := sourceMounts(nil, false, "/tmp/data", "/data")
 	require.NoError(t, err)
@@ -450,7 +450,7 @@ func TestRestoreTarget(t *testing.T) {
 	_, err = restoreTarget(mounts, "/mnt/ro/projects", "/restore-projects", "")
 	require.ErrorContains(t, err, "mounted read-only")
 	_, err = restoreTarget(mounts, "/opt/projects", "/restore-projects", "")
-	require.ErrorContains(t, err, "must be mounted into the Arcane container")
+	require.ErrorContains(t, err, "must be mounted into the HiveMind container")
 }
 
 func TestRestoreStages(t *testing.T) {
@@ -565,7 +565,7 @@ func TestRestoreStages(t *testing.T) {
 	t.Run("projects at data root cannot move", func(t *testing.T) {
 		layout := snapshotLayout{dataPath: "/data", projectsPath: "/data", databaseName: "arcane.db"}
 		_, err := restoreStages(mounts, "/app/data", "/srv/projects", repository, "snap", layout)
-		require.ErrorContains(t, err, "keeps projects in Arcane's data directory")
+		require.ErrorContains(t, err, "keeps projects in HiveMind's data directory")
 		stages, err := restoreStages(mounts, "/app/data", "/app/data", repository, "snap", layout)
 		require.NoError(t, err)
 		require.Len(t, stages, 1)
@@ -582,7 +582,7 @@ func TestRestoreStages(t *testing.T) {
 		}
 		layout := snapshotLayout{dataPath: "/data", projectsPath: "/projects", databaseName: "arcane.db"}
 		_, err := restoreStages(hostNested, "/app/data", "/volume4/docker/dsm", repository, "snap", layout)
-		require.ErrorContains(t, err, "contains Arcane's data directory")
+		require.ErrorContains(t, err, "contains HiveMind's data directory")
 	})
 }
 

@@ -16,12 +16,12 @@ type (
 		AuthType               string    `json:"authType" required:"false" doc:"Authentication method: none, http or ssh; required on create"`
 		Username               string    `json:"username,omitempty" doc:"Username for http authentication, sent with the token"`
 		SSHHostKeyVerification string    `json:"sshHostKeyVerification,omitempty" doc:"strict (known_hosts only), accept_new (trust an unknown host on first use; default) or skip"`
-		CommitAuthorName       string    `json:"commitAuthorName,omitempty" unorm:"nfc" trim:"true" doc:"Author name on commits Arcane pushes; defaults to Arcane"`
-		CommitAuthorEmail      string    `json:"commitAuthorEmail,omitempty" trim:"true" doc:"Author email on commits Arcane pushes; defaults to arcane@localhost"`
+		CommitAuthorName       string    `json:"commitAuthorName,omitempty" unorm:"nfc" trim:"true" doc:"Author name on commits HiveMind pushes; defaults to HiveMind"`
+		CommitAuthorEmail      string    `json:"commitAuthorEmail,omitempty" trim:"true" doc:"Author email on commits HiveMind pushes; defaults to arcane@localhost"`
 
 		Token                string `json:"token,omitempty" writeOnly:"true" copier:"-" doc:"Password or access token for http authentication; stored encrypted, empty on update removes it"`
 		SSHKey               string `json:"sshKey,omitempty" writeOnly:"true" copier:"-" doc:"Private key for ssh authentication; stored encrypted, empty on update removes it"`
-		SigningKey           string `json:"signingKey,omitempty" writeOnly:"true" copier:"-" doc:"Armored OpenPGP private key that signs the commits Arcane pushes; empty on update removes it"`
+		SigningKey           string `json:"signingKey,omitempty" writeOnly:"true" copier:"-" doc:"Armored OpenPGP private key that signs the commits HiveMind pushes; empty on update removes it"`
 		SigningKeyPassphrase string `json:"signingKeyPassphrase,omitempty" writeOnly:"true" copier:"-" doc:"Needed only when the signing key is passphrase-protected"`
 		HasToken             bool   `json:"hasToken" readOnly:"true"`
 		HasSshKey            bool   `json:"hasSshKey" readOnly:"true"`
@@ -64,7 +64,7 @@ type (
 		EnvironmentName string   `json:"environmentName,omitempty" readOnly:"true" doc:"Display name of the environment the sync belongs to"`
 		RepositoryID    string   `json:"repositoryId" required:"false" doc:"ID of the Git repository to use; required on create"`
 		Branch          string   `json:"branch" required:"false" doc:"Branch to sync from or back up to; required on create"`
-		ComposePath     string   `json:"composePath" required:"false" doc:"Compose file path in the repository; required for a deploy sync, set by Arcane for a backup or bidirectional sync"`
+		ComposePath     string   `json:"composePath" required:"false" doc:"Compose file path in the repository; required for a deploy sync, set by HiveMind for a backup or bidirectional sync"`
 		ID              string   `json:"id" readOnly:"true"`
 		TargetType      string   `json:"targetType" required:"false" doc:"What the sync deploys: project (default) or, for a deploy sync only, swarm_stack, which takes no projectId or pre-deploy script"`
 		Mode            string   `json:"mode" required:"false" doc:"deploy (default) applies the repository to the project, backup commits the project to it, bidirectional does both; ignored on update"`
@@ -87,7 +87,7 @@ type (
 		PullImageAfterSync bool `json:"pullImageAfterSync" required:"false" doc:"Pull the project images after a sync that changed files when no redeploy follows"`
 
 		RedeployAfterSync bool `json:"redeployAfterSync" required:"false" doc:"Redeploy the project after a sync that changed files even when it is stopped; a running project always is"`
-		BackupOnSave      bool `json:"backupOnSave" required:"false" doc:"Run the sync when project files are saved in Arcane; defaults to true, backup and bidirectional syncs only"`
+		BackupOnSave      bool `json:"backupOnSave" required:"false" doc:"Run the sync when project files are saved in HiveMind; defaults to true, backup and bidirectional syncs only"`
 		BackupPending     bool `json:"backupPending" readOnly:"true"`
 	}
 

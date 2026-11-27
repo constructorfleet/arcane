@@ -19,10 +19,8 @@ import (
 	"kit.getarcane.app"
 
 	"getarcane.dev/arcane/v3/internal/common"
-	"getarcane.dev/arcane/v3/internal/config"
 	"getarcane.dev/arcane/v3/internal/database"
 	"getarcane.dev/arcane/v3/internal/settings"
-	"getarcane.dev/types/v3"
 )
 
 type (
@@ -44,8 +42,7 @@ type (
 	}
 
 	ApplicationImagesService struct {
-		standard        map[string]appImage
-		development     map[string]appImage
+		images          map[string]appImage
 		settingsService *settings.SettingsService
 		db              *database.DB
 	}
@@ -95,67 +92,53 @@ var (
 	pwaIconSizes = []int{72, 96, 128, 144, 152, 192, 384, 512}
 
 	customImageTargets = map[string]customImageTarget{
-		"logo":               {slot: ImageSlotMark, size: customImageSize},
-		"logo-animated":      {slot: ImageSlotMark, size: customImageSize},
-		"logo-full":          {slot: ImageSlotFull, size: customImageSize},
-		"logo-full-animated": {slot: ImageSlotFull, size: customImageSize},
-		"favicon":            {slot: ImageSlotFavicon, size: customImageSize},
-		"icon-72x72":         {slot: ImageSlotPWA, size: 72},
-		"icon-96x96":         {slot: ImageSlotPWA, size: 96},
-		"icon-128x128":       {slot: ImageSlotPWA, size: 128},
-		"icon-144x144":       {slot: ImageSlotPWA, size: 144},
-		"icon-152x152":       {slot: ImageSlotPWA, size: 152},
-		"icon-192x192":       {slot: ImageSlotPWA, size: 192},
-		"icon-384x384":       {slot: ImageSlotPWA, size: 384},
-		"icon-512x512":       {slot: ImageSlotPWA, size: 512},
+		"logo":           {slot: ImageSlotMark, size: customImageSize},
+		"logo-full":      {slot: ImageSlotFull, size: customImageSize},
+		"logo-full-dark": {slot: ImageSlotFull, size: customImageSize},
+		"favicon":        {slot: ImageSlotFavicon, size: customImageSize},
+		"icon-72x72":     {slot: ImageSlotPWA, size: 72},
+		"icon-96x96":     {slot: ImageSlotPWA, size: 96},
+		"icon-128x128":   {slot: ImageSlotPWA, size: 128},
+		"icon-144x144":   {slot: ImageSlotPWA, size: 144},
+		"icon-152x152":   {slot: ImageSlotPWA, size: 152},
+		"icon-192x192":   {slot: ImageSlotPWA, size: 192},
+		"icon-384x384":   {slot: ImageSlotPWA, size: 384},
+		"icon-512x512":   {slot: ImageSlotPWA, size: 512},
 	}
 )
 
 func NewApplicationImagesService(embeddedFS embed.FS, settingsService *settings.SettingsService, db *database.DB) *ApplicationImagesService {
 	service := &ApplicationImagesService{
-		standard:        make(map[string]appImage),
-		development:     make(map[string]appImage),
+		images:          make(map[string]appImage),
 		settingsService: settingsService,
 		db:              db,
 	}
 
-	// Only non-stable builds load the development artwork; its 512px icon also replaces the standalone marks.
-	sets := map[string]map[string]appImage{"images": service.standard}
-	if !isStableVersion(config.Version) {
-		sets["images/development"] = service.development
+	entries, err := fs.ReadDir(embeddedFS, "images")
+	if err != nil {
+		return service
 	}
-	aliases := map[string][]string{"images/development/icon-512x512": {"logo", "logo-animated"}}
 
-	for dir, images := range sets {
-		entries, err := fs.ReadDir(embeddedFS, dir)
-		if err != nil {
+	for _, entry := range entries {
+		filename := entry.Name()
+		ext := strings.ToLower(filepath.Ext(filename))
+		mimeType := kit.GetImageMimeType(strings.TrimPrefix(ext, "."))
+		if entry.IsDir() || mimeType == "" {
 			continue
 		}
 
-		for _, entry := range entries {
-			filename := entry.Name()
-			ext := strings.ToLower(filepath.Ext(filename))
-			mimeType := kit.GetImageMimeType(strings.TrimPrefix(ext, "."))
-			if entry.IsDir() || mimeType == "" {
-				continue
-			}
-
-			data, readErr := embeddedFS.ReadFile(path.Join(dir, filename))
-			if readErr != nil {
-				continue
-			}
-
-			name := strings.TrimSuffix(filename, ext)
-			for _, key := range append([]string{name}, aliases[path.Join(dir, name)]...) {
-				images[key] = appImage{data: data, mimeType: mimeType}
-			}
+		data, readErr := embeddedFS.ReadFile(path.Join("images", filename))
+		if readErr != nil {
+			continue
 		}
+
+		service.images[strings.TrimSuffix(filename, ext)] = appImage{data: data, mimeType: mimeType}
 	}
 
 	return service
 }
 
-func (s *ApplicationImagesService) GetImageWithColor(ctx context.Context, name, colorOverride string, loop bool) ([]byte, string, error) {
+func (s *ApplicationImagesService) GetImage(ctx context.Context, name string) ([]byte, string, error) {
 	if target, isCustomizable := customImageTargets[name]; isCustomizable && s.settingsService.GetStringSetting(ctx, imageSlots[target.slot].hashKey) != "" {
 		var custom CustomImage
 		if err := s.db.WithContext(ctx).Where("slot = ? AND size = ?", target.slot, target.size).Limit(1).Find(&custom).Error; err != nil {
@@ -166,34 +149,12 @@ func (s *ApplicationImagesService) GetImageWithColor(ctx context.Context, name, 
 		}
 	}
 
-	img, ok := s.standard[name]
-	if dev, hasDev := s.development[name]; hasDev && s.settingsService.GetSettingsConfig().DevelopmentBrandingEnabled.IsTrue() {
-		img, ok = dev, true
-	}
+	img, ok := s.images[name]
 	if !ok {
 		return nil, "", common.Classify(common.ErrNotFound, fmt.Errorf("image '%s' not found", name))
 	}
 
-	data, mimeType := img.data, img.mimeType
-	if !IsLogoVariant(name) || mimeType != svgMimeType {
-		return data, mimeType, nil
-	}
-
-	accentColor := kit.Ternary(types.SafeAccentColor.MatchString(colorOverride), colorOverride, types.DefaultAccentColor)
-	svg := strings.NewReplacer(
-		"fill:#6D28D9", "fill:"+accentColor,
-		"fill:#6d28d9", "fill:"+accentColor,
-		"stroke:#6D28D9", "stroke:"+accentColor,
-		"stroke:#6d28d9", "stroke:"+accentColor,
-	).Replace(string(data))
-
-	// Loop mode swaps the animated mark's one-shot trace for its looping keyframes.
-	if loop && name == "logo-animated" {
-		svg = strings.Replace(svg, "animation: traceDraw 1.7s ease both;", "animation: traceDrawLoop 2.6s ease infinite;", 1)
-	}
-	data = []byte(svg)
-
-	return data, mimeType, nil
+	return img.data, img.mimeType, nil
 }
 
 func (s *ApplicationImagesService) UploadImage(ctx context.Context, slot ImageSlot, r io.Reader) error {
@@ -244,7 +205,7 @@ func (s *ApplicationImagesService) DeleteImage(ctx context.Context, slot ImageSl
 
 func IsLogoVariant(name string) bool {
 	switch name {
-	case "logo", "logo-full", "logo-animated", "logo-full-animated":
+	case "logo", "logo-full", "logo-full-dark":
 		return true
 	}
 	return false

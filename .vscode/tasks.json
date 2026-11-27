@@ -3,7 +3,7 @@
 	"tasks": [
 		{
 			"label": "Start Development Environment",
-			"detail": "Start the Arcane development environment with hot reload",
+			"detail": "Start the HiveMind development environment with hot reload",
 			"type": "shell",
 			"command": "./scripts/development/dev.sh",
 			"args": ["start"],
@@ -29,7 +29,7 @@
 		},
 		{
 			"label": "Stop Development Environment",
-			"detail": "Stop the Arcane development environment",
+			"detail": "Stop the HiveMind development environment",
 			"type": "shell",
 			"command": "./scripts/development/dev.sh",
 			"args": ["stop"],
@@ -52,7 +52,7 @@
 		},
 		{
 			"label": "Restart Development Environment",
-			"detail": "Restart the Arcane development environment",
+			"detail": "Restart the HiveMind development environment",
 			"type": "shell",
 			"command": "./scripts/development/dev.sh",
 			"args": ["restart"],
@@ -75,7 +75,7 @@
 		},
 		{
 			"label": "Rebuild Development Environment",
-			"detail": "Rebuild the Arcane development environment",
+			"detail": "Rebuild the HiveMind development environment",
 			"type": "shell",
 			"command": "./scripts/development/dev.sh",
 			"args": ["rebuild"],
@@ -98,7 +98,7 @@
 		},
 		{
 			"label": "Clean Development Environment",
-			"detail": "Clean the Arcane development environment",
+			"detail": "Clean the HiveMind development environment",
 			"type": "shell",
 			"command": "./scripts/development/dev.sh",
 			"args": ["clean"],
@@ -121,7 +121,7 @@
 		},
 		{
 			"label": "Logs Development Environment",
-			"detail": "View the logs of the Arcane development environment",
+			"detail": "View the logs of the HiveMind development environment",
 			"type": "shell",
 			"command": "./scripts/development/dev.sh",
 			"args": ["logs", "${input:logService}"],

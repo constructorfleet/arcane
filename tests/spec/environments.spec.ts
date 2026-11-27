@@ -983,7 +983,7 @@ test.describe('Agents', () => {
 			const sheetTitle = page.locator('[data-slot="sheet-title"]');
 			await expect(sheetTitle).toContainText('Agent Created');
 			await expect(
-				page.getByText('Arcane Agent - connects outbound to manager', { exact: true })
+				page.getByText('HiveMind Agent - connects outbound to manager', { exact: true })
 			).toBeVisible();
 			await expect(page.getByText('Enrollment Token', { exact: true })).toBeVisible();
 			await expect(page.getByText('Docker Run Command', { exact: true })).toBeVisible();

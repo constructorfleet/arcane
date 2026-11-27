@@ -293,7 +293,7 @@ func (s *ContainerService) RecoverInterruptedRedeploys(ctx context.Context) erro
 			continue
 		}
 		if backup.ID != journal.OriginalID {
-			slog.WarnContext(ctx, "Skipping redeploy backup recovery: container is not the one Arcane renamed", "container", journal.BackupName, "id", backup.ID, "journaledId", journal.OriginalID)
+			slog.WarnContext(ctx, "Skipping redeploy backup recovery: container is not the one HiveMind renamed", "container", journal.BackupName, "id", backup.ID, "journaledId", journal.OriginalID)
 			s.clearRedeployJournal(ctx, journal.OriginalID)
 			skipped++
 			continue

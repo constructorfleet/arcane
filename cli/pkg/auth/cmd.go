@@ -35,7 +35,7 @@ func Command() *cobra.Command {
 func newLoginCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:          "login",
-		Short:        "Login to Arcane using OIDC device authorization",
+		Short:        "Login to HiveMind using OIDC device authorization",
 		SilenceUsage: true,
 		Args:         cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -116,7 +116,7 @@ func newLoginCmd() *cobra.Command {
 func newLogoutCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:          "logout",
-		Short:        "Logout from Arcane",
+		Short:        "Logout from HiveMind",
 		SilenceUsage: true,
 		Args:         cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -369,7 +369,7 @@ func pollDeviceToken(cmd *cobra.Command, c *client.Client, deviceAuth types.Oidc
 				return types.AuthenticationResponse{}, errors.New("device authorization denied")
 			case strings.Contains(lower, "mfa_required"):
 				return types.AuthenticationResponse{}, errors.New("this account has MFA enabled, which browser-based CLI login cannot complete; create a personal API key in " +
-					"Arcane (Account -> API keys) and run: arcane config set api-key <key>")
+					"HiveMind (Account -> API keys) and run: arcane config set api-key <key>")
 			default:
 				return types.AuthenticationResponse{}, fmt.Errorf("device token exchange failed (status %d): %s", tokenResp.StatusCode, strings.TrimSpace(string(tokenBody)))
 			}

@@ -798,13 +798,13 @@ test.describe('Lifecycle', () => {
 			await dialog.locator('#repository').fill(repository);
 			await dialog.locator('#tag').fill('e2e');
 			await dialog.getByLabel('Description', { exact: true }).fill('Playwright lifecycle snapshot');
-			await dialog.getByLabel('Author', { exact: true }).fill('Arcane Playwright');
+			await dialog.getByLabel('Author', { exact: true }).fill('HiveMind Playwright');
 			await expect(dialog.locator('#repository')).toHaveValue(repository);
 			await expect(dialog.locator('#tag')).toHaveValue('e2e');
 			await expect(dialog.getByLabel('Description', { exact: true })).toHaveValue(
 				'Playwright lifecycle snapshot'
 			);
-			await expect(dialog.getByLabel('Author', { exact: true })).toHaveValue('Arcane Playwright');
+			await expect(dialog.getByLabel('Author', { exact: true })).toHaveValue('HiveMind Playwright');
 
 			const requestPromise = page.waitForRequest(
 				(request) =>
@@ -827,7 +827,7 @@ test.describe('Lifecycle', () => {
 				repository,
 				tag: 'e2e',
 				comment: 'Playwright lifecycle snapshot',
-				author: 'Arcane Playwright'
+				author: 'HiveMind Playwright'
 			});
 			expect(result.id).toMatch(/^sha256:/);
 			await expect(dialog).toBeHidden();

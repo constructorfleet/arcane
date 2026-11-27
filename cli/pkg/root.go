@@ -65,7 +65,7 @@ func NewRootCommand() *cobra.Command {
 	opts := &rootOptions{}
 	root := &cobra.Command{
 		Use:  "arcane-cli",
-		Long: "Arcane CLI - The official command line interface for Arcane",
+		Long: "HiveMind CLI - The official command line interface for HiveMind",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if opts.configPath != "" {
 				if err := config.SetConfigPath(opts.configPath); err != nil {
@@ -105,7 +105,7 @@ func NewRootCommand() *cobra.Command {
 			if !opts.showVersion {
 				return cmd.Help()
 			}
-			_, _ = fmt.Fprintf(output.Stdout(), "Arcane CLI version: %s\n", config.Version)
+			_, _ = fmt.Fprintf(output.Stdout(), "HiveMind CLI version: %s\n", config.Version)
 			_, _ = fmt.Fprintf(output.Stdout(), "Git revision: %s\n", config.Revision)
 			_, _ = fmt.Fprintf(output.Stdout(), "Go version: %s\n", runtime.Version())
 			_, _ = fmt.Fprintf(output.Stdout(), "OS/Arch: %s/%s\n", runtime.GOOS, runtime.GOARCH)

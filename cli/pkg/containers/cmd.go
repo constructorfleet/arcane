@@ -206,7 +206,7 @@ func newContainerListCmd(updatesOnly bool) *cobra.Command {
 		cmdutil.EnumVarP(command, command.Flags(), &opts.standalone, "standalone", "", "", "Filter standalone containers only", "true", "false")
 		command.Flags().StringVar(&opts.labelFilter, "label", "", "Filter by label (key or key=value)")
 		command.Flags().BoolVar(&opts.includeHidden, "include-hidden", false, "Include hidden containers")
-		command.Flags().BoolVar(&opts.include, "include-internal", false, "Include Arcane-internal containers")
+		command.Flags().BoolVar(&opts.include, "include-internal", false, "Include HiveMind-internal containers")
 	}
 
 	return command

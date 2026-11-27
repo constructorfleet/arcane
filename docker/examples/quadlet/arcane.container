@@ -1,6 +1,6 @@
-# Arcane runs as root (PUID/PGID=0) so the host system bus lets it manage Quadlet units and podman-auto-update.
+# HiveMind runs as root (PUID/PGID=0) so the host system bus lets it manage Quadlet units and podman-auto-update.
 [Unit]
-Description=Arcane
+Description=HiveMind
 Wants=network-online.target
 Requires=podman.socket
 After=network-online.target podman.socket

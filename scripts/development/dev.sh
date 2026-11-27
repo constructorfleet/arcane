@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Arcane Development Environment Manager
+# HiveMind Development Environment Manager
 # This script helps manage the Docker-based development environment with hot reloading
 
 set -euo pipefail
@@ -237,7 +237,7 @@ show_logs() {
 }
 
 start_dev() {
-    log_info "Starting Arcane development environment..."
+    log_info "Starting HiveMind development environment..."
     
     if ! docker compose -f "${COMPOSE_FILE}" -p "${PROJECT_NAME}" up -d --build; then
         log_error "Failed to start development environment"
@@ -253,7 +253,7 @@ start_dev() {
 }
 
 stop_dev() {
-    log_info "Stopping Arcane development environment..."
+    log_info "Stopping HiveMind development environment..."
     if ! docker compose -f "${COMPOSE_FILE}" -p "${PROJECT_NAME}" down; then
         log_error "Failed to stop development environment"
         exit 1
@@ -262,7 +262,7 @@ stop_dev() {
 }
 
 restart_dev() {
-    log_info "Restarting Arcane development environment..."
+    log_info "Restarting HiveMind development environment..."
     
     # Stop containers gracefully to allow Air to clean up properly
     log_info "Stopping containers gracefully..."
@@ -690,7 +690,7 @@ optimize_cache() {
 
 
 show_help() {
-    echo "Arcane Development Environment Manager"
+    echo "HiveMind Development Environment Manager"
     echo
     echo "Usage: $0 [COMMAND]"
     echo

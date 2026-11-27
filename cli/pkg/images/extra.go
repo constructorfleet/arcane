@@ -355,7 +355,7 @@ func newBuildCmd() *cobra.Command {
 		Annotations:  map[string]string{"arcane:scope": cmdutil.ScopeDestination},
 		Use:          "build <context-dir|git-url>",
 		Short:        "Build an image with BuildKit on the server",
-		Long:         "Build a Docker image using BuildKit with streaming progress output.\n\nThe context argument is a build context directory on the Arcane server or a Git URL.",
+		Long:         "Build a Docker image using BuildKit with streaming progress output.\n\nThe context argument is a build context directory on the HiveMind server or a Git URL.",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

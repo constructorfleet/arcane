@@ -36,12 +36,12 @@ test('login and representative authenticated surfaces pass the accessibility che
 	test.setTimeout(120_000);
 
 	await page.goto('/login');
-	await expect(page).toHaveTitle(/Arcane/);
+	await expect(page).toHaveTitle(/HiveMind/);
 	await expectNoSeriousAccessibilityViolations(page, 'Login page');
 
 	await page.getByLabel('Username').fill('arcane');
 	await page.getByLabel('Password').fill(authUtil.TEST_PASSWORD);
-	await page.getByRole('button', { name: 'Sign in to Arcane', exact: true }).click();
+	await page.getByRole('button', { name: 'Sign in to HiveMind', exact: true }).click();
 	await expect(page).toHaveURL('/dashboard');
 	await expect(page.getByRole('button', { name: 'Card view', exact: true })).toBeVisible();
 	await expectNoSeriousAccessibilityViolations(page, 'Dashboard', 'main');

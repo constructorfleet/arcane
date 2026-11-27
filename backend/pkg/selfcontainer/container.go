@@ -64,7 +64,7 @@ func InspectCurrentArcaneContainer(ctx context.Context, dockerClient *client.Cli
 	if containerID := FindArcaneContainerIDByLabel(ctx, dockerClient); containerID != "" {
 		inspect, err := compat.ContainerInspectWithCompatibility(ctx, dockerClient, containerID, client.ContainerInspectOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("inspect Arcane container: %w", err)
+			return nil, fmt.Errorf("inspect HiveMind container: %w", err)
 		}
 		// A labeled match overrides an unlabeled hit only when it shares that hit's network namespace.
 		if unlabeled == nil || sharesNetworkNamespace(&inspect.Container, unlabeled) {
@@ -76,7 +76,7 @@ func InspectCurrentArcaneContainer(ctx context.Context, dockerClient *client.Cli
 		return unlabeled, nil
 	}
 
-	return nil, errors.New("could not detect Arcane container")
+	return nil, errors.New("could not detect HiveMind container")
 }
 
 func sharesNetworkNamespace(candidate, owner *container.InspectResponse) bool {

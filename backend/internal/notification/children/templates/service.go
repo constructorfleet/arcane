@@ -309,7 +309,7 @@ func (s *Service) TestEmail(environmentName string) notifications.Content {
 			if err != nil {
 				return "", "", fmt.Errorf("failed to render test email: %w", err)
 			}
-			return notifications.BuildEmailSubject(environmentName, "Test Email from Arcane"), htmlBody, nil
+			return notifications.BuildEmailSubject(environmentName, "Test Email from HiveMind"), htmlBody, nil
 		},
 	}
 }

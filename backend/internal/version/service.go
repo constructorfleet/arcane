@@ -102,7 +102,7 @@ func NewVersionService(p VersionServiceParams) *VersionService {
 				defer cancel()
 				release, err := service.fetchLatestRelease(ctx)
 				if err != nil {
-					slog.WarnContext(ctx, "Failed to fetch latest Arcane release; skipping update checks until the cache expires", "error", err)
+					slog.WarnContext(ctx, "Failed to fetch latest HiveMind release; skipping update checks until the cache expires", "error", err)
 					return latestRelease{}, true, nil
 				}
 				return release, true, nil
@@ -400,7 +400,7 @@ func (s *VersionService) storedOrDigestBasedUpdate(ctx context.Context, current 
 	if strings.TrimSpace(current.ImageID) != "" && checkImageRef == current.ImageRef && !current.DigestPinned {
 		record, found, err := s.imageUpdateService.StoredUpdateByImageID(ctx, current.ImageID)
 		if err != nil {
-			slog.WarnContext(ctx, "Failed to read stored Arcane image update state", "imageId", current.ImageID, "error", err)
+			slog.WarnContext(ctx, "Failed to read stored HiveMind image update state", "imageId", current.ImageID, "error", err)
 		} else if found {
 			return record.HasUpdate, mo.PointerToOption(record.LatestDigest).OrEmpty()
 		}
@@ -453,7 +453,7 @@ func (s *VersionService) detectCurrentImageInfo(ctx context.Context) (detected c
 
 	containerId, err := cgroup.CurrentContainerID()
 	if err != nil {
-		// Fall back to the Arcane label when cgroup/hostname detection fails.
+		// Fall back to the HiveMind label when cgroup/hostname detection fails.
 		slog.DebugContext(ctx, "detectCurrentImageInfo: cgroup detection failed, trying label fallback", "error", err)
 		containerId = selfcontainer.FindArcaneContainerIDByLabel(ctx, dockerClient)
 	}

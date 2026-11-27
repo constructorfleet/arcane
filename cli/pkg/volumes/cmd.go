@@ -124,7 +124,7 @@ func newListCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&opts.allFlag, "all", "a", false, cmdutil.AllFlagUsage)
 	cmd.Flags().BoolVar(&opts.inUseOnlyFlag, "inuse", false, "Only show volumes currently in use")
 	cmd.Flags().BoolVar(&opts.unusedOnlyFlag, "unused", false, "Only show volumes not in use")
-	cmd.Flags().BoolVar(&opts.includeFlag, "include-internal", false, "Include Arcane-internal volumes")
+	cmd.Flags().BoolVar(&opts.includeFlag, "include-internal", false, "Include HiveMind-internal volumes")
 	cmdutil.SetScope(cmdutil.ScopeMerged, cmd)
 	cmd.PreRunE = func(cmd *cobra.Command, _ []string) error { return cmdutil.ExclusiveFlags(cmd, "inuse", "unused") }
 	return cmd

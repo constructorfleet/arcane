@@ -91,15 +91,15 @@ type (
 	}
 
 	DeploymentSnippet struct {
-		MTLS            *DeploymentSnippetMTLS `json:"mtls,omitempty" doc:"Optional Arcane-generated mTLS deployment assets for agents"`
+		MTLS            *DeploymentSnippetMTLS `json:"mtls,omitempty" doc:"Optional HiveMind-generated mTLS deployment assets for agents"`
 		DockerRun       string                 `json:"dockerRun" doc:"Docker run command snippet"`
 		DockerCompose   string                 `json:"dockerCompose" doc:"Docker compose YAML snippet"`
 		EnrollmentToken string                 `json:"enrollmentToken" doc:"Single-use enrollment token the agent uses to join this environment, shown only once"`
 	}
 
 	DeploymentSnippetMTLS struct {
-		DockerRun     string                  `json:"dockerRun" doc:"Docker run snippet using Arcane-generated mTLS assets"`
-		DockerCompose string                  `json:"dockerCompose" doc:"Docker compose snippet using Arcane-generated mTLS assets"`
+		DockerRun     string                  `json:"dockerRun" doc:"Docker run snippet using HiveMind-generated mTLS assets"`
+		DockerCompose string                  `json:"dockerCompose" doc:"Docker compose snippet using HiveMind-generated mTLS assets"`
 		HostDirHint   string                  `json:"hostDirHint" doc:"Suggested host directory containing the generated PEM files"`
 		Files         []DeploymentSnippetFile `json:"files" doc:"Generated PEM files to place on the agent host"`
 	}

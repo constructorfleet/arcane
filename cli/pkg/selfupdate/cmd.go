@@ -168,7 +168,7 @@ func (opts cliUpdateOptions) runCLIUpdate(cmd *cobra.Command, overrideChannel st
 		return cmdutil.PrintJSON(plan)
 	}
 
-	output.Header("Arcane CLI Update")
+	output.Header("HiveMind CLI Update")
 	output.KeyValue("Channel", plan.Channel)
 	output.KeyValue("Version", plan.Version)
 	output.KeyValue("Current SHA", plan.CurrentSHA)

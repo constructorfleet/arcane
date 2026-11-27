@@ -1,5 +1,5 @@
 name: 🐞 Bug Report
-description: Report a bug to help improve Arcane
+description: Report a bug to help improve HiveMind
 title: '🐞 Bug: '
 type: 'Bug'
 labels: 'triage'
@@ -64,8 +64,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: Arcane Version
-      description: What version of Arcane are you using? (Check the About dialog or version info)
+      label: HiveMind Version
+      description: What version of HiveMind are you using? (Check the About dialog or version info)
       placeholder: v1.2.3
     validations:
       required: true
@@ -74,7 +74,7 @@ body:
     id: installation
     attributes:
       label: Installation Method
-      description: How did you install Arcane?
+      description: How did you install HiveMind?
       options:
         - Docker Compose (Recommended)
         - Docker Run
@@ -113,7 +113,7 @@ body:
     id: os
     attributes:
       label: Operating System
-      description: What operating system is Arcane running on?
+      description: What operating system is HiveMind running on?
       options:
         - Linux
         - macOS
@@ -135,7 +135,7 @@ body:
     id: browser
     attributes:
       label: Browser & Version
-      description: What browser and version are you using to access Arcane?
+      description: What browser and version are you using to access HiveMind?
       placeholder: 'Chrome 119, Firefox 120, Safari 17, etc.'
     validations:
       required: false
@@ -144,7 +144,7 @@ body:
     attributes:
       value: |
         > [!IMPORTANT]
-        > **Required step:** Set `ARCANE_LOG_LEVEL=debug` in your environment (e.g. in your `.env` file or Docker Compose environment section), restart Arcane, reproduce the issue, and then provide the resulting logs below. Reports without debug logs may be closed.
+        > **Required step:** Set `ARCANE_LOG_LEVEL=debug` in your environment (e.g. in your `.env` file or Docker Compose environment section), restart HiveMind, reproduce the issue, and then provide the resulting logs below. Reports without debug logs may be closed.
 
   - type: textarea
     id: logs
@@ -153,7 +153,7 @@ body:
       description: Logs captured with ARCANE_LOG_LEVEL=debug after reproducing the issue (required)
       placeholder: |
         1. Set ARCANE_LOG_LEVEL=debug in your .env file or Docker Compose environment
-        2. Restart Arcane
+        2. Restart HiveMind
         3. Reproduce the issue
         4. Paste the logs here...
 

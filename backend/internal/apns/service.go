@@ -485,7 +485,7 @@ func (s *ApnsService) Enqueue(ctx context.Context, environmentID, environmentNam
 			batchCount = int(n)
 		}
 	}
-	title, body, severity := "Arcane notification", subject, "info"
+	title, body, severity := "HiveMind notification", subject, "info"
 	route := types.ApnsRoute{Kind: "environment", EnvironmentID: environmentID}
 	switch eventType {
 	case notifications.NotificationEventImageUpdate:

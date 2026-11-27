@@ -179,7 +179,7 @@ func (s *Service) ContainerUnitAction(ctx context.Context, containerRef string, 
 		return false, nil
 	}
 	if !availability.Available {
-		return true, common.Classify(common.ErrUnavailable, fmt.Errorf("container %s is managed by systemd unit %s, but Arcane cannot reach systemd: %s", containerRef, unit, availability.Reason))
+		return true, common.Classify(common.ErrUnavailable, fmt.Errorf("container %s is managed by systemd unit %s, but HiveMind cannot reach systemd: %s", containerRef, unit, availability.Reason))
 	}
 
 	conmonPID, err := rt.Client.ContainerConmonPID(ctx, match.ID)
@@ -202,7 +202,7 @@ func (s *Service) unverifiedUnitAction(ctx context.Context, containerRef string,
 	if err != nil || unit == "" {
 		return false, nil
 	}
-	return true, common.Classify(common.ErrUnavailable, fmt.Errorf("container %s is labelled with systemd unit %s, but Arcane cannot verify it: %w", containerRef, unit, cause))
+	return true, common.Classify(common.ErrUnavailable, fmt.Errorf("container %s is labelled with systemd unit %s, but HiveMind cannot verify it: %w", containerRef, unit, cause))
 }
 
 func (s *Service) GuardQuadletManaged(ctx context.Context, labels map[string]string) error {

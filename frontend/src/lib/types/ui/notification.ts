@@ -236,7 +236,7 @@ export function discordSettingsToFormValues(settings?: NotificationSettings): Di
 		enabled: settings?.enabled ?? false,
 		webhookId: getString(cfg, 'webhookId'),
 		token: getString(cfg, 'token'),
-		username: getString(cfg, 'username', 'Arcane'),
+		username: getString(cfg, 'username', 'HiveMind'),
 		avatarUrl: getString(cfg, 'avatarUrl'),
 		...eventFlagsToFormValues(events)
 	};
@@ -313,7 +313,7 @@ export function slackSettingsToFormValues(settings?: NotificationSettings): Slac
 	return {
 		enabled: settings?.enabled ?? false,
 		token: getString(cfg, 'token'),
-		botName: getString(cfg, 'botName', 'Arcane'),
+		botName: getString(cfg, 'botName', 'HiveMind'),
 		icon: getString(cfg, 'icon'),
 		color: getString(cfg, 'color'),
 		title: getString(cfg, 'title'),

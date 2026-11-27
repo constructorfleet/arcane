@@ -15,7 +15,7 @@
 	import { AlertIcon, ApiKeyIcon, ShieldCheckIcon, SuccessIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { passkeyService } from '#lib/services/passkey-service.js';
-	import { logoBranding } from '#lib/utils/branding.js';
+	import { customLogoHash } from '#lib/utils/branding.js';
 	import { getApplicationLogo } from '#lib/utils/docker.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
@@ -33,8 +33,7 @@
 	type CeremonyStatus = 'preparing' | 'ready' | 'working' | 'returning' | 'error';
 	type PageError = 'invalid_request' | 'callback_failed';
 
-	const branding = $derived(logoBranding());
-	const logoUrl = $derived(getApplicationLogo(false, undefined, undefined, branding));
+	const logoUrl = $derived(getApplicationLogo(false, false, { custom: customLogoHash() }));
 	let status = $state<CeremonyStatus>('preparing');
 	let pageError = $state<PageError>('invalid_request');
 	let request = $state<MobilePasskeyBridgeRequest | null>(null);
@@ -141,11 +140,7 @@
 		<div class="mb-7 flex items-center justify-between gap-4">
 			<div class="flex items-center gap-3">
 				<div class="flex size-11 items-center justify-center rounded-xl border bg-background/50 ring-1 ring-border/40">
-					<img
-						class={branding.development ? 'size-9' : 'h-7 w-auto max-w-40 object-contain'}
-						src={logoUrl}
-						alt={m.layout_title()}
-					/>
+					<img class="size-8 object-contain" src={logoUrl} alt={m.layout_title()} />
 				</div>
 				<p class="text-sm font-semibold tracking-wide">{m.layout_title()}</p>
 			</div>

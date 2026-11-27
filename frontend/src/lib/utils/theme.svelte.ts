@@ -17,7 +17,7 @@ const DEFAULT_THEME_OPTION: ApplicationThemeOption = {
 		card: '#ffffff',
 		border: '#d4d4d8',
 		foreground: '#18181b',
-		primary: '#8b5cf6'
+		primary: '#ffc400'
 	},
 	dark: {
 		background: '#24262b',
@@ -25,7 +25,7 @@ const DEFAULT_THEME_OPTION: ApplicationThemeOption = {
 		card: '#31343a',
 		border: '#4a4f58',
 		foreground: '#f5f7fa',
-		primary: '#a855f7'
+		primary: '#ffc400'
 	}
 };
 
@@ -69,7 +69,7 @@ const APP_THEME_STYLE_ID = 'arcane-app-theme';
 const OLED_CLASS = 'oled';
 const DARK_CLASS = 'dark';
 const OLED_THEME_COLOR = '#000000';
-const DEFAULT_ACCENT_COLOR = 'oklch(0.606 0.25 292.717)';
+const DEFAULT_ACCENT_COLOR = 'oklch(0.85 0.174 86.6)';
 
 let htmlClassObserver: MutationObserver | null = null;
 
@@ -123,14 +123,6 @@ export function resolveThemePrimary(isDarkMode: boolean): string {
 	}
 
 	return isDarkMode ? theme.dark.primary : theme.light.primary;
-}
-
-export function resolveLogoColor(isDarkMode: boolean): string {
-	if (appearanceState.accent !== 'default' && appearanceState.accent !== 'theme') {
-		return appearanceState.accent;
-	}
-
-	return resolveThemePrimary(isDarkMode);
 }
 
 export function resolveApplicationTheme(value?: string | null): ApplicationTheme {

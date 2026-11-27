@@ -618,7 +618,7 @@ func (s *Service) syncProjectDirectory(
 		}
 	}()
 
-	// Reserved root env files are Arcane's bookkeeping and only come from the env merge, which takes a committed .env as its git source.
+	// Reserved root env files are HiveMind's bookkeeping and only come from the env merge, which takes a committed .env as its git source.
 	for _, file := range syncFiles {
 		switch {
 		case !slices.Contains(projects.ReservedRootEnvFiles, file.RelativePath):
@@ -627,7 +627,7 @@ func (s *Service) syncProjectDirectory(
 		case file.RelativePath == projects.EffectiveEnvFileName:
 			stage.gitEnvContent = new(string(file.Content))
 		default:
-			slog.WarnContext(ctx, "dropping reserved Arcane env file from git payload; will be re-derived from override merge", "path", file.RelativePath)
+			slog.WarnContext(ctx, "dropping reserved HiveMind env file from git payload; will be re-derived from override merge", "path", file.RelativePath)
 		}
 	}
 	if sync.EnvContent != nil {
@@ -793,7 +793,7 @@ func (s *Service) recoverProject(ctx context.Context, sync *projectpkg.GitOpsSyn
 	prefix := projects.SanitizeProjectName(sync.ProjectName)
 	var matches []string
 	for _, entry := range entries {
-		// acfs reports a symlink as a non-directory, so adoption never follows one; Arcane's own scratch dirs never qualify.
+		// acfs reports a symlink as a non-directory, so adoption never follows one; HiveMind's own scratch dirs never qualify.
 		if !entry.IsDirectory || projects.IsInternalScratchDirName(entry.Name) || (prefix != "" && entry.Name != prefix && !strings.HasPrefix(entry.Name, prefix+"-")) {
 			continue
 		}

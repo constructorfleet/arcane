@@ -1,8 +1,8 @@
-# Arcane feature checklist
+# HiveMind feature checklist
 
 Last reviewed: 2026-11-18.
 
-This is the working scope for the Constructorfleet Arcane fork. Add, remove,
+This is the working scope for the Constructorfleet HiveMind fork. Add, remove,
 reword, or reprioritize entries here. IDs stay stable so changes can be requested
 by ID. The detailed architecture is in [SWARM-FORK.md](SWARM-FORK.md).
 
@@ -23,16 +23,16 @@ Change this ordering whenever priorities change.
 
 ## Confirmed groundwork
 
-- [x] BASE-01 — Fork Arcane under Constructorfleet on GitHub and Gitea.
+- [x] BASE-01 — Fork upstream Arcane as HiveMind under Constructorfleet on GitHub and Gitea.
 - [x] BASE-02 — Publish separate manager and agent images to Harbor.
 - [x] BASE-03 — Remove implicit “local agent” coverage from the manager's Swarm node; service tests cover manager-node enrollment and duplicate protection.
 - [x] BASE-04 — Provide a global-agent stack manifest accepted by Docker's stack parser.
-- [x] BASE-05 — Configure the homelab Arcane role and remove Komodo's role and active inventory/integration references.
-- [x] BASE-06 — Configure Harbor `latest` images and Arcane's SwarmCD per-stack image refresh.
+- [x] BASE-05 — Configure the homelab HiveMind role and remove Komodo's role and active inventory/integration references.
+- [x] BASE-06 — Configure Harbor `latest` images and HiveMind's SwarmCD per-stack image refresh.
 - [x] BASE-07 — Validate manager-only bootstrap and agent-enabled role rendering with Ansible and Docker stack tooling.
-- [x] BASE-08 — Create and verify an Arcane Docmost page describing actual status and limitations.
+- [x] BASE-08 — Create and verify a HiveMind Docmost page describing actual status and limitations.
 - [x] BASE-09 — Schedule separate hourly deployment-maintenance and documentation-maintenance follow-ups.
-- [x] BASE-10 — Perform and verify the initial live Arcane rollout from homelab-ansible.
+- [x] BASE-10 — Perform and verify the initial live HiveMind rollout from homelab-ansible.
 - [x] BASE-11 — Verify the live Authentik callback and administrator access.
 - [x] BASE-12 — Enroll and verify one agent per Linux node, including the manager host.
 
@@ -109,7 +109,7 @@ recovery, three pages, driver sorting in both directions, and navigation away/ba
 Volume service and pagination tests and Go lint passed. Local format/lint was
 blocked by missing `vp` at cf.3; later feature branches passed full local checks.
 
-cf.17 local-fixture acceptance identified the exact agent-scoped Arcane volume
+cf.17 local-fixture acceptance identified the exact agent-scoped HiveMind volume
 helper, retained In Use, and explained its mount ownership. Shared RBD identity,
 grouping and safe attachment-aware navigation remain open in
 [volume issue #13](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues/13).
@@ -132,7 +132,7 @@ Corrected live UI and no-helper acceptance remain tracked in #14.
 
 - [ ] Service Tasks table (#171). Verify pagination, total counts, node and state filters, and vertical cards on mobile. Networks and Storage reuse the shared related-resource table.
 
-- [ ] RES-01 — Discover resources on an existing Swarm regardless of whether Ansible, SwarmCD, Docker CLI, Arcane, or another UI deployed them.
+- [ ] RES-01 — Discover resources on an existing Swarm regardless of whether Ansible, SwarmCD, Docker CLI, HiveMind, or another UI deployed them.
 - [ ] RES-02 — Manage existing stacks/services without recreating or relabeling them merely to onboard them.
 - [ ] RES-03 — Inspect services/tasks and edit native service settings, replicas, constraints, labels, mounts, ports, and update policies.
 - [ ] RES-04 — Launch standalone containers from the UI on an explicitly selected node.
@@ -152,8 +152,8 @@ scoping in Services and Tasks, and node filtering in Tasks.
 
 - [x] CMP-01 — Create and edit stacks directly in the UI using standard Compose YAML.
 - [ ] CMP-02 — Parse and validate Compose, then validate the supported feature set for the selected target: Swarm stack or local Compose.
-- [ ] CMP-03 — Preserve useful YAML anchors, merges, extension fields, and Arcane's existing authoring conveniences.
-- [ ] CMP-04 — Audit and retain useful Arcane custom tags/features with documented expansion to deployable Compose. **Candidate features; exact set undecided.**
+- [ ] CMP-03 — Preserve useful YAML anchors, merges, extension fields, and HiveMind's existing authoring conveniences.
+- [ ] CMP-04 — Audit and retain useful HiveMind custom tags/features with documented expansion to deployable Compose. **Candidate features; exact set undecided.**
 - [ ] CMP-05 — Show resolved nonsecret variables, effective images, validation errors, and the deployment diff before applying changes.
 - [ ] CMP-06 — Keep GUI editing and YAML editing consistent, and warn when an edit cannot preserve a document feature.
 - [ ] CMP-07 — Preserve source Compose, associated files, deployment history, and enough provenance to explain live drift.
@@ -253,7 +253,7 @@ non-Harbor runtime and broader build/push acceptance remain
 [registry issue #40](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues/40).
 cf.22 standalone Push passed for a unique owned QA tag from explicitly selected
 swarm03. Activity output, the native agent request and Harbor artifact metadata
-agree on the pushed digest. The new repository/tag browses in Arcane and a
+agree on the pushed digest. The new repository/tag browses in HiveMind and a
 subsequent explicit swarm02 Pull passed. Layers were cross-mounted or cached;
 that cf.22 check did not establish uncached transfer. Negative and
 cancellation behavior has business-test coverage. No released tag was overwritten.
@@ -284,13 +284,13 @@ or support both remains an explicit design decision.
 ## Templates, metrics, and operations
 
 - [ ] TPL-01 — Support reusable templates with declared variables/secret inputs and a preview before deployment.
-- [ ] TPL-02 — Audit and reuse Arcane's existing template/catalog behavior where it fits standard Compose.
+- [ ] TPL-02 — Audit and reuse HiveMind's existing template/catalog behavior where it fits standard Compose.
 - [ ] OBS-01 — Expose Prometheus metrics for manager health, agent connectivity, operations, errors, deployment results, and reconciliation state.
 - [ ] OBS-02 — Provide useful UI error/status information for partial deployment failures and unavailable nodes.
 - [x] OBS-03 — Collect existing manager and node-agent Prometheus series through six unique task targets on the monitoring overlay, with remote-query and native container-ID coverage proof.
 - [ ] OPS-01 — Record an audit trail for mutations and sensitive operations without recording secret payloads.
 - [ ] OPS-02 — Verify rollback, backup/restore, encryption-key preservation, and upgrades for manager state.
-- [ ] OPS-03 — Keep Arcane Docmost feature, customization, deployment, and troubleshooting pages synchronized with verified changes.
+- [ ] OPS-03 — Keep HiveMind Docmost feature, customization, deployment, and troubleshooting pages synchronized with verified changes.
 
 Template evidence: a cf.15 unsaved Compose anchor/merge draft and matching
 synthetic `.env` input passed editor diagnostics; invalid YAML produced an error.
@@ -359,7 +359,7 @@ These observations do not establish the initiating allocation of the global OOM.
 
 This repository checklist is the source for scope and progress. Docmost contains
 operator-facing documentation, including
-[the Arcane page](https://docmost.home.prettybaked.com/s/general/p/arcane-hkk6Tx4CHx).
+[the HiveMind page](https://docmost.home.prettybaked.com/s/general/p/arcane-hkk6Tx4CHx).
 Changes to scope should be reflected here before the documentation agent presents
 them as committed behavior. Checking off a feature should cite its implementation
 and relevant verification in the change that completes it.

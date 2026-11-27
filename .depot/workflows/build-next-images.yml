@@ -1,4 +1,4 @@
-name: Build Next Versions of Arcane and CLI
+name: Build Next Versions of HiveMind and CLI
 
 on:
   push:

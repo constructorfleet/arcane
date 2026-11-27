@@ -54,13 +54,13 @@ func TestVersionOutput(t *testing.T) {
 				require.NoError(t, json.Unmarshal([]byte(out), &got))
 				require.Equal(t, "v1.2.3", got["displayVersion"])
 				require.Equal(t, "server-revision", got["revision"])
-				require.NotContains(t, out, "Arcane CLI")
+				require.NotContains(t, out, "HiveMind CLI")
 				return
 			}
-			require.Contains(t, out, "Arcane CLI")
+			require.Contains(t, out, "HiveMind CLI")
 			require.Contains(t, out, config.Version)
 			require.Contains(t, out, config.Revision)
-			require.Contains(t, out, "Arcane Server")
+			require.Contains(t, out, "HiveMind Server")
 			if tc.unavailable {
 				require.Contains(t, out, "Unavailable")
 				require.Contains(t, diagnostics, "Could not get server version")

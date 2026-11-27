@@ -63,7 +63,6 @@ export type Settings = {
 	baseServerUrl: string;
 	enableGravatar: boolean;
 	experimentalFeaturesEnabled: boolean;
-	developmentBrandingEnabled: boolean;
 	customLogoHash?: string;
 	customLogoFullHash?: string;
 	customFaviconHash?: string;

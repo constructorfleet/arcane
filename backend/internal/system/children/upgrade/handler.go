@@ -119,7 +119,7 @@ func (h *Handler) TriggerUpgrade(ctx context.Context, input *TriggerUpgradeInput
 
 func (h *Handler) StartUpgradeJob(ctx context.Context, input *StartUpgradeJobInput) (*handlerutil.Out[types.UpgradeJob], error) {
 	if h.cfg.AgentEnabled {
-		return nil, huma.Error400BadRequest("upgrade jobs are managed on the Arcane manager")
+		return nil, huma.Error400BadRequest("upgrade jobs are managed on the HiveMind manager")
 	}
 
 	user, err := handlerutil.RequireUser(ctx)
@@ -148,7 +148,7 @@ func (h *Handler) StartUpgradeJob(ctx context.Context, input *StartUpgradeJobInp
 
 func (h *Handler) GetCurrentUpgradeJob(ctx context.Context, input *types.EnvironmentInput) (*handlerutil.Out[types.UpgradeJob], error) {
 	if h.cfg.AgentEnabled {
-		return nil, huma.Error400BadRequest("upgrade jobs are managed on the Arcane manager")
+		return nil, huma.Error400BadRequest("upgrade jobs are managed on the HiveMind manager")
 	}
 
 	job, err := h.service.FindUpgradeJob(ctx)

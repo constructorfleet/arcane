@@ -105,22 +105,22 @@ test.describe('Token refresh behaviour', () => {
 		await page.goto('/login');
 		await page.getByLabel('Username').fill('arcane');
 		await page.getByLabel('Password').fill('not-the-admin-password');
-		await page.getByRole('button', { name: 'Sign in to Arcane', exact: true }).click();
+		await page.getByRole('button', { name: 'Sign in to HiveMind', exact: true }).click();
 
 		const proxyAlert = page
 			.getByRole('alert')
-			.filter({ hasText: "Arcane couldn't complete login through the reverse proxy" });
+			.filter({ hasText: "HiveMind couldn't complete login through the reverse proxy" });
 		await expect(proxyAlert).toBeVisible();
 		await expect(proxyAlert).not.toContainText('openresty');
 
 		await page.getByLabel('Password').fill('not-the-admin-password');
-		await page.getByRole('button', { name: 'Sign in to Arcane', exact: true }).click();
+		await page.getByRole('button', { name: 'Sign in to HiveMind', exact: true }).click();
 		await expect(
 			page.getByRole('alert').filter({ hasText: 'Invalid username or password' })
 		).toBeVisible();
 
 		await page.getByLabel('Password').fill(authUtil.TEST_PASSWORD);
-		await page.getByRole('button', { name: 'Sign in to Arcane', exact: true }).click();
+		await page.getByRole('button', { name: 'Sign in to HiveMind', exact: true }).click();
 		await expect(page).toHaveURL('/dashboard');
 		await expect(page.getByRole('button', { name: 'Card view', exact: true })).toBeVisible();
 		await expect(page.locator('main').getByRole('heading', { level: 1 })).toBeVisible();
@@ -148,7 +148,7 @@ test.describe('Token refresh behaviour', () => {
 
 		await expect.poll(() => refreshCallCount()).toBe(1);
 		await expect(page).toHaveURL('/dashboard');
-		await expect(page.getByRole('button', { name: 'Sign in to Arcane' })).not.toBeVisible();
+		await expect(page.getByRole('button', { name: 'Sign in to HiveMind' })).not.toBeVisible();
 	});
 
 	test('version mismatch 401 on a data endpoint mid-session is silently recovered', async ({
@@ -164,7 +164,7 @@ test.describe('Token refresh behaviour', () => {
 		await expect.poll(() => refreshCallCount()).toBe(1);
 		await expect(page).toHaveURL('/containers');
 		await expect(page.getByRole('heading', { name: 'Containers', level: 1 })).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Sign in to Arcane' })).not.toBeVisible();
+		await expect(page.getByRole('button', { name: 'Sign in to HiveMind' })).not.toBeVisible();
 	});
 
 	test('failed token refresh redirects to /login', async ({ page }) => {
@@ -190,7 +190,7 @@ test.describe('Token refresh behaviour', () => {
 		await page.waitForURL(/\/login(\?|$)/, { timeout: 15_000 });
 		expect(new URL(page.url()).searchParams.get('redirect')).toBe(returnPath);
 		await expect(
-			page.getByRole('button', { name: 'Sign in to Arcane', exact: true })
+			page.getByRole('button', { name: 'Sign in to HiveMind', exact: true })
 		).toBeVisible();
 	});
 
@@ -203,7 +203,7 @@ test.describe('Token refresh behaviour', () => {
 		await expect(page).toHaveURL(/\/login/);
 		expect(new URL(page.url()).searchParams.get('redirect')).toBe(returnPath);
 		await expect(
-			page.getByRole('button', { name: 'Sign in to Arcane', exact: true })
+			page.getByRole('button', { name: 'Sign in to HiveMind', exact: true })
 		).toBeVisible();
 	});
 

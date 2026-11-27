@@ -12,7 +12,7 @@
 	type Swatch = { label: string; color: string };
 
 	const defaultColors: Swatch[] = [
-		{ label: 'Purple', color: 'oklch(0.606 0.25 292.717)' },
+		{ label: 'Honey', color: 'oklch(0.85 0.174 86.6)' },
 		{ label: 'Rose', color: 'oklch(0.63 0.2 15)' },
 		{ label: 'Orange', color: 'oklch(0.68 0.2 50)' },
 		{ label: 'Amber', color: 'oklch(0.75 0.18 80)' },

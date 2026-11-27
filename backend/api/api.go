@@ -132,7 +132,7 @@ const (
 	scalarDocsHTML = `<!doctype html>
 <html>
   <head>
-    <title>Arcane API Reference</title>
+    <title>HiveMind API Reference</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
   </head>
@@ -158,7 +158,7 @@ func SetupAPI(p SetupParams) *authz.OperationRecorder {
 	p.Echo.JSONSerializer = jsonx.Serializer{}
 	sse.WriteTimeout = time.Hour
 
-	humaConfig := huma.DefaultConfig("Arcane API", config.Version)
+	humaConfig := huma.DefaultConfig("HiveMind API", config.Version)
 	humaConfig.Formats = maps.Clone(humaConfig.Formats)
 	humaConfig.Formats["application/json"] = jsonx.HumaFormat
 	humaConfig.Formats["json"] = jsonx.HumaFormat

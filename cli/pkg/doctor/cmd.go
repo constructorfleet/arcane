@@ -93,7 +93,7 @@ func Command() *cobra.Command {
 					return printErr
 				}
 			} else {
-				output.Header("Arcane CLI Diagnostics")
+				output.Header("HiveMind CLI Diagnostics")
 				rows := make([][]string, len(rep.Checks))
 				for i, item := range rep.Checks {
 					rows[i] = []string{item.Name, item.Status, item.Details}

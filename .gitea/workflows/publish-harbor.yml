@@ -1,4 +1,4 @@
-name: Release Arcane to Harbor
+name: Release HiveMind to Harbor
 on:
   push:
     branches: [main]

@@ -1,5 +1,5 @@
 # Integration candidate: requires the fork's patched agent image and an existing manager.
-# Create a reusable Arcane enrollment token with enough uses for every node,
+# Create a reusable HiveMind enrollment token with enough uses for every node,
 # and store it in the external Docker secret named arcane_agent_enrollment_token.
 # Set ARCANE_AGENT_IMAGE to an immutable patched image tag or digest and
 # ARCANE_MANAGER_API_URL to the reachable HTTPS control-plane URL.

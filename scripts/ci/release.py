@@ -70,7 +70,7 @@ def release_body(values, notes, sha, digests, pull, server, repository):
         project = urllib.parse.quote(name.split("/", 1)[0], safe="")
         artifact = f"https://{values['REGISTRY']}/api/v2.0/projects/{project}/repositories/{repo_name}/artifacts/{digest}"
         lines.append(f"| {image} | `{ref}:{values['VERSION']}` | `{ref}@{digest}` | [Repository]({harbor}) / [Artifact metadata]({artifact}) |")
-    lines.extend(["", f"Platforms: `{values['PLATFORMS']}`. Build provenance is attached to the images.", "", "Both images were built before any latest promotion. SwarmCD owns deployment; a published release does not by itself prove runtime acceptance.", "", "Validation and limitations are recorded above. Operator documentation: [Arcane in Docmost](https://docmost.home.prettybaked.com/s/general/p/arcane-hkk6Tx4CHx)."])
+    lines.extend(["", f"Platforms: `{values['PLATFORMS']}`. Build provenance is attached to the images.", "", "Both images were built before any latest promotion. SwarmCD owns deployment; a published release does not by itself prove runtime acceptance.", "", "Validation and limitations are recorded above. Operator documentation: [HiveMind in Docmost](https://docmost.home.prettybaked.com/s/general/p/arcane-hkk6Tx4CHx)."])
     return "\n".join(lines) + "\n"
 
 

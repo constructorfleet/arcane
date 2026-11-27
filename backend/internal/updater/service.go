@@ -213,7 +213,7 @@ func NewUpdaterService(p UpdaterServiceParams) (*UpdaterService, error) {
 		ResumeTarget:     service.recovery.ResumeTarget,
 		WithFrozenTarget: service.recovery.WithSingleTarget,
 	})
-	// The self container ID routes Arcane through the CLI self-updater even without its labels.
+	// The self container ID routes HiveMind through the CLI self-updater even without its labels.
 	selfContainerID, selfErr := cgroup.CurrentContainerID()
 	engine, err := updater.New(updater.Config{
 		DockerClientProvider:   service,
@@ -789,7 +789,7 @@ func (s *UpdaterService) RestartContainersUsingOldIDs(ctx context.Context, oldID
 
 func (s *UpdaterService) TriggerSelfUpdateViaCLI(ctx context.Context, source, containerID, containerName string, labelMap map[string]string) error {
 	if !labels.IsArcaneContainer(labelMap) {
-		return fmt.Errorf("%s: container is not an Arcane self-update target", source)
+		return fmt.Errorf("%s: container is not a HiveMind self-update target", source)
 	}
 	return s.TriggerSelfUpdate(ctx, updater.SelfUpdateTarget{
 		ContainerID:   containerID,
@@ -1309,7 +1309,7 @@ func (s *UpdaterService) TriggerSelfUpdate(ctx context.Context, target updater.S
 		s.appendAutoUpdateActivityMessage(
 			ctx,
 			activityID,
-			"Self-update initiated — Arcane will restart"+kit.Ternary(target.NewImageRef != "", " with "+target.NewImageRef, ""),
+			"Self-update initiated — HiveMind will restart"+kit.Ternary(target.NewImageRef != "", " with "+target.NewImageRef, ""),
 			"Self-update",
 			90,
 		)
@@ -1879,7 +1879,7 @@ func (s *UpdaterService) RecordUpdateRun(ctx context.Context, result updater.Res
 			case evidenceErr != nil:
 				return evidenceErr.Error()
 			case selfPending:
-				return "Arcane is restarting with the updated image"
+				return "HiveMind is restarting with the updated image"
 			}
 			return result.Error
 		}(),
@@ -1920,7 +1920,7 @@ func (p *updateProgress) completeBatch(ctx context.Context, options types.Update
 			ResourceType: "container",
 			Status:       types.RunStatusSucceeded,
 			ActivityID:   activityID,
-			Message:      "Arcane restart triggered with the updated image",
+			Message:      "HiveMind restart triggered with the updated image",
 		}))
 	}
 	checkpointErr := jobcontext.Progress(ctx, types.TargetOutcome{

@@ -303,8 +303,8 @@ func ValidateScriptPath(ctx context.Context, projectPath, scriptPath string) err
 	entry, err := acfs.Root{Path: absProject}.Stat(ctx, "/"+filepath.ToSlash(scriptPath), acfstypes.StatOptions{})
 	if err != nil {
 		if errors.Is(err, os.ErrPermission) {
-			// The runner image's user may read a path Arcane's uid cannot traverse (#3373); let the run surface real problems.
-			slog.WarnContext(ctx, "cannot inspect pre-deploy script as the Arcane user; proceeding, the runner container may still be able to read it",
+			// The runner image's user may read a path HiveMind's uid cannot traverse (#3373); let the run surface real problems.
+			slog.WarnContext(ctx, "cannot inspect pre-deploy script as the HiveMind user; proceeding, the runner container may still be able to read it",
 				"scriptPath", scriptPath,
 				"detail", describeLifecyclePathAccess(ctx, projectPath, absScript),
 			)

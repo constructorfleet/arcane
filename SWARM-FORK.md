@@ -1,8 +1,8 @@
-# Swarm management fork
+# HiveMind Swarm management fork
 
 ## Status
 
-Starting point: Arcane main `79c61a2b6`, reporting version 3.0.1.
+Starting point: upstream Arcane main `79c61a2b6`, reporting version 3.0.1 (rebranded as HiveMind).
 Fork: https://github.com/constructorfleet/arcane.
 Build repository: https://gitea.home.prettybaked.com/constructorfleet/arcane.
 
@@ -116,7 +116,7 @@ control, cancellation, and session revocation.
 
 ### Plugin volumes and files
 
-Reuse Arcane's helper-container mechanism. Ask the selected node's Docker Engine
+Reuse HiveMind's helper-container mechanism. Ask the selected node's Docker Engine
 to mount the named volume at a fixed path inside the helper. Do not open Docker's
 reported mountpoint on the manager, assume `/var/lib/docker/volumes`, or bind a
 plugin's private filesystem into the manager.
@@ -167,7 +167,7 @@ Swarm stack deploy supports a different feature set from local Docker Compose.
 Do not silently ignore unsupported deployment semantics. Standalone containers
 must select a node, since Swarm does not schedule standalone containers.
 
-Retain useful Arcane variable/template features after auditing their semantics.
+Retain useful HiveMind variable/template features after auditing their semantics.
 Prefer `x-` extension fields for optional application features. Any custom YAML
 tag must have a documented expansion and export to plain deployable Compose.
 Never evaluate arbitrary code during template expansion. Record source revision,
@@ -208,7 +208,7 @@ explicitly direct or repository-managed, with exactly one reconciliation owner.
 Direct mode saves a versioned bundle in the application and deploys it. Git mode
 edits the bundle in a branch and creates a commit or PR. Deploy only the accepted
 revision using the designated reconciler. Support existing SwarmCD ownership;
-do not also run an independent Arcane reconciliation loop for that stack.
+do not also run an independent HiveMind reconciliation loop for that stack.
 
 Model source mode separately from origin: a stack deployed by Ansible can be
 observed and operated without transferring ownership from Ansible. UI edits to

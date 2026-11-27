@@ -591,7 +591,7 @@ func (s *UserService) CreateDefaultAdmin(ctx context.Context, opts DefaultAdminO
 				return fmt.Errorf("failed to hash default admin password: %w", err)
 			}
 			email := "admin@localhost"
-			displayName := "Arcane Admin"
+			displayName := "HiveMind Admin"
 			userModel := &User{
 				Username:               opts.Username,
 				Email:                  new(email),

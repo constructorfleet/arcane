@@ -100,7 +100,7 @@ func (s *Service) ImageOperations(user *types.Actor, credentials []types.Contain
 	}
 }
 
-// PrepareProjectBindDirectories creates missing bind sources as Arcane's user, not root (#4132).
+// PrepareProjectBindDirectories creates missing bind sources as HiveMind's user, not root (#4132).
 func PrepareProjectBindDirectories(projectPath string) projects.PrepareProjectFunc {
 	return func(ctx context.Context, project *composetypes.Project) error {
 		for _, serviceName := range slices.Sorted(maps.Keys(project.Services)) {

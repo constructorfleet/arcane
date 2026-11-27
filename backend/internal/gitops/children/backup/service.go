@@ -394,8 +394,8 @@ func (s *Service) Plan(ctx context.Context, req PlanRequest) (*PullPlan, error) 
 			req.Result,
 			req.Actor,
 			types.GitOpsBackupFailureConflict,
-			"Files changed in both Arcane and the repository",
-			fmt.Errorf("%d file(s) changed in both Arcane and the repository since the last sync: %s", len(conflicts), changedPathList(conflicts)),
+			"Files changed in both HiveMind and the repository",
+			fmt.Errorf("%d file(s) changed in both HiveMind and the repository since the last sync: %s", len(conflicts), changedPathList(conflicts)),
 			true,
 		)
 	}
@@ -612,7 +612,7 @@ func (
 			types.GitOpsBackupFailureDestinationOccupied,
 			"Backup directory already contains unrelated files",
 			fmt.Errorf(
-				"directory %s on branch %s already contains files that are not an Arcane backup",
+				"directory %s on branch %s already contains files that are not a HiveMind backup",
 				localSync.BackupDirectory,
 				localSync.Branch,
 			),
@@ -621,7 +621,7 @@ func (
 	}
 
 	var message strings.Builder
-	fmt.Fprintf(&message, "Back up %s from Arcane", project.Name)
+	fmt.Fprintf(&message, "Back up %s from HiveMind", project.Name)
 	if actor.Username != "" && actor.ID != types.SystemUser.ID {
 		fmt.Fprintf(&message, " (%s)", actor.Username)
 	}
@@ -1158,7 +1158,7 @@ func normalizeBackupPaths(ctx context.Context, rules backupPathRules, raw []stri
 			continue
 		}
 		if slices.Contains(projects.ReservedRootEnvFiles, cleaned) {
-			return nil, fmt.Errorf("backup path %q is an Arcane-managed env file and cannot be synced both ways", entry)
+			return nil, fmt.Errorf("backup path %q is a HiveMind-managed env file and cannot be synced both ways", entry)
 		}
 		exists, err := acfs.Root{Path: rules.projectPath}.Exists(ctx, "/"+cleaned)
 		if err != nil {

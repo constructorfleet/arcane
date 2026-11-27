@@ -19,7 +19,7 @@ func Command() *cobra.Command {
 		Use:     "oidc",
 		Aliases: []string{"oidc-mappings", "oidc-mapping"},
 		Short:   "Manage OIDC group → role mappings",
-		Long: "Manage OIDC group → role mappings. On every OIDC login, Arcane looks up the user's groups claim and applies " +
+		Long: "Manage OIDC group → role mappings. On every OIDC login, HiveMind looks up the user's groups claim and applies " +
 			"the matching mappings as source='oidc' role assignments. The groups claim itself is configured via the " +
 			"oidcGroupsClaim setting (default `groups`).",
 	}

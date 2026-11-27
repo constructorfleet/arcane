@@ -1,5 +1,5 @@
 {
-	"name": "Arcane Dev Container",
+	"name": "HiveMind Dev Container",
 	"dockerComposeFile": "compose.yaml",
 	"service": "arcane-dev-container",
 	"workspaceFolder": "/workspace",

@@ -106,7 +106,6 @@ var (
 		"deployWaitTimeout",
 		"depotProjectId",
 		"depotToken",
-		"developmentBrandingEnabled",
 		"diskUsagePath",
 		"dockerApiTimeout",
 		"dockerClientRefreshInterval",

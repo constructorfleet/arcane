@@ -28,7 +28,7 @@ func Command() *cobra.Command {
 	cmd := &cobra.Command{
 		Annotations: map[string]string{"arcane:scope": cmdutil.ScopeGlobal},
 		Use:         "config",
-		Short:       "Manage Arcane CLI's Configuration",
+		Short:       "Manage HiveMind CLI's Configuration",
 	}
 	cmd.AddCommand(newConfigShowCmd(), newConfigSetCmd(), newConfigInitCmd(), newConfigBackupCmd(), newConfigPathCmd(), newConfigTestCmd())
 	return cmd
@@ -120,7 +120,7 @@ func newConfigSetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set [key value]...",
 		Short: "Set configuration values",
-		Long: `Set configuration values for connecting to an Arcane server.
+		Long: `Set configuration values for connecting to a HiveMind server.
 
 Preferred syntax (key/value pairs):
 
@@ -211,7 +211,7 @@ Legacy flag syntax (flags shown below) is still supported:
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&opts.serverURL, "server-url", "", "Arcane server URL (e.g., http://localhost:3553)")
+	cmd.Flags().StringVar(&opts.serverURL, "server-url", "", "HiveMind server URL (e.g., http://localhost:3553)")
 	cmd.Flags().StringVar(&opts.apiKey, "api-key", "", "API key for authentication")
 	cmd.Flags().StringVar(&opts.jwtToken, "jwt-token", "", "JWT access token for authentication (Bearer token)")
 	cmd.Flags().StringVar(&opts.federatedAudience, "federated-audience", "", "Default audience for federated authentication")

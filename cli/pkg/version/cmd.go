@@ -19,12 +19,12 @@ func Command() *cobra.Command {
 	return &cobra.Command{
 		Annotations:  map[string]string{"arcane:scope": cmdutil.ScopeGlobal},
 		Use:          "version",
-		Short:        "Show CLI and Arcane server versions",
+		Short:        "Show CLI and HiveMind server versions",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !cmdutil.JSONOutputEnabled(cmd) {
-				output.Header("Arcane CLI")
+				output.Header("HiveMind CLI")
 				output.KeyValue("Version", config.Version)
 				output.KeyValue("Revision", config.Revision)
 			}
@@ -42,7 +42,7 @@ func Command() *cobra.Command {
 				if cmdutil.JSONOutputEnabled(cmd) {
 					return fmt.Errorf("failed to get server version: %w", err)
 				}
-				output.Header("Arcane Server")
+				output.Header("HiveMind Server")
 				output.KeyValue("Status", "Unavailable")
 				output.Warning("Could not get server version: %s", err)
 				return nil
@@ -52,7 +52,7 @@ func Command() *cobra.Command {
 				return cmdutil.PrintJSON(result)
 			}
 
-			output.Header("Arcane Server")
+			output.Header("HiveMind Server")
 
 			output.KeyValue("Version", cmp.Or(result.DisplayVersion, result.CurrentVersion))
 			if result.Revision != "" {

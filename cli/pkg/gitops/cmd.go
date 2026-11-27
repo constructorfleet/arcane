@@ -139,7 +139,7 @@ func newCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&opts.project, "project", "", "Existing project ID or name to link (required for backup and bidirectional modes)")
 	cmd.Flags().StringVar(&opts.backupDirectory, "backup-directory", "", "Repository directory that project files are pushed to (backup and bidirectional modes)")
 	cmd.Flags().StringArrayVar(&opts.backupPaths, "backup-path", nil, "Extra project path to push besides the compose files (repeatable; backup and bidirectional modes)")
-	cmd.Flags().BoolVar(&opts.backupOnSave, "backup-on-save", true, "Push to Git whenever project files are saved in Arcane (backup and bidirectional modes)")
+	cmd.Flags().BoolVar(&opts.backupOnSave, "backup-on-save", true, "Push to Git whenever project files are saved in HiveMind (backup and bidirectional modes)")
 	_ = cmd.MarkFlagRequired("name")
 	_ = cmd.MarkFlagRequired("repo-id")
 	_ = cmd.MarkFlagRequired("branch")
@@ -175,7 +175,7 @@ func newUpdateCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&opts.autoSync, "auto-sync", false, "Enable automatic sync")
 	cmd.Flags().IntVar(&opts.interval, "interval", 0, "Sync interval in minutes")
 	cmd.Flags().StringArrayVar(&opts.backupPaths, "backup-path", nil, "Extra project path to push besides the compose files; replaces the current list (repeatable; backup and bidirectional modes)")
-	cmd.Flags().BoolVar(&opts.backupOnSave, "backup-on-save", false, "Push to Git whenever project files are saved in Arcane (backup and bidirectional modes)")
+	cmd.Flags().BoolVar(&opts.backupOnSave, "backup-on-save", false, "Push to Git whenever project files are saved in HiveMind (backup and bidirectional modes)")
 	cmdutil.SetResource(gitopsSyncRef, cmd)
 	return cmd
 }

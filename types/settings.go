@@ -53,7 +53,7 @@ type (
 )
 
 const (
-	DefaultAccentColor = "oklch(0.606 0.25 292.717)"
+	DefaultAccentColor = "oklch(0.85 0.174 86.6)"
 )
 
 var (

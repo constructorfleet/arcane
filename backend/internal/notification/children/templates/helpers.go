@@ -29,7 +29,7 @@ const (
 <table cellpadding="6" cellspacing="0" border="0">
 {{range .Rows}}<tr><td><strong>{{.Label}}</strong></td><td>{{.Value}}</td></tr>
 {{end}}</table>
-<p><a href="{{.AppURL}}">Open Arcane</a></p>
+<p><a href="{{.AppURL}}">Open HiveMind</a></p>
 </body>
 </html>`
 )

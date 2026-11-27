@@ -597,7 +597,7 @@ func (s *ActivityService) FailStaleImageUpdateChecks(ctx context.Context) (int64
 	return s.finalizeSwept(ctx, "stale image update check",
 		func() ([]sweeps.Candidate, error) { return s.sweeps.StaleImageUpdateChecks(ctx) },
 		func(sweeps.Candidate) (types.ActivityStatus, string) {
-			return types.ActivityStatusFailed, "Image update check failed because it was stale after Arcane restarted"
+			return types.ActivityStatusFailed, "Image update check failed because it was stale after HiveMind restarted"
 		},
 		"Image update check failed",
 	)
@@ -692,7 +692,7 @@ func (s *ActivityService) ResolveOrphanedQueuedActivities(ctx context.Context, p
 	return s.finalizeSwept(ctx, "orphaned queued",
 		func() ([]sweeps.Candidate, error) { return s.sweeps.OrphanedQueued(ctx, protectedIDs) },
 		func(sweeps.Candidate) (types.ActivityStatus, string) {
-			return types.ActivityStatusFailed, "Queued activity was interrupted by an Arcane restart"
+			return types.ActivityStatusFailed, "Queued activity was interrupted by a HiveMind restart"
 		},
 	)
 }
@@ -729,9 +729,9 @@ func (s *ActivityService) ResolveStaleAutoUpdateActivities(ctx context.Context, 
 		func() ([]sweeps.Candidate, error) { return s.sweeps.StaleAutoUpdates(ctx, protectedIDs) },
 		func(candidate sweeps.Candidate) (types.ActivityStatus, string) {
 			if selfUpdate, _ := candidate.Metadata["selfUpdateTriggered"].(bool); selfUpdate {
-				return types.ActivityStatusSuccess, "Auto-update completed — Arcane restarted with the updated image"
+				return types.ActivityStatusSuccess, "Auto-update completed — HiveMind restarted with the updated image"
 			}
-			return types.ActivityStatusFailed, "Auto-update interrupted by Arcane restart"
+			return types.ActivityStatusFailed, "Auto-update interrupted by HiveMind restart"
 		},
 	)
 }
@@ -1024,7 +1024,7 @@ func (s *ActivityService) FailInterruptedBackups(ctx context.Context, protectedI
 			}), err
 		},
 		func(sweeps.Candidate) (types.ActivityStatus, string) {
-			return types.ActivityStatusFailed, "Backup interrupted by Arcane restart"
+			return types.ActivityStatusFailed, "Backup interrupted by HiveMind restart"
 		},
 	)
 	return err

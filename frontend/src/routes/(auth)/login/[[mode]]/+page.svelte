@@ -7,7 +7,6 @@
 		type PublicKeyCredentialRequestOptionsJSON
 	} from '@simplewebauthn/browser';
 	import { createMutation, useQueryClient } from '@tanstack/svelte-query';
-	import { mode } from 'mode-watcher';
 	import { onMount, untrack } from 'svelte';
 
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
@@ -26,10 +25,9 @@
 	import type { AuthenticationResponse, MFAChallenge as MFAChallengeData } from '#lib/types/auth.js';
 	import { cn } from '#lib/utils.js';
 	import { normalizeAuthenticationError } from '#lib/utils/auth.js';
-	import { logoBranding } from '#lib/utils/branding.js';
+	import { customLogoHash } from '#lib/utils/branding.js';
 	import { getApplicationLogo } from '#lib/utils/docker.js';
 	import { getEffectiveLandingPage } from '#lib/utils/navigation.js';
-	import { resolveLogoColor } from '#lib/utils/theme.svelte.js';
 
 	import type { PageProps } from './$types';
 
@@ -43,15 +41,8 @@
 	const showPasskeyLoginButton = $derived(passkeySupported && data.passkeyLoginAvailable === true);
 	const queryClient = useQueryClient();
 
-	const logoColor = $derived(resolveLogoColor(mode.current === 'dark'));
 	const animationsEnabled = $derived(userStore.current?.preferences?.animationsEnabled ?? true);
-	const branding = $derived(logoBranding());
-	const markUrl = $derived(
-		getApplicationLogo(false, logoColor, logoColor, {
-			animated: animationsEnabled,
-			...branding
-		})
-	);
+	const markUrl = $derived(getApplicationLogo(false, false, { custom: customLogoHash() }));
 
 	const oidcEnabledBySettings = $derived(data.settings?.oidcEnabled === true);
 	const showOidcLoginButton = $derived(oidcEnabledBySettings);
@@ -195,10 +186,7 @@
 				<div class="p-6 md:p-8">
 					<div class="mb-7 flex flex-col items-center text-center">
 						<img
-							class={cn(
-								'mb-4 object-contain drop-shadow-md drop-shadow-primary/15 md:hidden',
-								branding.development ? 'size-14' : 'size-10'
-							)}
+							class={cn('mb-4 size-10 object-contain drop-shadow-md drop-shadow-primary/15 md:hidden')}
 							src={markUrl}
 							alt={m.layout_title()}
 						/>

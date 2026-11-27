@@ -40,7 +40,7 @@ var (
 
 	AdminCmd = &cobra.Command{
 		Use:   "admin",
-		Short: "Manage Arcane administration",
+		Short: "Manage HiveMind administration",
 	}
 
 	resetPasswordCmd = &cobra.Command{

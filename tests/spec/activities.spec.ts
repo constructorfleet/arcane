@@ -490,7 +490,7 @@ test.describe('Activity Center', () => {
 		await page.waitForURL(/\/login/);
 		await page.getByLabel('Username').fill('user-b');
 		await page.getByLabel('Password').fill('password');
-		await page.getByRole('button', { name: 'Sign in to Arcane', exact: true }).click();
+		await page.getByRole('button', { name: 'Sign in to HiveMind', exact: true }).click();
 		await page.waitForURL('/dashboard');
 		await expect.poll(() => streamedUsers).toContain('user-b');
 		activityCenter = await openActivityCenter(page);

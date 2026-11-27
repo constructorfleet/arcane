@@ -61,7 +61,7 @@ func newResolveCmd() *cobra.Command {
 		Use:   "resolve <sync-id|name>",
 		Short: "Resolve a push conflict that needs attention",
 		Long: "Resolve a conflict on a gitops sync that pushes to Git.\n\n" +
-			"use_arcane keeps the Arcane copies of the conflicting files and pushes them to Git.\n" +
+			"use_arcane keeps the HiveMind copies of the conflicting files and pushes them to Git.\n" +
 			"use_repository replaces the conflicting project files with the repository copies (bidirectional syncs only).\n" +
 			"On a bidirectional sync, files changed on only one side merge normally with either strategy.",
 		Args:         cobra.ExactArgs(1),
@@ -162,7 +162,7 @@ func (o *resolveOptions) run(cmd *cobra.Command, args []string) error {
 			kit.Ternary(
 				o.strategy == types.GitOpsBackupConflictUseRepository,
 				"Replace the conflicting project files with the repository copies for gitops sync %s?",
-				"Overwrite the conflicting files in Git with the Arcane copies for gitops sync %s?",
+				"Overwrite the conflicting files in Git with the HiveMind copies for gitops sync %s?",
 			),
 			cmp.Or(resolved.Name, resolved.ID),
 		),

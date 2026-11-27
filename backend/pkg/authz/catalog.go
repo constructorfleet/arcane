@@ -29,7 +29,7 @@ var permissionCatalog = []PermissionCatalogResource{
 	{
 		Key:         "users",
 		Label:       "Users",
-		Description: "Arcane user accounts",
+		Description: "HiveMind user accounts",
 		Scope:       PermissionScopeGlobal,
 		Actions: []PermissionCatalogAction{
 			{
@@ -134,7 +134,7 @@ var permissionCatalog = []PermissionCatalogResource{
 	{
 		Key:         "federated",
 		Label:       "Federated Credentials",
-		Description: "Federated identity credentials that exchange external tokens for Arcane access",
+		Description: "Federated identity credentials that exchange external tokens for HiveMind access",
 		Scope:       PermissionScopeGlobal,
 		Actions: []PermissionCatalogAction{
 			{
@@ -197,7 +197,7 @@ var permissionCatalog = []PermissionCatalogResource{
 	{
 		Key:         "environments",
 		Label:       "Environments",
-		Description: "Docker environments managed by Arcane",
+		Description: "Docker environments managed by HiveMind",
 		Scope:       PermissionScopeGlobal,
 		Actions: []PermissionCatalogAction{
 			{
@@ -526,7 +526,7 @@ var permissionCatalog = []PermissionCatalogResource{
 	{
 		Key:         "system-backups",
 		Label:       "System Backups",
-		Description: "Backups of the Arcane system and system-managed volumes",
+		Description: "Backups of the HiveMind system and system-managed volumes",
 		Scope:       PermissionScopeGlobal,
 		Actions: []PermissionCatalogAction{
 			{
@@ -589,7 +589,7 @@ var permissionCatalog = []PermissionCatalogResource{
 	{
 		Key:         "events",
 		Label:       "Events",
-		Description: "The Arcane event log",
+		Description: "The HiveMind event log",
 		Scope:       PermissionScopeGlobal,
 		Actions: []PermissionCatalogAction{
 			{
@@ -610,7 +610,7 @@ var permissionCatalog = []PermissionCatalogResource{
 	{
 		Key:         "diagnostics",
 		Label:       "Diagnostics",
-		Description: "Runtime diagnostics for the Arcane backend",
+		Description: "Runtime diagnostics for the HiveMind backend",
 		Scope:       PermissionScopeGlobal,
 		Actions: []PermissionCatalogAction{
 			{
@@ -1759,7 +1759,7 @@ var permissionCatalog = []PermissionCatalogResource{
 				Key:         "upgrade",
 				Permission:  PermSystemUpgrade,
 				Label:       "Trigger upgrade",
-				Description: "Upgrade Arcane",
+				Description: "Upgrade HiveMind",
 				Requires:    []string{PermSystemRead},
 			},
 		},

@@ -20,7 +20,7 @@ func RegisterRoutes(api huma.API, h *Handler) {
 			OperationID: "list-system-backups",
 			Method:      http.MethodGet,
 			Path:        "/backups",
-			Summary:     "List Arcane system backups",
+			Summary:     "List HiveMind system backups",
 			Tags: []string{
 				"System Backups",
 			},
@@ -64,7 +64,7 @@ func RegisterRoutes(api huma.API, h *Handler) {
 			OperationID: "get-system-backup-policies",
 			Method:      http.MethodGet,
 			Path:        "/backups/policies",
-			Summary:     "Get Arcane system backup policies",
+			Summary:     "Get HiveMind system backup policies",
 			Tags: []string{
 				"System Backups",
 			},
@@ -78,7 +78,7 @@ func RegisterRoutes(api huma.API, h *Handler) {
 			OperationID: "update-system-backup-policies",
 			Method:      http.MethodPut,
 			Path:        "/backups/policies",
-			Summary:     "Update Arcane system backup policies",
+			Summary:     "Update HiveMind system backup policies",
 			Tags: []string{
 				"System Backups",
 			},
@@ -92,7 +92,7 @@ func RegisterRoutes(api huma.API, h *Handler) {
 			OperationID: "generate-system-backup-recovery-key",
 			Method:      http.MethodPost,
 			Path:        "/backups/recovery/key",
-			Summary:     "Generate an Arcane system backup recovery key",
+			Summary:     "Generate a HiveMind system backup recovery key",
 			Tags: []string{
 				"System Backups",
 			},
@@ -109,7 +109,7 @@ func RegisterRoutes(api huma.API, h *Handler) {
 			OperationID: "set-system-backup-recovery-key",
 			Method:      http.MethodPut,
 			Path:        "/backups/recovery/key",
-			Summary:     "Configure Arcane system backup recovery key",
+			Summary:     "Configure HiveMind system backup recovery key",
 			Tags: []string{
 				"System Backups",
 			},
@@ -124,7 +124,7 @@ func RegisterRoutes(api huma.API, h *Handler) {
 			DefaultStatus: http.StatusAccepted,
 			Method:        http.MethodPost,
 			Path:          "/backups",
-			Summary:       "Create Arcane system backup",
+			Summary:       "Create HiveMind system backup",
 			Tags: []string{
 				"System Backups",
 			},
@@ -138,7 +138,7 @@ func RegisterRoutes(api huma.API, h *Handler) {
 			OperationID: "discover-system-backups",
 			Method:      http.MethodPost,
 			Path:        "/backups/discover",
-			Summary:     "Discover Arcane system backups in S3",
+			Summary:     "Discover HiveMind system backups in S3",
 			Tags: []string{
 				"System Backups",
 			},
@@ -152,8 +152,8 @@ func RegisterRoutes(api huma.API, h *Handler) {
 			OperationID: "system-backup-action",
 			Method:      http.MethodPost,
 			Path:        "/agents/{id}/backups/{backupId}",
-			Summary:     "Restore Arcane system backup",
-			Description: "Restore a full Arcane system backup, or selected project files with action restorefiles",
+			Summary:     "Restore HiveMind system backup",
+			Description: "Restore a full HiveMind system backup, or selected project files with action restorefiles",
 			Tags: []string{
 				"System Backups",
 			},
@@ -171,7 +171,7 @@ func RegisterRoutes(api huma.API, h *Handler) {
 			OperationID: "browse-system-backup-files",
 			Method:      http.MethodPost,
 			Path:        "/agents/{id}/backups/{backupId}/files/browse",
-			Summary:     "Browse project files in an Arcane system backup",
+			Summary:     "Browse project files in a HiveMind system backup",
 			Tags: []string{
 				"System Backups",
 			},
@@ -185,7 +185,7 @@ func RegisterRoutes(api huma.API, h *Handler) {
 			OperationID: "upload-system-backup",
 			Method:      http.MethodPost,
 			Path:        "/agents/{id}/backups/{backupId}/upload",
-			Summary:     "Upload Arcane system backup",
+			Summary:     "Upload HiveMind system backup",
 			Tags: []string{
 				"System Backups",
 			},
@@ -199,7 +199,7 @@ func RegisterRoutes(api huma.API, h *Handler) {
 			OperationID: "delete-system-backup",
 			Method:      http.MethodDelete,
 			Path:        "/agents/{id}/backups/{backupId}",
-			Summary:     "Delete Arcane system backup",
+			Summary:     "Delete HiveMind system backup",
 			Tags: []string{
 				"System Backups",
 			},

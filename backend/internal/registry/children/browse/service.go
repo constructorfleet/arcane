@@ -257,7 +257,7 @@ func classifyBrowseError(err error, message string) error {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return common.Classify(common.ErrTimeout, fmt.Errorf("%s: %w", message, err))
 	}
-	// Upstream auth failures are not Arcane permission failures, so they must not map to 401/403.
+	// Upstream auth failures are not HiveMind permission failures, so they must not map to 401/403.
 	if IsUnauthorizedRegistryError(err) {
 		return common.Classify(common.ErrBadRequest, fmt.Errorf("%s: %w", message+": the registry denied access with the configured credentials", err))
 	}

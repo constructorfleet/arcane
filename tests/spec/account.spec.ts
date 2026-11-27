@@ -47,7 +47,7 @@ async function login(page: Page, username: string, password: string, expectedPat
 	await page.goto('/login');
 	await page.getByLabel('Username or email', { exact: true }).fill(username);
 	await page.getByLabel('Password', { exact: true }).fill(password);
-	await page.getByRole('button', { name: 'Sign in to Arcane', exact: true }).click();
+	await page.getByRole('button', { name: 'Sign in to HiveMind', exact: true }).click();
 	await expect(page).toHaveURL(expectedPath);
 	await expect(page.locator('main').first()).toBeVisible();
 }

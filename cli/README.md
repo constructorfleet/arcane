@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="../.github/assets/img/PNG-3.png" alt="Arcane Logo" width="500" />
+  <img src="../.github/assets/img/hivemind-full.png" alt="HiveMind Logo" width="500" />
   <p>The Official Command Line Client</p>
 
 <a href="https://pkg.go.dev/getarcane.dev/cli/v3"><img src="https://pkg.go.dev/badge/getarcane.dev/cli/v3.svg" alt="Go Reference"></a>
@@ -13,7 +13,7 @@
 
 ## Install
 
-This module lives inside the main Arcane repo. To build the CLI locally:
+This module lives inside the main HiveMind repo. To build the CLI locally:
 
 - `go install getarcane.dev/cli/v3@latest`
 
@@ -32,7 +32,7 @@ Create a starter config file (all supported keys):
 - `arcane config init`
 - `arcane config backup` (moves current config to `~/.config/arcanecli.yml.bak`)
 
-Set the Arcane server URL:
+Set the HiveMind server URL:
 
 - `arcane config set server-url http://localhost:3552`
 

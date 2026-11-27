@@ -360,7 +360,7 @@ test.describe('Container updates', () => {
 	});
 });
 
-test.describe('Arcane upgrades', () => {
+test.describe('HiveMind upgrades', () => {
 	const TOKEN_EXPIRY_KEY = 'arcane_token_expiry';
 	const REFRESH_COOKIE = 'arcane_refresh_test=complete';
 	const UPGRADE_CHANNEL = 'arcane-upgrade';
@@ -828,7 +828,7 @@ test.describe('Arcane upgrades', () => {
 			await page.waitForURL(/\/login(?:\?|$)/, { timeout: 10_000 });
 			expect(refreshCalls).toBe(1);
 			await expect(
-				page.getByRole('button', { name: 'Sign in to Arcane', exact: true })
+				page.getByRole('button', { name: 'Sign in to HiveMind', exact: true })
 			).toBeVisible();
 		});
 
@@ -868,7 +868,7 @@ test.describe('Arcane upgrades', () => {
 			await page.waitForURL(/\/login(?:\?|$)/, { timeout: 10_000 });
 			expect(refreshCalls).toBe(1);
 			await expect(
-				page.getByRole('button', { name: 'Sign in to Arcane', exact: true })
+				page.getByRole('button', { name: 'Sign in to HiveMind', exact: true })
 			).toBeVisible();
 		});
 	});

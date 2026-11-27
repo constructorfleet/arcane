@@ -1,12 +1,9 @@
 <script lang="ts">
-	import { mode } from 'mode-watcher';
 	import type { Snippet } from 'svelte';
 
 	import { m } from '#lib/paraglide/messages.js';
-	import userStore from '#lib/stores/user-store.svelte.js';
-	import { logoBranding } from '#lib/utils/branding.js';
+	import { customLogoHash } from '#lib/utils/branding.js';
 	import { getApplicationLogo } from '#lib/utils/docker.js';
-	import { resolveLogoColor } from '#lib/utils/theme.svelte.js';
 
 	interface Props {
 		busy: boolean;
@@ -18,22 +15,21 @@
 
 	let { busy, busyTitle, busyDescription, error, children }: Props = $props();
 
-	const logoColor = $derived(resolveLogoColor(mode.current === 'dark'));
-	const animationsEnabled = $derived(userStore.current?.preferences?.animationsEnabled ?? true);
-	const loaderLogoUrl = $derived(
-		getApplicationLogo(false, logoColor, logoColor, {
-			animated: animationsEnabled,
-			loop: animationsEnabled,
-			...logoBranding()
-		})
-	);
+	const customHash = $derived(customLogoHash());
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-background">
 	<div class="w-full max-w-md space-y-8">
 		<div class="flex flex-col items-center text-center">
 			{#if busy}
-				<img class="size-12 object-contain" src={loaderLogoUrl} alt="" />
+				{#if customHash}
+					<img class="size-12 object-contain" src={getApplicationLogo(false, false, { custom: customHash })} alt="" />
+				{:else}
+					<picture>
+						<source srcset="/branding/barnabee-static.webp" media="(prefers-reduced-motion: reduce)" />
+						<img class="h-24 w-auto object-contain" src="/branding/barnabee-flapping.webp" width="77" height="96" alt="" />
+					</picture>
+				{/if}
 				<h2 class="mt-6 text-2xl font-semibold">{busyTitle}</h2>
 				<p class="mt-2 text-sm text-muted-foreground">{busyDescription}</p>
 			{:else if error}

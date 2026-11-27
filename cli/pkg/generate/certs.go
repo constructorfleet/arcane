@@ -52,8 +52,8 @@ func newMTLSCmd() *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:   "mtls",
-		Short: "Generate Arcane agent mTLS assets",
-		Long:  `Generate an Arcane-managed agent mTLS CA and agent client certificate bundle using ML-DSA-87.`,
+		Short: "Generate HiveMind agent mTLS assets",
+		Long:  `Generate a HiveMind-managed agent mTLS CA and agent client certificate bundle using ML-DSA-87.`,
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return generateMTLSOutput(cmd, opts.outDir, opts.envID, opts.appURL)
@@ -61,7 +61,7 @@ func newMTLSCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.outDir, "out-dir", "./agent-mtls", "directory to write generated agent mTLS assets")
 	cmd.Flags().StringVar(&opts.envID, "agent-id", "local-agent", "Agent ID to embed in the generated certificate")
-	cmd.Flags().StringVar(&opts.appURL, "app-url", "http://localhost:3552", "Arcane manager app URL to embed as the agent mTLS SPIFFE trust domain")
+	cmd.Flags().StringVar(&opts.appURL, "app-url", "http://localhost:3552", "HiveMind manager app URL to embed as the agent mTLS SPIFFE trust domain")
 	return cmd
 }
 
@@ -75,14 +75,14 @@ func newTLSCmd() *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:   "tls",
-		Short: "Generate Arcane HTTPS TLS assets",
-		Long:  `Generate a self-signed Arcane HTTPS server certificate bundle using ECDSA P-384.`,
+		Short: "Generate HiveMind HTTPS TLS assets",
+		Long:  `Generate a self-signed HiveMind HTTPS server certificate bundle using ECDSA P-384.`,
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return generateTLSOutput(cmd, opts.outDir, opts.commonName, opts.hosts, opts.certName, opts.keyName)
 		},
 	}
-	cmd.Flags().StringVar(&opts.outDir, "out-dir", "./arcane-tls", "directory to write generated Arcane TLS assets")
+	cmd.Flags().StringVar(&opts.outDir, "out-dir", "./arcane-tls", "directory to write generated HiveMind TLS assets")
 	cmd.Flags().StringVar(&opts.commonName, "common-name", "localhost", "certificate common name")
 	cmd.Flags().StringSliceVar(&opts.hosts, "host", []string{"localhost", "127.0.0.1"}, "DNS name or IP SAN to include; repeat flag to add more")
 	cmd.Flags().StringVar(&opts.certName, "cert-name", "server.crt", "certificate file name to write under out-dir")
@@ -105,7 +105,7 @@ func generateMTLSOutput(cmd *cobra.Command, mtlsOutDir, mtlsEnvID, mtlsAppURL st
 	if jsonOutput(cmd) {
 		return printJSON(cmd, paths)
 	}
-	_, _ = fmt.Fprintln(w, "Generated Arcane agent mTLS assets (ML-DSA-87)")
+	_, _ = fmt.Fprintln(w, "Generated HiveMind agent mTLS assets (ML-DSA-87)")
 	_, _ = fmt.Fprintf(w, "CA cert: %s\n", paths.CACertPath)
 	_, _ = fmt.Fprintf(w, "CA key: %s\n", paths.CAKeyPath)
 	_, _ = fmt.Fprintf(w, "Agent cert: %s\n", paths.ClientCertPath)
@@ -135,7 +135,7 @@ func generateTLSOutput(cmd *cobra.Command, tlsOutDir, tlsCommonName string, tlsH
 	if jsonOutput(cmd) {
 		return printJSON(cmd, paths)
 	}
-	_, _ = fmt.Fprintln(w, "Generated Arcane TLS assets (ECDSA P-384)")
+	_, _ = fmt.Fprintln(w, "Generated HiveMind TLS assets (ECDSA P-384)")
 	_, _ = fmt.Fprintf(w, "Server cert: %s\n", paths.CertPath)
 	_, _ = fmt.Fprintf(w, "Server key: %s\n", paths.KeyPath)
 	_, _ = fmt.Fprintln(w)
@@ -255,11 +255,11 @@ func GenerateMLDSA87PrivateKey() (*mldsa.PrivateKey, error) {
 }
 
 func NewAgentMTLSCATemplate() (*x509.Certificate, error) {
-	template, err := newCertificateTemplate("Arcane Agent mTLS CA")
+	template, err := newCertificateTemplate("HiveMind Agent mTLS CA")
 	if err != nil {
 		return nil, err
 	}
-	template.Subject = pkix.Name{CommonName: "Arcane Agent mTLS CA", Organization: []string{"Arcane"}}
+	template.Subject = pkix.Name{CommonName: "HiveMind Agent mTLS CA", Organization: []string{"HiveMind"}}
 	template.IsCA = true
 	template.BasicConstraintsValid = true
 	template.MaxPathLen = 1
@@ -279,7 +279,7 @@ func NewAgentMTLSClientTemplate(commonName string, uriSAN *url.URL, dnsSANs []st
 	template.NotBefore = time.Now().UTC().Add(-24 * time.Hour)
 	template.Subject = pkix.Name{
 		CommonName:   commonName,
-		Organization: []string{"Arcane Agents"},
+		Organization: []string{"HiveMind Agents"},
 	}
 	template.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
 	template.KeyUsage = x509.KeyUsageDigitalSignature
@@ -299,7 +299,7 @@ func NewServerTLSTemplate(commonName string, hosts []string) (*x509.Certificate,
 	if err != nil {
 		return nil, err
 	}
-	template.Subject = pkix.Name{CommonName: commonName, Organization: []string{"Arcane"}}
+	template.Subject = pkix.Name{CommonName: commonName, Organization: []string{"HiveMind"}}
 	template.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
 	template.KeyUsage = x509.KeyUsageDigitalSignature
 

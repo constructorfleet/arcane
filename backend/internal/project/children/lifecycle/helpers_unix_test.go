@@ -22,7 +22,7 @@ func TestDescribeLifecyclePathAccess_ReportsPathMetadata(t *testing.T) {
 
 	got := describeLifecyclePathAccess(t.Context(), dir, scriptPath)
 
-	assert.Contains(t, got, "Arcane process identity: uid=")
+	assert.Contains(t, got, "HiveMind process identity: uid=")
 	assert.Contains(t, got, "Path inspection:")
 	assert.Contains(t, got, scriptsDir)
 	assert.Contains(t, got, scriptPath)

@@ -358,7 +358,7 @@ func (s *Service) prepareUpgrade(ctx context.Context, user types.Actor, target u
 		}
 		idx := slices.IndexFunc(containers.Items, func(c container.Summary) bool { return strings.HasPrefix(c.ID, containerID) })
 		if idx < 0 {
-			return container.InspectResponse{}, fmt.Errorf("inspect container: %w", common.Classify(common.ErrNotFound, errors.New("could not find Arcane container")))
+			return container.InspectResponse{}, fmt.Errorf("inspect container: %w", common.Classify(common.ErrNotFound, errors.New("could not find HiveMind container")))
 		}
 		if inspect, inspectErr = s.dockerService.Call(ctx, func(ctx context.Context, cli *client.Client) (client.ContainerInspectResult, error) {
 			return compat.ContainerInspectWithCompatibility(ctx, cli, containers.Items[idx].ID, client.ContainerInspectOptions{})
@@ -507,7 +507,7 @@ func (s *Service) runPreparedUpgrade(ctx context.Context, prepared *preparedUpgr
 		slog.InfoContext(ctx, "Keeping upgrader container after exit (ARCANE_UPGRADE_KEEP_CONTAINER=true)")
 	}
 
-	// Inherit the security context (SELinux label, privileged) that lets Arcane reach the socket on hardened hosts.
+	// Inherit the security context (SELinux label, privileged) that lets HiveMind reach the socket on hardened hosts.
 	securityOpt := slices.Clone(kit.FromPtr(prepared.current.HostConfig).SecurityOpt)
 	// On SELinux-enforcing hosts the socket is container_var_run_t, so without a label opt the upgrader exits with EACCES.
 	if !kit.FromPtr(prepared.current.HostConfig).Privileged &&
@@ -631,7 +631,7 @@ func (s *Service) followUpgrader(ctx context.Context, upgraderID string) {
 	case <-ctx.Done():
 	case <-time.After(upgradeJobManagerNoRestartGrace):
 	}
-	s.progress.finish(kit.Ternary(exit == upgraderExitFailed, fmt.Sprintf("Upgrader exited with code %d", exitCode), "Upgrader exited without restarting Arcane"))
+	s.progress.finish(kit.Ternary(exit == upgraderExitFailed, fmt.Sprintf("Upgrader exited with code %d", exitCode), "Upgrader exited without restarting HiveMind"))
 }
 
 // A tag change also returns the Compose edit to save before the upgrader starts.

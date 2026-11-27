@@ -19,12 +19,12 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:     "arcane",
-	Long:    "Arcane - Modern Docker Management, Designed for Everyone.",
+	Long:    "HiveMind - Modern Docker Management, Designed for Everyone.",
 	Version: config.Version,
 	Run: func(cmd *cobra.Command, args []string) {
 		err := bootstrap.Bootstrap(cmd.Context())
 		if err != nil {
-			slog.ErrorContext(cmd.Context(), "Failed to run Arcane", "error", err)
+			slog.ErrorContext(cmd.Context(), "Failed to run HiveMind", "error", err)
 			os.Exit(1)
 		}
 	},

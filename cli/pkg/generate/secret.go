@@ -73,7 +73,7 @@ func generateSecrets(cmd *cobra.Command, secretFormat string, secretLength int) 
 		_, _ = fmt.Fprintln(w, "environment:")
 		_, _ = fmt.Fprintf(w, "  - ARCANE_ENCRYPTION_KEY=%s\n", base64.StdEncoding.EncodeToString(encryptionKey))
 	case "all":
-		_, _ = fmt.Fprintln(w, "Arcane cryptographic secrets")
+		_, _ = fmt.Fprintln(w, "HiveMind cryptographic secrets")
 		_, _ = fmt.Fprintln(w, "===========================")
 		_, _ = fmt.Fprintln(w)
 

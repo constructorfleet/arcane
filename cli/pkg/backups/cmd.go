@@ -40,8 +40,8 @@ func Command() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "backups",
 		Aliases: []string{"backup"},
-		Short:   "Manage Arcane system backups (admin only)",
-		Long: `System backups snapshot Arcane's database and configuration, encrypted with the recovery key.
+		Short:   "Manage HiveMind system backups (admin only)",
+		Long: `System backups snapshot HiveMind's database and configuration, encrypted with the recovery key.
 Backups are stored in the local repository, a saved S3 destination, or both; policies schedule automatic runs.`,
 	}
 	cmd.AddCommand(newListCmd())
@@ -65,7 +65,7 @@ func newListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "list",
 		Aliases:      []string{"ls"},
-		Short:        "List Arcane system backups",
+		Short:        "List HiveMind system backups",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -109,7 +109,7 @@ func newCreateCmd() *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:   "create",
-		Short: "Create an Arcane system backup",
+		Short: "Create a HiveMind system backup",
 		Long: `Create a system backup. With no flags the backup is stored locally; --s3-destination
 alone stores it in S3, and --local together with --s3-destination stores it in both.`,
 		Args:         cobra.NoArgs,
@@ -194,7 +194,7 @@ func newDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "delete <backup-id>",
 		Aliases:      []string{"rm", "remove"},
-		Short:        "Delete an Arcane system backup",
+		Short:        "Delete a HiveMind system backup",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -225,13 +225,13 @@ func newRestoreCmd() *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:          "restore <backup-id>",
-		Short:        "Restore Arcane from a system backup",
-		Long:         `Restore overwrites the current Arcane database and configuration with the backup contents, then restarts Arcane.`,
+		Short:        "Restore HiveMind from a system backup",
+		Long:         `Restore overwrites the current HiveMind database and configuration with the backup contents, then restarts HiveMind.`,
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !opts.force {
-				output.Warning("Restoring backup %s will OVERWRITE the current Arcane database and configuration, then restart Arcane. This cannot be undone.", args[0])
+				output.Warning("Restoring backup %s will OVERWRITE the current HiveMind database and configuration, then restart HiveMind. This cannot be undone.", args[0])
 			}
 			confirmed, confirmErr := cmdutil.ConfirmOrCancel(cmd, cmdutil.ConfirmOptions{Label: "Are you absolutely sure you want to restore this backup?", Force: opts.force})
 			if confirmErr != nil || !confirmed {
@@ -261,7 +261,7 @@ func newRestoreCmd() *cobra.Command {
 				FailureMessage: "failed to restore backup",
 				Render: func(data types.MessageResponse) error {
 					output.Success("%s", data.Message)
-					output.Warning("Arcane will restart while the restore is applied; the server may be unavailable for a short time.")
+					output.Warning("HiveMind will restart while the restore is applied; the server may be unavailable for a short time.")
 					return nil
 				},
 			})
@@ -279,7 +279,7 @@ func newUploadCmd() *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:          "upload <backup-id>",
-		Short:        "Upload an Arcane system backup to an S3 destination",
+		Short:        "Upload a HiveMind system backup to an S3 destination",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -328,8 +328,8 @@ func newDiscoverCmd() *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:          "discover",
-		Short:        "Discover Arcane system backups stored in an S3 destination",
-		Long:         `Discover scans an S3 destination for backups and imports records for any not already known to this Arcane instance.`,
+		Short:        "Discover HiveMind system backups stored in an S3 destination",
+		Long:         `Discover scans an S3 destination for backups and imports records for any not already known to this HiveMind instance.`,
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -369,7 +369,7 @@ func newDiscoverCmd() *cobra.Command {
 func newPoliciesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "policies",
-		Short:        "Show Arcane system backup policies",
+		Short:        "Show HiveMind system backup policies",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -398,7 +398,7 @@ func newPoliciesUpdateCmd() *cobra.Command {
 	var opts policiesUpdateOptions
 	cmd := &cobra.Command{
 		Use:   "update",
-		Short: "Update Arcane system backup policies",
+		Short: "Update HiveMind system backup policies",
 		Long: `Update a system backup policy with flags: the current policies are fetched, the targeted
 policy is modified, and the whole set is saved back. A new policy is created when none exist.
 Alternatively, --file replaces all policies from a raw JSON payload.`,
@@ -458,7 +458,7 @@ Alternatively, --file replaces all policies from a raw JSON payload.`,
 func newRecoveryKeyCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "recovery",
-		Short: "Manage the Arcane system backup recovery key",
+		Short: "Manage the HiveMind system backup recovery key",
 	}
 	cmd.AddCommand(newRecoveryKeyGenerateCmd())
 	cmd.AddCommand(newRecoveryKeySetCmd())
@@ -471,7 +471,7 @@ func newRecoveryKeyGenerateCmd() *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:          "generate",
-		Short:        "Generate a new Arcane system backup recovery key",
+		Short:        "Generate a new HiveMind system backup recovery key",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -527,7 +527,7 @@ func newRecoveryKeySetCmd() *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:          "set",
-		Short:        "Configure the Arcane system backup recovery key",
+		Short:        "Configure the HiveMind system backup recovery key",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

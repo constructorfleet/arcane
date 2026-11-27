@@ -94,7 +94,7 @@ var (
 
 func NewService(p ServiceParams) *Service {
 	// Copa logs through the global logrus logger; route it into slog so its
-	// output follows Arcane's log format.
+	// output follows HiveMind's log format.
 	logging.InstallLogrusBridge()
 
 	return &Service{
@@ -498,9 +498,9 @@ func resolvePatchedRef(imageRef, patchedTag, suffix string) (string, error) {
 	return localName + ":" + tag, nil
 }
 
-// writeRegistryAuthConfig merges Arcane's registry credentials into the
+// writeRegistryAuthConfig merges HiveMind's registry credentials into the
 // docker config file copa reads for BuildKit registry auth. It only touches the
-// config when DOCKER_CONFIG is set, i.e. the deployment (normally Arcane's own
+// config when DOCKER_CONFIG is set, i.e. the deployment (normally HiveMind's own
 // startup) owns that directory — a user's ~/.docker/config.json is never modified.
 func (s *Service) writeRegistryAuthConfig(ctx context.Context) {
 	configDir := strings.TrimSpace(os.Getenv("DOCKER_CONFIG"))

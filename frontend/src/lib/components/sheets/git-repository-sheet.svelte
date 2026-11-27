@@ -325,7 +325,12 @@
 				<p class="text-xs text-muted-foreground">{m.commit_identity_description()}</p>
 			</div>
 			<div class="grid gap-3 sm:grid-cols-2">
-				<FormInput label={m.commit_author_name()} type="text" placeholder="Arcane" bind:input={inputs.commitAuthorName} />
+				<FormInput
+					label={m.commit_author_name()}
+					type="text"
+					placeholder={m.layout_title()}
+					bind:input={inputs.commitAuthorName}
+				/>
 				<FormInput
 					label={m.commit_author_email()}
 					type="text"

@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	backupMountMissingWarning = "No volume is mounted at /backups in the Arcane container. Backups will only live inside Docker unless you mount a host path."
+	backupMountMissingWarning = "No volume is mounted at /backups in the HiveMind container. Backups will only live inside Docker unless you mount a host path."
 
 	volumeBackupContainerRecoveryTimeout  = 30 * time.Second
 	volumeBackupContainerRecoveryInterval = 500 * time.Millisecond
@@ -120,7 +120,7 @@ func (s *Service) stopRunningContainersForBackup(ctx context.Context, volumeName
 			arcaneOwned = append(arcaneOwned, candidate)
 			continue
 		}
-		// Arcane helpers auto-remove on stop, which would leave nothing to restart.
+		// HiveMind helpers auto-remove on stop, which would leave nothing to restart.
 		if strings.EqualFold(candidate.Labels[selfcontainer.InternalResourceLabel], "true") {
 			continue
 		}
@@ -129,7 +129,7 @@ func (s *Service) stopRunningContainersForBackup(ctx context.Context, volumeName
 	// Restores rewrite the volume in place, so refuse rather than corrupt data under a labeled container.
 	if refuseArcaneWriters {
 		if writers := docker.FilterContainersUsingVolume(arcaneOwned, volumeName); len(writers) > 0 {
-			return nil, fmt.Errorf("volume %s is mounted by a running Arcane-managed container; restoring under it would corrupt its data", volumeName)
+			return nil, fmt.Errorf("volume %s is mounted by a running HiveMind-managed container; restoring under it would corrupt its data", volumeName)
 		}
 	}
 	containerIDs := docker.FilterContainersUsingVolume(eligible, volumeName)

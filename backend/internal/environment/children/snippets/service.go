@@ -91,7 +91,7 @@ func (s *Service) GenerateMTLS(ctx context.Context, mtls *agent.MTLS, envID, env
 			Type:        event.EventTypeEnvironmentMTLSCAGenerated,
 			Severity:    event.EventSeverityInfo,
 			Title:       "Agent mTLS CA generated",
-			Description: "Arcane generated a new agent mTLS certificate authority",
+			Description: "HiveMind generated a new agent mTLS certificate authority",
 			Metadata:    database.JSON{"kind": "ca"},
 		}); caEventErr != nil {
 			slog.WarnContext(ctx, "Failed to create agent mTLS CA generation event", "error", caEventErr)
@@ -102,7 +102,7 @@ func (s *Service) GenerateMTLS(ctx context.Context, mtls *agent.MTLS, envID, env
 			Type:          event.EventTypeEnvironmentMTLSCertIssued,
 			Severity:      event.EventSeverityInfo,
 			Title:         "Agent mTLS certificate issued",
-			Description:   fmt.Sprintf("Arcane issued an agent mTLS client certificate for environment '%s'", envName),
+			Description:   fmt.Sprintf("HiveMind issued an agent mTLS client certificate for environment '%s'", envName),
 			ResourceType:  new("environment"),
 			ResourceID:    new(envID),
 			ResourceName:  new(envName),

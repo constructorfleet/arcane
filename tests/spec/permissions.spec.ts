@@ -322,7 +322,7 @@ async function loginAs(
 	await page.goto('/login');
 	await page.getByLabel('Username').fill(username);
 	await page.getByLabel('Password').fill(password);
-	await page.getByRole('button', { name: 'Sign in to Arcane', exact: true }).click();
+	await page.getByRole('button', { name: 'Sign in to HiveMind', exact: true }).click();
 	await expect(page).toHaveURL(expectedPath, { timeout: 15_000 });
 }
 

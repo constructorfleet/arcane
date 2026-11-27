@@ -1,7 +1,7 @@
 # Replace 1000 with the uid and gid of the user running rootless Podman.
-# Run `systemctl --user enable --now podman.socket` first; Arcane talks to Podman through that socket.
+# Run `systemctl --user enable --now podman.socket` first; HiveMind talks to Podman through that socket.
 # Run `loginctl enable-linger <user>` so the user's Podman socket and session bus survive logout.
-# keep-id maps that uid into the container unchanged. Arcane starts as root, then switches to PUID/PGID,
+# keep-id maps that uid into the container unchanged. HiveMind starts as root, then switches to PUID/PGID,
 # so it reaches the Podman socket and the session bus as their owner.
 services:
   arcane:
@@ -24,7 +24,7 @@ services:
     security_opt:
       - label=disable
     # Use host cgroup namespace for better container self-detection
-    # This allows Arcane to detect its own container ID more reliably
+    # This allows HiveMind to detect its own container ID more reliably
     cgroup: host
     healthcheck:
       test: ['CMD', './arcane', 'health', '--timeout', '2s']

@@ -206,7 +206,7 @@ func (s *VolumeService) ReconcileInterruptedBackups(ctx context.Context, protect
 	if len(protectedIDs) > 0 {
 		query = query.Where("id NOT IN ?", protectedIDs)
 	}
-	if err := query.Updates(map[string]any{"status": VolumeBackupStatusFailed, "error": "Backup interrupted by Arcane restart"}).Error; err != nil {
+	if err := query.Updates(map[string]any{"status": VolumeBackupStatusFailed, "error": "Backup interrupted by HiveMind restart"}).Error; err != nil {
 		return err
 	}
 	return s.backup.WatchAcceptedBackups(ctx)
@@ -909,7 +909,7 @@ func (s *VolumeService) ListBackupVolumeOptions(ctx context.Context) ([]types.Sy
 	}
 	inspect, inspectErr := s.dockerService.Call(ctx, selfcontainer.InspectCurrentArcaneContainer)
 	if inspectErr != nil {
-		slog.DebugContext(ctx, "volume service: could not identify Arcane-mounted volumes for centralized backups", "error", inspectErr)
+		slog.DebugContext(ctx, "volume service: could not identify HiveMind-mounted volumes for centralized backups", "error", inspectErr)
 	}
 	arcaneMounts := kit.FromPtr(inspect).Mounts
 	options := make([]types.SystemVolumeBackupOption, 0, len(result.Items))

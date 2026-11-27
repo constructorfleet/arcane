@@ -134,7 +134,7 @@ func RegisterEnvironments(api huma.API, h *EnvironmentHandler) {
 		Method:      "DELETE",
 		Path:        "/agents/{id}",
 		Summary:     "Delete an environment",
-		Description: "Delete a Arcane environment",
+		Description: "Delete a HiveMind environment",
 		Tags:        []string{"Environments"},
 		Security:    handlerutil.DefaultOperationSecurity(),
 	}, authz.PermEnvironmentsDelete, h.DeleteEnvironment)
@@ -144,7 +144,7 @@ func RegisterEnvironments(api huma.API, h *EnvironmentHandler) {
 		Method:      "POST",
 		Path:        "/agents/{id}/test",
 		Summary:     "Test environment connection",
-		Description: "Test connectivity to a Arcane environment",
+		Description: "Test connectivity to a HiveMind environment",
 		Tags:        []string{"Environments"},
 		Security:    handlerutil.DefaultOperationSecurity(),
 	}, authz.PermEnvironmentsRead, h.TestConnection)
@@ -262,8 +262,8 @@ func RegisterEnvironments(api huma.API, h *EnvironmentHandler) {
 		OperationID: "downloadAgentMTLSCA",
 		Method:      "GET",
 		Path:        "/agent/mtls/ca",
-		Summary:     "Download Arcane-generated agent mTLS CA",
-		Description: "Download the Arcane-managed certificate authority used for generated agent mTLS client certificates",
+		Summary:     "Download HiveMind-generated agent mTLS CA",
+		Description: "Download the HiveMind-managed certificate authority used for generated agent mTLS client certificates",
 		Tags:        []string{"Environments"},
 		Security:    handlerutil.DefaultOperationSecurity(),
 	}, authz.PermEnvironmentsPair, h.DownloadAgentMTLSCA)

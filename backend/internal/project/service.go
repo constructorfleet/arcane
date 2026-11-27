@@ -1766,7 +1766,7 @@ func (s *ProjectService) RedeployProject(ctx context.Context, projectID string, 
 		return resolveProjectComposeFileErr
 	}
 
-	// Arcane's own container goes through the system upgrade flow; a failed listing skips the guard.
+	// HiveMind's own container goes through the system upgrade flow; a failed listing skips the guard.
 	if containers, listErr := s.details.ComposeContainers(ctx); listErr != nil {
 		slog.WarnContext(ctx, "could not list compose containers to check self-redeploy guard; skipping guard", "error", listErr)
 	} else {
@@ -2639,7 +2639,7 @@ func (s *ProjectService) ProjectMetadata(ctx context.Context, p Project, env *pr
 	loadedAt := time.Now()
 	meta, err := projects.ParseArcaneComposeMetadata(ctx, composeFile, env.projectsDirectory, env.autoInjectEnv)
 	if err != nil {
-		slog.WarnContext(ctx, "failed to parse Arcane compose metadata", "path", composeFile, "error", err)
+		slog.WarnContext(ctx, "failed to parse HiveMind compose metadata", "path", composeFile, "error", err)
 		return empty
 	}
 
@@ -2845,9 +2845,9 @@ func (s *ProjectService) SyncProjectsFromFileSystem(ctx context.Context) error {
 		if strings.TrimSpace(kit.FromPtr((&p).GitOpsManagedBy)) != "" {
 			continue
 		}
-		// Rows from Arcane scratch or snapshot dirs are never real projects, so they bypass the mass-wipe guard.
+		// Rows from HiveMind scratch or snapshot dirs are never real projects, so they bypass the mass-wipe guard.
 		if projects.IsInternalScratchDirName(p.Name) || projects.IsInternalScratchDirName(filepath.Base(p.Path)) || projects.IsInternalScratchDirName(kit.FromPtr(p.DirName)) {
-			deletions = append(deletions, projectCleanupDecision{project: p, reason: "removed internal Arcane scratch record (project-update/gitops temp dir)"})
+			deletions = append(deletions, projectCleanupDecision{project: p, reason: "removed internal HiveMind scratch record (project-update/gitops temp dir)"})
 			continue
 		}
 		root, underRoot := listing.ProjectRoot(roots, p.Path).Get()

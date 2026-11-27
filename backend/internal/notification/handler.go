@@ -72,7 +72,7 @@ func isSupportedNotificationTestType(testType string) bool {
 
 func (h *NotificationHandler) rejectOnAgent() error {
 	if h.config.AgentEnabled {
-		return huma.Error400BadRequest("notifications are managed on the Arcane manager")
+		return huma.Error400BadRequest("notifications are managed on the HiveMind manager")
 	}
 	return nil
 }
