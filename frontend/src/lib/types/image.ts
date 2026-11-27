@@ -32,6 +32,8 @@ export interface ImageUsedBy {
 }
 
 export interface ImageRepositoryCopy {
+	artifactKey?: string;
+	platform?: string;
 	id: string;
 	environmentId: string;
 	environmentName?: string;
@@ -45,15 +47,12 @@ export interface ImageRepositoryCopy {
 export interface ImageRepositoryGroup {
 	copies: ImageRepositoryCopy[];
 	digests: string[] | null;
-	minSize: number;
-	maxSize: number;
-	variants: number;
-	scannedVariants: number;
 	checkErrorRef?: string;
-	sawScanError?: boolean;
 }
 
 export interface ImageSummary {
+	artifactKey?: string;
+	platform?: string;
 	logicalId?: string;
 	id: string;
 	repositoryGroup?: ImageRepositoryGroup;

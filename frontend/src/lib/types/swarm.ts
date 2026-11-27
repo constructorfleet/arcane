@@ -239,6 +239,7 @@ export interface SwarmServiceSummary {
 	mode: SwarmServiceModeName;
 	replicas: number;
 	runningReplicas: number;
+	runningImageVersions?: string[];
 	ports: SwarmServicePort[];
 	createdAt: string;
 	updatedAt: string;
@@ -462,6 +463,7 @@ export interface SwarmTaskSummary {
 	nodeName: string;
 	desiredState: string;
 	currentState: string;
+	mixedImageVersions?: boolean;
 	error?: string;
 	containerId?: string;
 	image?: string;

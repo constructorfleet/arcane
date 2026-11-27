@@ -19,13 +19,14 @@ type (
 	}
 
 	ListSwarmServicesInput struct {
-		EnvironmentID string `path:"id" doc:"Environment ID"`
-		Search        string `query:"search" doc:"Search query"`
-		Sort          string `query:"sort" doc:"Column to sort by"`
-		Order         string `query:"order" default:"asc" doc:"Sort direction (asc or desc)"`
-		NetworkID     string `query:"networkId" doc:"Filter services by Swarm network ID"`
-		Start         int    `query:"start" default:"0" doc:"Start index for pagination"`
-		Limit         int    `query:"limit" default:"20" doc:"Number of items per page"`
+		MixedImageVersions string `query:"mixedImageVersions" doc:"Filter services running multiple image versions"`
+		EnvironmentID      string `path:"id" doc:"Environment ID"`
+		Search             string `query:"search" doc:"Search query"`
+		Sort               string `query:"sort" doc:"Column to sort by"`
+		Order              string `query:"order" default:"asc" doc:"Sort direction (asc or desc)"`
+		NetworkID          string `query:"networkId" doc:"Filter services by Swarm network ID"`
+		Start              int    `query:"start" default:"0" doc:"Start index for pagination"`
+		Limit              int    `query:"limit" default:"20" doc:"Number of items per page"`
 	}
 
 	GetSwarmServiceInput struct {
@@ -85,7 +86,10 @@ func NewHandler(
 
 func (h *Handler) ListServices(ctx context.Context, input *ListSwarmServicesInput) (*handlerutil.Page[types.SwarmServiceSummary], error) {
 	params := handlerutil.PaginationParams(input.Start, input.Limit, input.Sort, input.Order, input.Search)
-	params.Filters = map[string]string{}
+	params.Filters = map[string]string{"mixedImageVersions": input.MixedImageVersions}
+	if input.MixedImageVersions == "" {
+		delete(params.Filters, "mixedImageVersions")
+	}
 	if input.NetworkID != "" {
 		params.Filters["networkId"] = input.NetworkID
 	}

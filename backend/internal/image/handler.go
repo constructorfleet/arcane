@@ -49,18 +49,20 @@ type (
 	}
 
 	ListImagesInput struct {
-		EnvironmentID     string `path:"id" doc:"Environment ID"`
-		Search            string `query:"search" doc:"Search query"`
-		Repository        string `query:"repository" doc:"Select an exact repository in grouped mode"`
-		Sort              string `query:"sort" doc:"Column to sort by"`
-		Order             string `query:"order" default:"asc" doc:"Sort direction (asc or desc)"`
-		InUse             string `query:"inUse" doc:"Filter by in-use status (true/false)"`
-		Updates           string `query:"updates" doc:"Filter by update availability (true/false)"`
-		Hardened          string `query:"hardened" doc:"Filter by Docker Hardened Image status (true/false or a support status)"`
-		Label             string `query:"label" doc:"Filter by label key or key=value"`
-		Start             int    `query:"start" default:"0" doc:"Start index for pagination"`
-		Limit             int    `query:"limit" default:"20" doc:"Number of items per page"`
-		GroupByRepository bool   `query:"groupByRepository" doc:"Group images by registry and repository before pagination"`
+		ImageEnvironmentID string `query:"imageEnvironmentId" doc:"Owning observation used to resolve an exact grouped image version"`
+		EnvironmentID      string `path:"id" doc:"Environment ID"`
+		Search             string `query:"search" doc:"Search query"`
+		ImageID            string `query:"imageId" doc:"Select an exact immutable image version in grouped mode"`
+		Repository         string `query:"repository" doc:"Select an exact repository in grouped mode"`
+		Sort               string `query:"sort" doc:"Column to sort by"`
+		Order              string `query:"order" default:"asc" doc:"Sort direction (asc or desc)"`
+		InUse              string `query:"inUse" doc:"Filter by in-use status (true/false)"`
+		Updates            string `query:"updates" doc:"Filter by update availability (true/false)"`
+		Hardened           string `query:"hardened" doc:"Filter by Docker Hardened Image status (true/false or a support status)"`
+		Label              string `query:"label" doc:"Filter by label key or key=value"`
+		Start              int    `query:"start" default:"0" doc:"Start index for pagination"`
+		Limit              int    `query:"limit" default:"20" doc:"Number of items per page"`
+		GroupByImage       bool   `query:"groupByImage" doc:"Group copies of the same running registry artifact and platform before pagination"`
 	}
 
 	GetImageInput struct {
@@ -160,8 +162,12 @@ func (h *ImageHandler) ListImages(ctx context.Context, input *ListImagesInput) (
 		params.Filters["label"] = input.Label
 	}
 
-	if input.GroupByRepository {
-		params.Filters["groupByRepository"] = "true"
+	if input.ImageID != "" {
+		params.Filters["imageId"] = input.ImageID
+	}
+	if input.GroupByImage {
+		params.Filters["groupByImage"] = "true"
+		params.Filters["imageEnvironmentId"] = input.ImageEnvironmentID
 		params.Filters["repository"] = input.Repository
 	}
 

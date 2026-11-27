@@ -49,6 +49,11 @@ var servicePagination = pagination.Config[types.SwarmServiceSummary]{
 			return strings.Join(svc.Nodes, " "), nil
 		},
 	},
+	FilterAccessors: []pagination.FilterAccessor[types.SwarmServiceSummary]{
+		{Key: "mixedImageVersions", Fn: func(svc types.SwarmServiceSummary, value string) bool {
+			return (len(svc.RunningImageVersions) > 1) == (value == "true")
+		}},
+	},
 	SortBindings: []pagination.SortBinding[types.SwarmServiceSummary]{
 		{Key: "name", Fn: func(a, b types.SwarmServiceSummary) int { return strings.Compare(a.Name, b.Name) }},
 		{Key: "image", Fn: func(a, b types.SwarmServiceSummary) int { return strings.Compare(a.Image, b.Image) }},
@@ -577,6 +582,7 @@ func (s *Service) summarizeServices(ctx context.Context, services []swarm.Servic
 		}
 	}
 
+	versions := RunningImageVersions(services, tasksResult.Items)
 	summaries := make([]types.SwarmServiceSummary, 0, len(services))
 	for _, service := range services {
 		var nodeNames []string
@@ -587,7 +593,9 @@ func (s *Service) summarizeServices(ctx context.Context, services []swarm.Servic
 			}
 			sort.Strings(nodeNames)
 		}
-		summaries = append(summaries, types.NewSwarmServiceSummary(service, nodeNames, networkNameByID))
+		summary := types.NewSwarmServiceSummary(service, nodeNames, networkNameByID)
+		summary.RunningImageVersions = versions[service.ID]
+		summaries = append(summaries, summary)
 	}
 
 	return summaries, nil
@@ -623,4 +631,37 @@ func toServiceNetworkIPAMConfig(cfg network.IPAMConfig) types.SwarmServiceNetwor
 		Gateway: kit.Ternary(cfg.Gateway.IsValid(), cfg.Gateway.String(), ""),
 		IPRange: kit.Ternary(cfg.IPRange.IsValid(), cfg.IPRange.String(), ""),
 	}
+}
+
+// RunningImageVersions reports simultaneous versions in replicated services, including retiring running tasks.
+func RunningImageVersions(services []swarm.Service, tasks []swarm.Task) map[string][]string {
+	replicated := make(map[string]bool, len(services))
+	for _, service := range services {
+		replicated[service.ID] = service.Spec.Mode.Replicated != nil
+	}
+	versions := make(map[string]map[string]string)
+	for _, task := range tasks {
+		if !replicated[task.ServiceID] || task.Status.State != swarm.TaskStateRunning || task.Spec.ContainerSpec == nil {
+			continue
+		}
+		ref := task.Spec.ContainerSpec.Image
+		if ref == "" {
+			continue
+		}
+		key := ref
+		if _, digest, pinned := strings.Cut(ref, "@"); pinned {
+			key = digest
+		}
+		if versions[task.ServiceID] == nil {
+			versions[task.ServiceID] = make(map[string]string)
+		}
+		versions[task.ServiceID][key] = ref
+	}
+	mixed := make(map[string][]string)
+	for id, refs := range versions {
+		if len(refs) > 1 {
+			mixed[id] = slices.Sorted(maps.Values(refs))
+		}
+	}
+	return mixed
 }

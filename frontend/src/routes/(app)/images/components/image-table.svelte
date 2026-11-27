@@ -416,11 +416,8 @@
 			{#if (item.repoTags?.length ?? 0) > 1}
 				<Badge variant="gray" title={item.repoTags.join(', ')}>+{item.repoTags.length - 1}</Badge>
 			{/if}
-			{#if item.repositoryGroup.variants > 1}
-				<Badge variant="gray">{m.image_variant_count({ count: item.repositoryGroup.variants })}</Badge>
-			{:else if item.repositoryGroup.digests?.[0]}
-				<DigestCell value={item.repositoryGroup.digests[0]} />
-			{/if}
+			<DigestCell value={item.repositoryGroup.digests?.[0] ?? item.id} />
+			{#if item.platform}<Badge variant="gray" mono>{item.platform}</Badge>{/if}
 		</div>
 	{:else if item.repoTags && item.repoTags.length > 0 && item.repoTags[0] !== '<none>:<none>'}
 		<div class="flex flex-wrap gap-1.5">
@@ -452,11 +449,7 @@
 {/snippet}
 
 {#snippet SizeCell({ item }: { item: ImageRow })}
-	{#if item.repositoryGroup && item.repositoryGroup.minSize !== item.repositoryGroup.maxSize}
-		{bytes.format(item.repositoryGroup.minSize)}–{bytes.format(item.repositoryGroup.maxSize)}
-	{:else}
-		{bytes.format(Number(item.size ?? 0), { unitSeparator: ' ' })}
-	{/if}
+	{bytes.format(Number(item.size ?? 0), { unitSeparator: ' ' })}
 {/snippet}
 
 {#snippet StatusCell({ item }: { item: ImageRow })}
@@ -580,32 +573,7 @@
 {/snippet}
 
 {#snippet VulnerabilitiesCell({ item }: { item: ImageRow })}
-	<!-- Scan support is configured per environment. -->
-	{#if item.repositoryGroup}
-		{@const stats = item.repositoryGroup}
-		{@const scan = item.vulnerabilityScan}
-		{@const findings = scan?.status === 'completed' ? scan.summary : undefined}
-		<div class="flex min-w-0 flex-wrap items-center justify-center gap-1.5">
-			{#if findings}
-				<Badge variant={findings.critical ? 'red' : findings.high ? 'amber' : 'gray'}>{findings.total}</Badge>
-				{#if scan?.scanTime}
-					<time datetime={scan.scanTime} class="text-xs whitespace-nowrap text-muted-foreground">
-						{formatDateTimeShort(scan.scanTime)}
-					</time>
-				{/if}
-			{/if}
-			{#if stats.sawScanError}
-				<span class="text-xs text-destructive">{m.vuln_scan_failed()}</span>
-			{/if}
-			{#if stats.scannedVariants < stats.variants}
-				<span class="text-xs text-muted-foreground"
-					>{stats.scannedVariants
-						? m.image_scan_coverage({ scanned: stats.scannedVariants, total: stats.variants })
-						: m.vuln_no_scan()}</span
-				>
-			{/if}
-		</div>
-	{:else if featureStore.isEnabled('vulnerabilityManagement', item.environmentId)}
+	{#if featureStore.isEnabled('vulnerabilityManagement', item.environmentId)}
 		<div class="flex max-w-full min-w-0 items-center justify-center">
 			<VulnerabilityScanItem
 				scanSummary={item.vulnerabilityScan}

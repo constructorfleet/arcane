@@ -4862,5 +4862,9 @@
   "registry_scan_invalid_reference": "This image has no usable registry digest.",
   "backing_filesystem": "Backing filesystem",
   "filesystem_used_of_total": "{used} used of {total}",
-  "open_workspace": "Open Workspace"
+  "open_workspace": "Open Workspace",
+  "mixed_image_versions": "Multiple image versions are running in this replicated service",
+  "service_running_mixed_images": "{name} is running multiple image versions",
+  "in_use_images": "In-use Images",
+  "image_storage_all_copies": "Image Storage (All Copies)"
 }

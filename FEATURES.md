@@ -379,3 +379,12 @@ are verified; authenticated scan submission and live UI acceptance remain open.
 cf.107 addresses #254 by removing remote report collection from inventory and
 Security page reads, selecting proxy platform digests, and retaining stored
 report views. Browser stability and fleet-scale load acceptance remain open.
+
+cf.108 addresses image identity QA #257 and mixed-version service visibility #258
+(NODE-05 / OBS-02). Running repository digest plus platform identifies an image
+version; Docker IDs route operations internally. A native captured-inventory
+replay of five live agents verified one artifact row despite two engine IDs,
+with exact detail lookup from all five nodes. Replicated-service version checks
+cover running retiring tasks, pinned tag aliases, stopped history, and global
+service exclusion. Authenticated browser acceptance remains open; fleet-wide
+report storage, scan coordination, and scale acceptance remain #256.

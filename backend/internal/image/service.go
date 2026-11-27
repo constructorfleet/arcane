@@ -73,6 +73,7 @@ type (
 		patch           *patch.Service
 		patchWorkflow   *flow.Workflow
 		projectIDCache  *cache.Cache[struct{}, map[string]string]
+		platforms       cache.Cache[string, string]
 	}
 
 	imageRefUpdateLookup struct {
@@ -145,6 +146,7 @@ func NewImageService(p ImageServiceParams) *ImageService {
 			RegistryService:      p.RegistryService,
 			VulnerabilityService: p.VulnerabilityService,
 		}),
+		platforms: cache.Cache[string, string]{Capacity: 4096, TTL: 24 * time.Hour},
 		projectIDCache: &cache.Cache[struct{}, map[string]string]{
 			Capacity: 1,
 			TTL:      projectIDCacheTTL,
@@ -1211,6 +1213,17 @@ func (s *ImageService) ListImagesPaginated(ctx context.Context, environmentID st
 		return nil, pagination.Response{}, err
 	}
 
+	consumers := s.runningImageConsumers(ctx, containers)
+	if params.Filters["inUse"] == "true" {
+		active := make(map[string]bool, len(consumers))
+		for _, consumer := range consumers {
+			active[consumer.ImageID] = true
+		}
+		dockerImages = slices.DeleteFunc(slices.Clone(dockerImages), func(img image.Summary) bool { return !active[img.ID] })
+	}
+	if imageID := params.Filters["imageId"]; imageID != "" {
+		dockerImages = slices.DeleteFunc(slices.Clone(dockerImages), func(img image.Summary) bool { return img.ID != imageID })
+	}
 	imageIDs := make([]string, 0, len(dockerImages))
 	for _, img := range dockerImages {
 		imageIDs = append(imageIDs, img.ID)
@@ -1232,15 +1245,28 @@ func (s *ImageService) ListImagesPaginated(ctx context.Context, environmentID st
 		return nil, pagination.Response{}, err
 	}
 
+	platforms := s.imagePlatforms(ctx, consumers)
 	items := MapDockerImagesToDTOs(
 		dockerImages,
 		containers,
-		s.runningImageConsumers(ctx, containers),
+		consumers,
 		BuildVolumeUsageMap(containers, s.BuildProjectIDMap(ctx, containers)),
 		buildUpdateMap(updateRecords),
 		vulnerabilityMap,
 	)
-	if params.Filters["groupByRepository"] == "true" {
+	for i := range items {
+		items[i].SetEnvironment(types.EnvironmentRef{ID: environmentID})
+		items[i].Platform = platforms[items[i].ID]
+		observations := imageCopiesByRepository(items[i], "")
+		for _, repo := range slices.Sorted(maps.Keys(observations)) {
+			observation := observations[repo]
+			if observation.InUse {
+				items[i].ArtifactKey = observation.ArtifactKey
+				break
+			}
+		}
+	}
+	if params.Filters["groupByImage"] == "true" {
 		grouped, resp := s.libraryPage([]pagination.EnvironmentPage[types.ImageSummary]{{Environment: types.EnvironmentRef{ID: environmentID}, Items: items}}, params)
 		return grouped, resp, nil
 	}
@@ -1251,9 +1277,9 @@ func (s *ImageService) ListImagesPaginated(ctx context.Context, environmentID st
 
 func (s *ImageService) AggregateImages(ctx context.Context, params pagination.QueryParams) (types.ImageListResponse, error) {
 	overrides := url.Values{"start": {"0"}, "limit": {"-1"}}
-	grouped := params.Filters["groupByRepository"] == "true"
+	grouped := params.Filters["groupByImage"] == "true"
 	if grouped {
-		for _, key := range []string{"groupByRepository", "repository", "search", "inUse", "updates", "hardened", "label"} {
+		for _, key := range []string{"groupByImage", "repository", "imageId", "imageEnvironmentId", "search", "updates", "hardened", "label"} {
 			overrides[key] = nil
 		}
 	}
@@ -1521,7 +1547,7 @@ func MapDockerImagesToDTOs(
 				labels, _ := kit.AsStringMap(di.Labels)
 				return labels
 			}(),
-			InUse:  len(usedBy) > 0,
+			InUse:  len(activeRefsByImageID[di.ID]) > 0,
 			UsedBy: usedBy,
 			UpdateInfo: func() *types.ImageUpdateInfo {
 				if updateRecord, exists := updateMap[di.ID]; exists {

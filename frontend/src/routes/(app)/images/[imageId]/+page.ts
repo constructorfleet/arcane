@@ -39,7 +39,7 @@ export const load: PageLoad = async ({ params, parent, url }): Promise<ImageDeta
 	}
 
 	const [requestedImage] = operationResult.data;
-	let image = requestedImage;
+	const image = requestedImage;
 	if (!image) throw error(404, 'Image not found');
 
 	const repository = url.searchParams.get('repo') ?? (image.repo !== '<none>' ? image.repo : null);
@@ -50,7 +50,7 @@ export const load: PageLoad = async ({ params, parent, url }): Promise<ImageDeta
 				readableEnvironments('images:list'),
 				{
 					pagination: { page: 1, limit: 1 },
-					search: repository ? undefined : image.id
+					filters: { imageId: image.id, imageEnvironmentId: envId }
 				},
 				repository ?? undefined
 			)
@@ -60,9 +60,5 @@ export const load: PageLoad = async ({ params, parent, url }): Promise<ImageDeta
 	const repositoryCopies = (repositoryResult.data.data[0]?.repositoryGroup?.copies ?? []).filter(
 		(copy) => copy.inUse && hasPermission('images:read', copy.environmentId)
 	);
-	const activeCopy =
-		repositoryCopies.find((copy) => copy.id === params.imageId && copy.environmentId === envId) ?? repositoryCopies[0];
-	if (activeCopy && (activeCopy.id !== image.id || activeCopy.environmentId !== envId))
-		image = await queryClient.ensureQueryData(imageDetailQuery(activeCopy.environmentId, activeCopy.id));
-	return { envId: activeCopy?.environmentId ?? envId, imageId: image.id, image, repository, repositoryCopies };
+	return { envId, imageId: image.id, image, repository, repositoryCopies };
 };

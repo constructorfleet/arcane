@@ -14,6 +14,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { CopyButton } from '#lib/components/ui/copy-button/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
+	import VulnerabilityScanPanel from '#lib/components/vulnerability/vulnerability-scan-panel.svelte';
 	import { useUrlTab } from '#lib/hooks/use-url-tab.svelte.js';
 	import { TagIcon, ImagesIcon, LayersIcon, ShieldCheckIcon, InspectIcon, FileTextIcon } from '#lib/icons/index.js';
 	import TabbedPageLayout from '#lib/layouts/tabbed-page-layout.svelte';
@@ -25,12 +26,12 @@
 	import { imageService } from '#lib/services/image-service.js';
 	import { vulnerabilityService } from '#lib/services/vulnerability-service.js';
 	import { featureStore } from '#lib/stores/features.store.svelte.js';
+	import type { ImageRepositoryCopy } from '#lib/types/image.js';
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
 	import { handleApiResultWithCallbacks, extractApiErrorMessage } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { parseImageRef } from '#lib/utils/docker.js';
 	import { bytes, formatDateTimeShort } from '#lib/utils/formatting.js';
-	import { inUseImageTargets } from '#lib/utils/image-scan.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 	import { toastVulnerabilityScanStatus } from '#lib/utils/vulnerability.js';
 
@@ -39,7 +40,6 @@
 	import HardenedImagePanel from './components/hardened-image-panel.svelte';
 	import ImageAttestationsPanel from './components/image-attestations-panel.svelte';
 	import ImageHistoryPanel from './components/image-history-panel.svelte';
-	import ImageScanReports from './components/image-scan-reports.svelte';
 
 	let { data } = $props();
 
@@ -67,10 +67,15 @@
 
 	// fallow-ignore-next-line code-duplication -- permission $derived declarations; script-level, no shared render surface
 	const canDeleteImage = $derived(hasPermission('images:delete', currentEnvId));
-	const scanTargets = $derived(
-		inUseImageTargets(data.repositoryCopies.filter((copy) => hasPermission('vulnerabilities:scan', copy.environmentId)))
+	const scanTarget = $derived(
+		data.repositoryCopies.find(
+			(copy) =>
+				copy.inUse &&
+				hasPermission('vulnerabilities:scan', copy.environmentId) &&
+				hasPermission('vulnerabilities:read', copy.environmentId)
+		)
 	);
-	const canScanImage = $derived(vulnerabilityManagementEnabled && scanTargets.length > 0);
+	const canScanImage = $derived(vulnerabilityManagementEnabled && !!scanTarget);
 	const canPatchImage = $derived(hasPermission('images:patch', currentEnvId));
 	const canTagImage = $derived(hasPermission('images:tag', currentEnvId));
 	const canPullImage = $derived(hasPermission('images:pull', currentEnvId));
@@ -88,34 +93,28 @@
 	let pushDialogOpen = $state(false);
 	let releaseNotesOpen = $state(false);
 
+	const reportTarget = $derived(
+		scanTarget ?? data.repositoryCopies.find((copy) => copy.inUse && hasPermission('vulnerabilities:read', copy.environmentId))
+	);
 	const scanQuery = createQuery(() => ({
-		...imageScanResultQuery(currentEnvId, image?.id ?? ''),
-		enabled: vulnerabilityManagementEnabled && !!image?.id && hasPermission('vulnerabilities:read', currentEnvId)
+		...imageScanResultQuery(reportTarget?.environmentId ?? currentEnvId, reportTarget?.id ?? ''),
+		enabled: vulnerabilityManagementEnabled && !!reportTarget
 	}));
 	const vulnerabilityScan = $derived(scanQuery.data ?? null);
 
 	const scanMutation = createMutation(() => ({
-		mutationFn: ({ imageId, environmentId }: { imageId: string; environmentId: string }) =>
-			Promise.all(
-				(scanTargets.length ? scanTargets : [{ id: imageId, environmentId }]).map(async (target) => ({
-					target,
-					result: await vulnerabilityService.scanImage(target.id, target.environmentId)
-				}))
-			),
-		onSuccess: async (results) => {
-			for (const { target, result } of results) {
-				toastVulnerabilityScanStatus(result, { includeStarted: true });
-				await queryClient.invalidateQueries({ queryKey: queryKeys.vulnerabilities.scanResult(target.environmentId, target.id) });
-			}
+		mutationFn: (target: ImageRepositoryCopy) => vulnerabilityService.scanImage(target.id, target.environmentId),
+		onSuccess: async (result, target) => {
+			toastVulnerabilityScanStatus(result, { includeStarted: true });
+			await queryClient.invalidateQueries({ queryKey: queryKeys.vulnerabilities.scanResult(target.environmentId, target.id) });
 		},
 		onError: (error) => {
 			toast.error(m.vuln_scan_failed(), { description: extractApiErrorMessage(error) });
 		}
 	}));
-
 	function handleScanImage() {
-		if (!canScanImage || !image?.id || scanMutation.isPending) return;
-		scanMutation.mutate({ imageId: image.id, environmentId: currentEnvId });
+		if (!canScanImage || !scanTarget || scanMutation.isPending) return;
+		scanMutation.mutate(scanTarget);
 	}
 
 	async function handlePatchImage() {
@@ -124,7 +123,10 @@
 
 		// Prefer the stored scan report when one exists; fall back to
 		// patching all outdated OS packages.
-		const options = vulnerabilityScan?.hasReport ? { scanId: image.id } : undefined;
+		const options =
+			vulnerabilityScan?.hasReport && reportTarget?.id === image.id && reportTarget.environmentId === currentEnvId
+				? { scanId: image.id }
+				: undefined;
 		const result = await tryCatch(imageService.patchImage(image.id, options, currentEnvId));
 		await handleApiResultWithCallbacks({
 			result,
@@ -444,7 +446,16 @@
 
 			{#if vulnerabilityManagementEnabled}
 				<Tabs.Content value="vulnerabilities" layout="table">
-					<ImageScanReports copies={data.repositoryCopies} isScanning={scanMutation.isPending} onScan={handleScanImage} />
+					{#if scanQuery.isPending && reportTarget}<p role="status">{m.common_loading()}</p>{/if}
+					{#if scanQuery.error}<p role="alert" class="text-destructive">{extractApiErrorMessage(scanQuery.error)}</p>{/if}
+					{#if reportTarget}
+						<VulnerabilityScanPanel
+							environmentId={reportTarget.environmentId}
+							scan={vulnerabilityScan}
+							isScanning={scanMutation.isPending}
+							onScan={canScanImage ? handleScanImage : undefined}
+						/>
+					{:else}<p class="text-sm text-muted-foreground">{m.security_no_images_to_scan()}</p>{/if}
 				</Tabs.Content>
 			{/if}
 		{/snippet}

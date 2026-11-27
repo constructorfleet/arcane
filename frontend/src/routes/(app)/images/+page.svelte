@@ -18,7 +18,7 @@
 	import { CloseIcon, VolumesIcon, LocalFolderComputerIcon, SearchIcon } from '#lib/icons/index.js';
 	import { ResourcePageLayout, type ActionButton, type StatCardConfig } from '#lib/layouts/index.js';
 	import { m } from '#lib/paraglide/messages.js';
-	import { imageLibraryQuery, imageListQuery, imageUsageCountsQuery } from '#lib/query/images.js';
+	import { imageLibraryQuery, imageUsageCountsQuery } from '#lib/query/images.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { imageService } from '#lib/services/image-service.js';
 	import { emptySettings, settingsService } from '#lib/services/settings-service.js';
@@ -72,7 +72,7 @@
 
 	const imagesQuery = createQuery(() => {
 		const scope = pageState.scope;
-		const listQuery = data.linkedAgent ? imageListQuery : imageLibraryQuery;
+		const listQuery = imageLibraryQuery;
 		return {
 			...listQuery(scope, readableEnvironments('images:list', data.linkedAgent), pageState.requestOptions),
 			placeholderData: (previous, query) => (query?.queryKey[1] === scope ? previous : undefined),
@@ -340,15 +340,16 @@
 		return buttons;
 	});
 
+	const imageCount = $derived(images.pagination.grandTotalItems ?? images.pagination.totalItems);
 	const statCards: StatCardConfig[] = $derived([
 		{
-			title: imageUsageCounts.totalImages === 1 ? m.images_total_one() : m.images_total(),
-			value: imageUsageCounts.totalImages,
+			title: m.in_use_images(),
+			value: imageCount,
 			icon: VolumesIcon,
 			iconColor: 'text-info'
 		},
 		{
-			title: m.images_total_size(),
+			title: m.image_storage_all_copies(),
 			value: String(bytes.format(imageUsageCounts.totalImageSize, { unitSeparator: ' ' })),
 			icon: LocalFolderComputerIcon,
 			iconColor: 'text-warning'
@@ -366,7 +367,7 @@
 		{#if resourcesReady}
 			{#key JSON.stringify([pageState.scope, data.linkedAgent])}
 				<ImageTable
-					repositoryLibrary={!data.linkedAgent}
+					repositoryLibrary={true}
 					scope={pageState.scope}
 					images={withFailedEnvironments(images, countFailures)}
 					bind:selectedIds={pageState.selectedIds}

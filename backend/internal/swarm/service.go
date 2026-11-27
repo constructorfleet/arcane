@@ -520,6 +520,7 @@ func (s *SwarmService) listTasksPaginatedWithFilters(ctx context.Context, filter
 		return nil, pagination.Response{}, fmt.Errorf("failed to list swarm tasks: %w", err)
 	}
 
+	versions := services.RunningImageVersions(servicesResult.Items, tasksResult.Items)
 	items := make([]types.SwarmTaskSummary, 0, len(tasksResult.Items))
 	networkID := params.Filters["networkId"]
 	if networkID != "" {
@@ -530,7 +531,9 @@ func (s *SwarmService) listTasksPaginatedWithFilters(ctx context.Context, filter
 		if networkID != "" && !taskUsesNetwork(task, networkID) {
 			continue
 		}
-		items = append(items, types.NewSwarmTaskSummary(task, serviceNameByID[task.ServiceID], nodeNameByID[task.NodeID]))
+		summary := types.NewSwarmTaskSummary(task, serviceNameByID[task.ServiceID], nodeNameByID[task.NodeID])
+		summary.MixedImageVersions = task.Status.State == swarm.TaskStateRunning && len(versions[task.ServiceID]) > 1
+		items = append(items, summary)
 	}
 
 	result := taskPagination.SearchOrderAndPaginate(items, params)

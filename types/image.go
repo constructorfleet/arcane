@@ -82,6 +82,8 @@ type (
 
 		EnvironmentTag
 		RepositoryGroup  *ImageRepositoryGroup `json:"repositoryGroup,omitempty"`
+		ArtifactKey      string                `json:"artifactKey,omitempty"`
+		Platform         string                `json:"platform,omitempty"`
 		LogicalID        string                `json:"logicalId,omitempty"`
 		ID               string                `json:"id" sortable:"true"`
 		Repo             string                `json:"repo" sortable:"true"`
@@ -99,19 +101,16 @@ type (
 	}
 
 	ImageRepositoryGroup struct {
-		CheckErrorRef   string                `json:"checkErrorRef,omitempty"`
-		Copies          []ImageRepositoryCopy `json:"copies"`
-		Digests         []string              `json:"digests"`
-		MinSize         int64                 `json:"minSize"`
-		MaxSize         int64                 `json:"maxSize"`
-		Variants        int                   `json:"variants"`
-		ScannedVariants int                   `json:"scannedVariants"`
-		SawScanError    bool                  `json:"sawScanError,omitempty"`
+		CheckErrorRef string                `json:"checkErrorRef,omitempty"`
+		Copies        []ImageRepositoryCopy `json:"copies"`
+		Digests       []string              `json:"digests"`
 	}
 
 	ImageRepositoryCopy struct {
 		EnvironmentTag
 		Hardened         *HardenedImageInfo `json:"hardened,omitempty"`
+		ArtifactKey      string             `json:"artifactKey,omitempty"`
+		Platform         string             `json:"platform,omitempty"`
 		ID               string             `json:"id"`
 		Tags             []string           `json:"tags"`
 		RepoDigests      []string           `json:"repoDigests"`

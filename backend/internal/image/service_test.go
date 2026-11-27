@@ -192,7 +192,7 @@ func TestMapDockerImagesToDTOs_PopulatesPinnedReferences(t *testing.T) {
 	assert.Equal(t, []string{regularDigest}, items[1].RepoDigests)
 	assert.Nil(t, items[1].PinnedReferences)
 	assert.Empty(t, items[1].ActiveReferences)
-	assert.True(t, items[1].InUse)
+	assert.False(t, items[1].InUse)
 }
 
 func TestImageService_GetImageDetail_EnrichesPinnedReferences(t *testing.T) {

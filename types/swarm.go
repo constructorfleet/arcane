@@ -246,8 +246,9 @@ type (
 		Networks  []string            `json:"networks"`
 		Mounts    []SwarmServiceMount `json:"mounts"`
 
-		Replicas        uint64 `json:"replicas"`
-		RunningReplicas uint64 `json:"runningReplicas"`
+		RunningImageVersions []string `json:"runningImageVersions,omitempty"`
+		Replicas             uint64   `json:"replicas"`
+		RunningReplicas      uint64   `json:"runningReplicas"`
 	}
 
 	SwarmServiceInspect struct {
@@ -411,18 +412,19 @@ type (
 		CreatedAt time.Time `json:"createdAt"`
 		UpdatedAt time.Time `json:"updatedAt"`
 		EnvironmentTag
-		ID           string `json:"id"`
-		Name         string `json:"name"`
-		ServiceID    string `json:"serviceId"`
-		ServiceName  string `json:"serviceName"`
-		NodeID       string `json:"nodeId"`
-		NodeName     string `json:"nodeName"`
-		DesiredState string `json:"desiredState"`
-		CurrentState string `json:"currentState"`
-		Error        string `json:"error,omitempty"`
-		ContainerID  string `json:"containerId,omitempty"`
-		Image        string `json:"image,omitempty"`
-		Slot         int    `json:"slot,omitempty"`
+		ID                 string `json:"id"`
+		Name               string `json:"name"`
+		ServiceID          string `json:"serviceId"`
+		ServiceName        string `json:"serviceName"`
+		NodeID             string `json:"nodeId"`
+		NodeName           string `json:"nodeName"`
+		DesiredState       string `json:"desiredState"`
+		CurrentState       string `json:"currentState"`
+		Error              string `json:"error,omitempty"`
+		ContainerID        string `json:"containerId,omitempty"`
+		Image              string `json:"image,omitempty"`
+		Slot               int    `json:"slot,omitempty"`
+		MixedImageVersions bool   `json:"mixedImageVersions,omitempty"`
 	}
 )
 

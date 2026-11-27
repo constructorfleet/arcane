@@ -10,6 +10,7 @@
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
 	import * as ArcaneTooltip from '#lib/components/arcane-tooltip/index.js';
 	import PruneConfirmationDialog from '#lib/components/dialogs/prune-confirmation-dialog.svelte';
+	import { swarmEnvironmentsQueryOptions } from '#lib/components/swarm/swarm-environments.js';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { IsMobile } from '#lib/hooks/is-mobile.svelte.js';
@@ -17,6 +18,7 @@
 	import { m } from '#lib/paraglide/messages.js';
 	import { containerListQuery } from '#lib/query/containers.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
+	import { swarmServiceListQuery } from '#lib/query/swarm.js';
 	import { apiKeyService } from '#lib/services/api-key-service.js';
 	import { containerService } from '#lib/services/container-service.js';
 	import { environmentManagementService } from '#lib/services/env-mgmt-service.js';
@@ -217,6 +219,19 @@
 		return value?.currentVersion !== undefined;
 	}
 
+	const swarmQuery = createQuery(() => ({
+		...swarmEnvironmentsQueryOptions('swarm-services:list'),
+		enabled: anyWidgetVisible(ATTENTION_WIDGETS) && loadableEnvironments('swarm-services:list').length > 0,
+		refetchInterval: 30000
+	}));
+	const mixedServicesQuery = createQuery(() => ({
+		...swarmServiceListQuery(swarmQuery.data ?? { environments: [], managers: [], failedEnvironments: [], scope: '' }, {
+			pagination: { page: 1, limit: 20 },
+			filters: { mixedImageVersions: true }
+		}),
+		enabled: anyWidgetVisible(ATTENTION_WIDGETS) && !!swarmQuery.data?.environments.length,
+		refetchInterval: 30000
+	}));
 	const containersQuery = createQuery(() => {
 		const environments = loadableEnvironments('containers:list');
 		return {
@@ -553,8 +568,23 @@
 		)
 	);
 
-	const attentionItems = $derived(
-		buildAttentionItems({
+	const attentionItems = $derived([
+		...(mixedServicesQuery.data?.data ?? [])
+			.filter((service) => (service.runningImageVersions?.length ?? 0) > 1)
+			.map((service): AttentionItem => ({
+				key: `mixed-images:${service.environmentId}:${service.id}`,
+				severity: 'critical',
+				environmentId: service.environmentId,
+				title: m.service_running_mixed_images({ name: service.name }),
+				detail: m.mixed_image_versions(),
+				timestamp: service.updatedAt,
+				actionLabel: m.common_view(),
+				target: {
+					kind: 'link',
+					href: `${resolve('/(app)/swarm/services/[serviceId]', { serviceId: service.id })}?env=${encodeURIComponent(service.environmentId)}&tab=tasks`
+				}
+			})),
+		...buildAttentionItems({
 			environments: environmentCards.map(({ environment }) => environment),
 			containers: containersByEnvironment,
 			images: imagesByEnvironment,
@@ -574,14 +604,16 @@
 			),
 			now: Temporal.Now.instant()
 		})
-	);
+	]);
 	const recentActivityGroups = $derived.by(() => {
 		if (!visibleWidgets.has('attention')) return activityGroups;
 		const shown = new Set(attentionItems.map((item) => item.activityKey));
 		return activityGroups.filter((group) => !shown.has(group.key));
 	});
 	const attentionFailed = $derived(
-		[containersQuery, eventsQuery, riskQuery, jobsQuery, versionsQuery].some((query) => query.isError)
+		[containersQuery, eventsQuery, riskQuery, jobsQuery, versionsQuery, swarmQuery, mixedServicesQuery].some(
+			(query) => query.isError
+		)
 	);
 	const attentionCountByEnvironment = $derived(
 		attentionItems.reduce(

@@ -185,6 +185,7 @@
 {/snippet}
 
 {#snippet ErrorCell({ item }: { item: TaskRow })}
+	{#if item.mixedImageVersions}<span class="wrap-anywhere text-destructive">{m.mixed_image_versions()}</span>{/if}
 	{#if item.error}
 		<span class="wrap-anywhere text-destructive">{item.error}</span>
 	{/if}
@@ -281,6 +282,7 @@
 		]}
 	>
 		<SwarmTaskContainer task={item} environmentId={item.environmentId} tablePage={requestOptions.pagination?.page} />
+		{#if item.mixedImageVersions}<p class="mt-1 text-sm text-destructive">{m.mixed_image_versions()}</p>{/if}
 		{#if serviceScoped && item.error}
 			<p class="mt-1 text-sm wrap-anywhere text-destructive">{item.error}</p>
 		{/if}

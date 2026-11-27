@@ -8,10 +8,13 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/containerd/platforms"
 	"github.com/distribution/reference"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
+	"github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/errgroup"
 
 	"getarcane.dev/arcane/v3/pkg/pagination"
 	"getarcane.dev/types/v3"
@@ -31,7 +34,7 @@ func (s *ImageService) runningImageConsumers(ctx context.Context, containers []c
 			if err != nil || !info.Info.Swarm.ControlAvailable {
 				return nil, err
 			}
-			filters := make(client.Filters).Add("node", info.Info.Swarm.NodeID).Add("desired-state", string(swarm.TaskStateRunning))
+			filters := make(client.Filters).Add("node", info.Info.Swarm.NodeID)
 			result, err := dockerClient.TaskList(ctx, client.TaskListOptions{Filters: filters})
 			return append([]swarm.Task{}, result.Items...), err
 		})
@@ -46,7 +49,7 @@ func (s *ImageService) runningImageConsumers(ctx context.Context, containers []c
 func runningImageContainers(containers []container.Summary, tasks []swarm.Task) []container.Summary {
 	active := make(map[string]string, len(tasks))
 	for _, task := range tasks {
-		if task.DesiredState == swarm.TaskStateRunning && task.Status.State == swarm.TaskStateRunning {
+		if task.Status.State == swarm.TaskStateRunning {
 			active[task.ID] = ""
 			if task.Spec.ContainerSpec != nil {
 				active[task.ID] = task.Spec.ContainerSpec.Image
@@ -72,9 +75,22 @@ func runningImageContainers(containers []container.Summary, tasks []swarm.Task) 
 
 func (s *ImageService) libraryPage(pages []pagination.EnvironmentPage[types.ImageSummary], params pagination.QueryParams) ([]types.ImageSummary, pagination.Response) {
 	items := groupImageRepositories(pages, params.Filters["repository"])
+	if imageID := params.Filters["imageId"]; imageID != "" {
+		items = slices.DeleteFunc(items, func(item types.ImageSummary) bool {
+			source := params.Filters["imageEnvironmentId"]
+			if item.RepositoryGroup == nil {
+				return item.ID != imageID || source != "" && item.EnvironmentID != source
+			}
+			return !slices.ContainsFunc(item.RepositoryGroup.Copies, func(copy types.ImageRepositoryCopy) bool {
+				return copy.ID == imageID && (source == "" || copy.EnvironmentID == source)
+			})
+		})
+	}
 	params.Filters = maps.Clone(params.Filters)
 	delete(params.Filters, "repository")
-	delete(params.Filters, "groupByRepository")
+	delete(params.Filters, "groupByImage")
+	delete(params.Filters, "imageId")
+	delete(params.Filters, "imageEnvironmentId")
 	config := pagination.WithEnvironment(s.getImagePaginationConfig())
 	result := config.SearchOrderAndPaginate(items, params)
 	if params.Limit > 0 && int64(params.Start) >= result.TotalCount {
@@ -85,18 +101,26 @@ func (s *ImageService) libraryPage(pages []pagination.EnvironmentPage[types.Imag
 }
 
 func groupImageRepositories(pages []pagination.EnvironmentPage[types.ImageSummary], onlyRepository string) []types.ImageSummary {
+	if onlyRepository != "" {
+		onlyRepository = imageRepositoryName(onlyRepository)
+		if onlyRepository == "" {
+			return nil
+		}
+	}
 	groups := map[string][]types.ImageSummary{}
 	var items []types.ImageSummary
 	for _, page := range pages {
 		for _, image := range page.Items {
 			image.SetEnvironment(page.Environment)
 			byRepository := imageCopiesByRepository(image, onlyRepository)
-			for repo, observation := range byRepository {
-				groups[repo] = append(groups[repo], observation)
+			for _, observation := range byRepository {
+				key := observation.ArtifactKey
+				groups[key] = append(groups[key], observation)
 			}
 			if len(byRepository) == 0 && onlyRepository == "" {
 				if image.InUse {
-					groups["local:"+image.ID] = append(groups["local:"+image.ID], image)
+					key := "local:" + image.ID + "|" + image.Platform
+					groups[key] = append(groups[key], image)
 				} else {
 					items = append(items, image)
 				}
@@ -125,7 +149,10 @@ func imageCopiesByRepository(image types.ImageSummary, onlyRepository string) ma
 				return activeRepo == repo || activeRepo == "" && repo == primary
 			})
 			observation.Repo, observation.Tag = repo, "<none>"
-			observation.RepoTags, observation.RepoDigests, observation.PinnedReferences = nil, nil, nil
+			observation.RepoTags, observation.RepoDigests = nil, nil
+			observation.PinnedReferences = slices.DeleteFunc(slices.Clone(image.ActiveReferences), func(active string) bool {
+				return imageRepositoryName(active) != repo || !strings.Contains(active, "@")
+			})
 			if repo != primary {
 				observation.UpdateInfo = nil
 			}
@@ -149,6 +176,12 @@ func imageCopiesByRepository(image types.ImageSummary, onlyRepository string) ma
 		if repo == primary && image.Tag != "<none>" && slices.Contains(observation.RepoTags, repo+":"+image.Tag) {
 			observation.Tag = image.Tag
 		}
+		if len(image.ActiveReferences) > 0 && !observation.InUse {
+			delete(byRepository, repo)
+			continue
+		}
+		key, _ := imageVariant(observation)
+		observation.ArtifactKey = "image:" + repo + "@" + key
 		byRepository[repo] = observation
 	}
 	return byRepository
@@ -181,22 +214,29 @@ func mergeImageRepository(copies []types.ImageSummary) types.ImageSummary {
 			}
 			return 1
 		}
+		switch {
+		case a.VulnerabilityScan != nil && b.VulnerabilityScan != nil:
+			if freshness := b.VulnerabilityScan.ScanTime.Compare(a.VulnerabilityScan.ScanTime); freshness != 0 {
+				return freshness
+			}
+		case a.VulnerabilityScan != nil:
+			return -1
+		case b.VulnerabilityScan != nil:
+			return 1
+		}
 		return cmp.Or(cmp.Compare(b.Created, a.Created), cmp.Compare(a.EnvironmentID, b.EnvironmentID), cmp.Compare(a.ID, b.ID))
 	})
 	row := copies[0]
-	row.LogicalID = "image-repository:" + row.Repo
+	row.LogicalID = row.ArtifactKey
 	if row.Repo == "<none>" || row.Repo == "" {
-		row.LogicalID = "image-local:" + row.ID
+		row.LogicalID = "image-local:" + row.ID + "|" + row.Platform
 	}
 	row.RepoTags, row.RepoDigests = nil, nil
-	group := &types.ImageRepositoryGroup{MinSize: row.Size, MaxSize: row.Size}
-	observed := map[string]struct{}{}
-	scanned := map[string]struct{}{}
-	checked := map[string]struct{}{}
-	row.VulnerabilityScan = nil
+	group := &types.ImageRepositoryGroup{}
+	checked := false
 	for i, observation := range copies {
 		group.Copies = append(group.Copies, types.ImageRepositoryCopy{
-			EnvironmentTag: observation.EnvironmentTag, ID: observation.ID, Tags: observation.RepoTags, InUse: observation.InUse,
+			ArtifactKey: observation.ArtifactKey, Platform: observation.Platform, EnvironmentTag: observation.EnvironmentTag, ID: observation.ID, Tags: observation.RepoTags, InUse: observation.InUse,
 			RepoDigests: observation.RepoDigests, PinnedReferences: observation.PinnedReferences, Hardened: observation.Hardened,
 		})
 		row.RepoTags = append(row.RepoTags, observation.RepoTags...)
@@ -204,15 +244,12 @@ func mergeImageRepository(copies []types.ImageSummary) types.ImageSummary {
 		if !observation.InUse && (row.InUse || i > 0) {
 			continue
 		}
-		key, digest := imageVariant(observation)
-		observed[key] = struct{}{}
-		group.MinSize = min(group.MinSize, observation.Size)
-		group.MaxSize = max(group.MaxSize, observation.Size)
+		_, digest := imageVariant(observation)
 		if digest != "" {
 			group.Digests = append(group.Digests, digest)
 		}
 		if row.InUse && observation.UpdateInfo != nil && observation.Tag != "<none>" {
-			checked[key] = struct{}{}
+			checked = true
 			if observation.UpdateInfo.HasUpdate && (row.UpdateInfo == nil || !row.UpdateInfo.HasUpdate) {
 				row.UpdateInfo = observation.UpdateInfo
 			}
@@ -220,29 +257,21 @@ func mergeImageRepository(copies []types.ImageSummary) types.ImageSummary {
 				group.CheckErrorRef = observation.Repo + ":" + observation.Tag
 			}
 		}
-		if report := observation.VulnerabilityScan; report != nil {
-			group.SawScanError = group.SawScanError || report.Status == types.VulnerabilityScanStatusFailed
-			if report.Status == types.VulnerabilityScanStatusCompleted && report.Summary != nil {
-				scanned[key] = struct{}{}
-				if row.VulnerabilityScan == nil || compareImageScans(report, row.VulnerabilityScan) > 0 {
-					row.VulnerabilityScan = report
-				}
-			}
-		}
 	}
-	if !row.InUse || len(checked) < len(observed) && row.UpdateInfo != nil && !row.UpdateInfo.HasUpdate {
+	if !row.InUse || !checked && row.UpdateInfo != nil && !row.UpdateInfo.HasUpdate {
 		row.UpdateInfo = nil
 	}
 	row.RepoTags = sortedUnique(row.RepoTags)
 	row.RepoDigests = sortedUnique(row.RepoDigests)
 	group.Digests = sortedUnique(group.Digests)
-	group.Variants = len(observed)
-	group.ScannedVariants = len(scanned)
 	row.RepositoryGroup = group
 	return row
 }
 
 func imageVariant(observation types.ImageSummary) (string, string) {
+	if observation.Platform == "" {
+		return observation.ID + "|" + observation.EnvironmentID, ""
+	}
 	var pins []string
 	for _, ref := range observation.ActiveReferences {
 		if _, digest, pinned := strings.Cut(ref, "@"); pinned && imageRepositoryName(ref) == observation.Repo {
@@ -250,20 +279,52 @@ func imageVariant(observation types.ImageSummary) (string, string) {
 		}
 	}
 	if pins = sortedUnique(pins); len(pins) == 1 {
-		return pins[0], pins[0]
+		return pins[0] + "|" + observation.Platform, pins[0]
 	}
 	if len(observation.RepoDigests) == 1 {
 		_, digest, _ := strings.Cut(observation.RepoDigests[0], "@")
-		return digest, digest
+		return digest + "|" + observation.Platform, digest
 	}
-	return observation.ID, ""
+	return observation.ID + "|" + observation.Platform, ""
 }
 
-func compareImageScans(a, b *types.VulnerabilityScanSummary) int {
-	return cmp.Or(
-		cmp.Compare(a.Summary.Critical, b.Summary.Critical),
-		cmp.Compare(a.Summary.High, b.Summary.High),
-		cmp.Compare(a.Summary.Total, b.Summary.Total),
-		a.ScanTime.Compare(b.ScanTime),
-	)
+// imagePlatforms reads immutable local metadata once, without contacting a registry.
+func (s *ImageService) imagePlatforms(ctx context.Context, consumers []container.Summary) map[string]string {
+	ids := make(map[string]struct{}, len(consumers))
+	for _, consumer := range consumers {
+		ids[consumer.ImageID] = struct{}{}
+	}
+	ordered := slices.Sorted(maps.Keys(ids))
+	values := make([]string, len(ordered))
+	var group errgroup.Group
+	group.SetLimit(8)
+	for i, id := range ordered {
+		group.Go(func() error {
+			value, _, err := s.platforms.GetOrLoad(id, func(id string) (string, bool, error) {
+				inspected, err := s.dockerService.Call(ctx, func(ctx context.Context, cli *client.Client) (client.ImageInspectResult, error) {
+					return cli.ImageInspect(ctx, id)
+				})
+				if err != nil {
+					return "", false, err
+				}
+				if inspected.Os == "" || inspected.Architecture == "" {
+					return "", false, nil
+				}
+				platform := platforms.Format(platforms.Normalize(v1.Platform{OS: inspected.Os, Architecture: inspected.Architecture, Variant: inspected.Variant}))
+				return platform, true, nil
+			})
+			if err != nil {
+				slog.DebugContext(ctx, "Image platform unavailable", "imageId", id, "error", err)
+				return nil
+			}
+			values[i] = value
+			return nil
+		})
+	}
+	_ = group.Wait()
+	result := make(map[string]string, len(ordered))
+	for i, id := range ordered {
+		result[id] = values[i]
+	}
+	return result
 }

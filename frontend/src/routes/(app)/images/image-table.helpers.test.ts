@@ -44,11 +44,7 @@ describe('image action targets', () => {
 				},
 				{ id: 'sha256:same', environmentId: 'agent-b', tags: null, repoDigests: [], pinnedReferences: [], inUse: false }
 			],
-			digests: ['sha256:a'],
-			minSize: 0,
-			maxSize: 0,
-			variants: 1,
-			scannedVariants: 0
+			digests: ['sha256:a']
 		};
 		const targets = imageActionTargets(row);
 		expect(targets).toHaveLength(2);

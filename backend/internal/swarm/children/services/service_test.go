@@ -307,3 +307,27 @@ func newSettingsDockerService(t *testing.T, dockerClient *client.Client) *docker
 	t.Cleanup(func() { require.NoError(t, settingsService.Stop(context.WithoutCancel(t.Context()))) })
 	return docker.NewDockerClientService(t.Context(), db, settingsService, docker.ClientOptions{}).WithClient(dockerClient)
 }
+
+func TestRunningImageVersions(t *testing.T) {
+	const first = "repo/app:old@sha256:aaaa"
+	const second = "repo/app:new@sha256:bbbb"
+	services := []swarm.Service{
+		{ID: "mixed", Spec: swarm.ServiceSpec{Mode: swarm.ServiceMode{Replicated: &swarm.ReplicatedService{}}}},
+		{ID: "same", Spec: swarm.ServiceSpec{Mode: swarm.ServiceMode{Replicated: &swarm.ReplicatedService{}}}},
+		{ID: "global", Spec: swarm.ServiceSpec{Mode: swarm.ServiceMode{Global: &swarm.GlobalService{}}}},
+	}
+	tasks := []swarm.Task{
+		{ServiceID: "mixed", DesiredState: swarm.TaskStateShutdown, Status: swarm.TaskStatus{State: swarm.TaskStateRunning}, Spec: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{Image: first}}},
+		{ServiceID: "mixed", Status: swarm.TaskStatus{State: swarm.TaskStateRunning}, Spec: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{Image: second}}},
+		{ServiceID: "same", Status: swarm.TaskStatus{State: swarm.TaskStateRunning}, Spec: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{Image: first}}},
+		{ServiceID: "same", Status: swarm.TaskStatus{State: swarm.TaskStateRunning}, Spec: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{Image: "repo/app:alias@sha256:aaaa"}}},
+		{ServiceID: "same", Status: swarm.TaskStatus{State: swarm.TaskStateShutdown}, Spec: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{Image: second}}},
+		{ServiceID: "global", Status: swarm.TaskStatus{State: swarm.TaskStateRunning}, Spec: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{Image: first}}},
+		{ServiceID: "global", Status: swarm.TaskStatus{State: swarm.TaskStateRunning}, Spec: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{Image: second}}},
+	}
+	require.Equal(t, map[string][]string{"mixed": {second, first}}, RunningImageVersions(services, tasks))
+	summaries := []types.SwarmServiceSummary{{ID: "mixed", RunningImageVersions: []string{first, second}}, {ID: "same"}}
+	page := servicePagination.SearchOrderAndPaginate(summaries, pagination.QueryParams{Filters: map[string]string{"mixedImageVersions": "true"}})
+	require.Len(t, page.Items, 1)
+	require.Equal(t, "mixed", page.Items[0].ID)
+}
