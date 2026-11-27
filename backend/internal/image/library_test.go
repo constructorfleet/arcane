@@ -73,6 +73,57 @@ func TestImageLibraryGroupsBeforeSearchAndPagination(t *testing.T) {
 	require.False(t, all[3].InUse)
 }
 
+func TestImageLibraryRunningConsumerCounts(t *testing.T) {
+	const digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	for _, tt := range []struct {
+		second *int
+		want   *int
+		name   string
+	}{
+		{name: "all active copies", second: new(3), want: new(5)},
+		{name: "unknown active copy", second: nil, want: nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			pages := []pagination.EnvironmentPage[types.ImageSummary]{
+				{Environment: types.EnvironmentRef{ID: "one"}, Items: []types.ImageSummary{{
+					ID: "image", Platform: "linux/amd64", RepoTags: []string{"alpine:latest"}, RepoDigests: []string{"alpine@" + digest},
+					ActiveReferences: []string{"alpine:latest"}, InUse: true, RunningContainers: new(2),
+				}}},
+				{Environment: types.EnvironmentRef{ID: "two"}, Items: []types.ImageSummary{{
+					ID: "image", Platform: "linux/amd64", RepoTags: []string{"alpine:latest"}, RepoDigests: []string{"alpine@" + digest},
+					ActiveReferences: []string{"alpine:latest"}, InUse: true, RunningContainers: tt.second,
+				}}},
+			}
+			rows := groupImageRepositories(pages, "")
+			require.Len(t, rows, 1)
+			require.Equal(t, tt.want, rows[0].RunningContainers)
+		})
+	}
+}
+
+func TestImageLibraryScopesRunningConsumers(t *testing.T) {
+	active := types.ImageSummary{
+		ID: "image", InUse: true, RunningContainers: new(2),
+		EnvironmentTag: types.EnvironmentTag{EnvironmentID: "one", EnvironmentName: "Node one"},
+		UsedBy:         []types.ImageUsedBy{{Type: "container", ID: "container", Name: "app"}},
+	}
+	other := active
+	other.EnvironmentID = "two"
+	other.EnvironmentName = "Node two"
+	other.RunningContainers = new(1)
+	cached := active
+	cached.EnvironmentID = "cache"
+	cached.InUse = false
+	cached.RunningContainers = new(99)
+	cached.UsedBy = []types.ImageUsedBy{{Type: "container", ID: "stopped", Name: "stopped"}}
+	row := mergeImageRepository([]types.ImageSummary{active, active, other, cached})
+	require.Equal(t, new(3), row.RunningContainers)
+	require.Len(t, row.UsedBy, 2)
+	require.Equal(t, "one", row.UsedBy[0].EnvironmentID)
+	require.Equal(t, "two", row.UsedBy[1].EnvironmentID)
+	require.Equal(t, "container", row.UsedBy[0].ID)
+}
+
 func TestImageLibrarySeparatesVersionsAndMergesReplicas(t *testing.T) {
 	const ref = "example.com/project/image:latest@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	containers := []container.Summary{

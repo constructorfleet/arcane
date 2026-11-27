@@ -24,6 +24,30 @@ import (
 	"getarcane.dev/types/v3"
 )
 
+func TestListConfigsScopesOwnedAndReferencedIDsBeforePagination(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		assert.NoError(t, json.MarshalWrite(w, []swarm.Config{
+			{ID: "unrelated", Spec: swarm.ConfigSpec{Annotations: swarm.Annotations{Name: "aaa"}}},
+			{ID: "owned", Spec: swarm.ConfigSpec{Annotations: swarm.Annotations{Name: "owned", Labels: map[string]string{"com.docker.stack.namespace": "stack"}}}},
+			{ID: "referenced", Spec: swarm.ConfigSpec{Annotations: swarm.Annotations{Name: "referenced"}}},
+		}))
+	}))
+	t.Cleanup(server.Close)
+	cli, err := client.New(client.WithHost(server.URL), client.WithAPIVersion("1.41"), client.WithHTTPClient(server.Client()))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = cli.Close() })
+	service := NewService(newSettingsDockerService(t, cli), func(context.Context) error { return nil })
+	items, page, err := service.ListConfigs(t.Context(), pagination.QueryParams{
+		Params: pagination.Params{Start: 1, Limit: 1}, SortParams: pagination.SortParams{Sort: "name", Order: pagination.SortAsc},
+		Filters: map[string]string{"ids": "referenced", "stackName": "stack"},
+	})
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, "referenced", items[0].ID)
+	require.EqualValues(t, 2, page.TotalItems)
+}
+
 func TestService_UpdateConfig_KeepsDataAndReplacesLabels(t *testing.T) {
 	current := swarm.Config{
 		ID:      "config-1",

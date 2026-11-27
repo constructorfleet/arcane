@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 
 import { m } from '#lib/paraglide/messages.js';
-import { swarmStackQuery, swarmStackServiceListQuery, swarmStackTaskListQuery } from '#lib/query/swarm.js';
+import { swarmStackQuery } from '#lib/query/swarm.js';
 import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 import { environmentName, resolveDetailEnvironmentId } from '#lib/utils/environments.js';
 import { resourceTablePage } from '#lib/utils/resource-navigation.js';
@@ -43,19 +43,15 @@ export const load: PageLoad = async ({ params, parent, url }) => {
 
 	const operationResult = await tryCatch(
 		(async () => {
-			const [stack, services, tasks] = await Promise.all([
-				queryClient.query(swarmStackQuery(envId, stackName)),
-				queryClient.query(swarmStackServiceListQuery(environment, stackName, servicesRequestOptions)),
-				queryClient.query(swarmStackTaskListQuery(environment, stackName, tasksRequestOptions))
-			]);
+			const stack = await queryClient.query(swarmStackQuery(envId, stackName));
 
 			return {
 				envId,
 				environment,
 				stack,
 				stackName,
-				services,
-				tasks,
+				services: null,
+				tasks: null,
 				source: null,
 				sourceState: 'loading' as StackSourceState,
 				servicesRequestOptions,

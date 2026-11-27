@@ -9,13 +9,11 @@
 </script>
 
 <script lang="ts">
-	import { goto } from '$app/navigation';
-
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
 	import { UniversalMobileCard, type ColumnSpec, type MobileFieldVisibility } from '#lib/components/arcane-table/index.js';
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
-	import { InspectIcon, LayersIcon, type IconType } from '#lib/icons/index.js';
+	import { InspectIcon, LayersIcon, ExternalLinkIcon, type IconType } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { PaginationResponse } from '#lib/types/base.js';
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
@@ -80,7 +78,7 @@
 
 {#snippet NameCell({ item }: { item: RelatedResourceRow })}
 	{#if item.href}
-		<a href={item.href} class="text-primary hover:underline">{item.name}</a>
+		<a href={item.href} class="text-primary-text hover:underline">{item.name}</a>
 	{:else}
 		{item.name}
 	{/if}
@@ -92,12 +90,28 @@
 
 {#snippet actions({ item }: { item: RelatedResourceRow })}
 	{#if item.href || item.inspect?.length}
+		{@const actions = [
+			...new Map(
+				(item.inspect ?? [])
+					.filter((action) => !action.href || action.href !== item.href)
+					.map((action) => [action.href ?? action.label, action])
+			).values()
+		]}
 		<RowActionsMenu name={item.name}>
-			{#each item.inspect ?? [{ label: m.common_inspect(), href: item.href }] as action (action.href ?? action.label)}
-				<DropdownMenu.Item disabled={!action.href} onclick={() => action.href && goto(action.href)}>
-					<InspectIcon />{action.label}
-				</DropdownMenu.Item>
-			{/each}
+			{#if item.href}<DropdownMenu.Item
+					>{#snippet child({ props })}<a {...props} href={item.href}><InspectIcon />{m.common_view_details()}</a
+						>{/snippet}</DropdownMenu.Item
+				>{/if}
+			{#if actions.length}
+				<DropdownMenu.Sub
+					><DropdownMenu.SubTrigger><ExternalLinkIcon />{m.related_resources()}</DropdownMenu.SubTrigger><DropdownMenu.SubContent>
+						{#each actions as action (action.href ?? action.label)}<DropdownMenu.Item disabled={!action.href}
+								>{#snippet child({ props })}<a {...props} href={action.href}><InspectIcon />{action.label}</a
+									>{/snippet}</DropdownMenu.Item
+							>{/each}
+					</DropdownMenu.SubContent></DropdownMenu.Sub
+				>
+			{/if}
 		</RowActionsMenu>
 	{/if}
 {/snippet}

@@ -1250,7 +1250,7 @@ func (s *ImageService) ListImagesPaginated(ctx context.Context, environmentID st
 		dockerImages,
 		containers,
 		consumers,
-		BuildVolumeUsageMap(containers, s.BuildProjectIDMap(ctx, containers)),
+		BuildVolumeUsageMap(consumers, s.BuildProjectIDMap(ctx, consumers)),
 		buildUpdateMap(updateRecords),
 		vulnerabilityMap,
 	)
@@ -1547,8 +1547,9 @@ func MapDockerImagesToDTOs(
 				labels, _ := kit.AsStringMap(di.Labels)
 				return labels
 			}(),
-			InUse:  len(activeRefsByImageID[di.ID]) > 0,
-			UsedBy: usedBy,
+			InUse:             len(activeRefsByImageID[di.ID]) > 0,
+			RunningContainers: new(len(activeRefsByImageID[di.ID])),
+			UsedBy:            usedBy,
 			UpdateInfo: func() *types.ImageUpdateInfo {
 				if updateRecord, exists := updateMap[di.ID]; exists {
 					return updateRecord.UpdateInfo()

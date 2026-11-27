@@ -13,6 +13,7 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/libtnb/sqlite"
+	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/api/types/system"
 	"github.com/moby/moby/client"
@@ -39,6 +40,31 @@ func newSwarmTestDockerClient(t *testing.T, server *httptest.Server) *client.Cli
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = cli.Close() })
 	return cli
+}
+
+func TestServiceResourceReferencesUseExactIDs(t *testing.T) {
+	service := swarm.Service{ID: "exact-service", Spec: swarm.ServiceSpec{TaskTemplate: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{
+		Secrets: []*swarm.SecretReference{{SecretID: "secret-exact", SecretName: "same-name"}},
+		Configs: []*swarm.ConfigReference{{ConfigID: "config-exact", ConfigName: "same-name"}},
+		Mounts:  []mount.Mount{{Type: mount.TypeVolume, Source: "volume-exact"}, {Type: mount.TypeBind, Source: "not-volume"}},
+	}}}}
+	for _, test := range []struct {
+		filters map[string]string
+		want    bool
+	}{
+		{map[string]string{"secretId": "secret-exact"}, true},
+		{map[string]string{"secretId": "same-name"}, false},
+		{map[string]string{"configId": "config-exact"}, true},
+		{map[string]string{"configId": "same-name"}, false},
+		{map[string]string{"secretId": "secret-exact", "configId": "missing"}, false},
+		{map[string]string{"volumeName": "volume-exact"}, true},
+		{map[string]string{"volumeName": "not-volume"}, false},
+		{map[string]string{"serviceIds": "other,exact-service"}, true},
+		{map[string]string{"serviceIds": "exact"}, false},
+	} {
+		assert.Equal(t, test.want, serviceMatchesResources(service, test.filters), test.filters)
+	}
+	assert.False(t, serviceMatchesResources(swarm.Service{}, map[string]string{"secretId": "secret-exact"}))
 }
 
 func TestForceUpdateServicePreservesCurrentSpecAndRegistryAuth(t *testing.T) {
@@ -229,16 +255,31 @@ func servicesScopeContext(t *testing.T, target string, bodies map[string]any) co
 	})
 }
 
-func TestListServicesFiltersByNetworkBeforePagination(t *testing.T) {
+func TestListServicesFiltersResourceReferencesBeforePagination(t *testing.T) {
 	services := []swarm.Service{
 		{ID: "unrelated", Spec: swarm.ServiceSpec{Annotations: swarm.Annotations{Name: "aaa-unrelated"}}},
 		{ID: "dnsrr", Spec: swarm.ServiceSpec{
-			Annotations:  swarm.Annotations{Name: "dnsrr"},
-			TaskTemplate: swarm.TaskSpec{Networks: []swarm.NetworkAttachmentConfig{{Target: "overlay"}}},
+			Annotations: swarm.Annotations{Name: "dnsrr"},
+			TaskTemplate: swarm.TaskSpec{
+				Networks: []swarm.NetworkAttachmentConfig{{Target: "overlay"}},
+				ContainerSpec: &swarm.ContainerSpec{
+					Secrets: []*swarm.SecretReference{{SecretID: "secret-id"}},
+					Configs: []*swarm.ConfigReference{{ConfigID: "config-id"}},
+					Mounts:  []mount.Mount{{Type: mount.TypeVolume, Source: "volume-name"}},
+				},
+			},
 		}},
 		{
-			ID: "vip", Spec: swarm.ServiceSpec{Annotations: swarm.Annotations{Name: "vip"}},
-			Endpoint: swarm.Endpoint{VirtualIPs: []swarm.EndpointVirtualIP{{NetworkID: "overlay"}}},
+			ID: "vip", Spec: swarm.ServiceSpec{
+				Annotations: swarm.Annotations{Name: "vip"},
+				TaskTemplate: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{
+					Secrets: []*swarm.SecretReference{{SecretID: "secret-id"}},
+					Configs: []*swarm.ConfigReference{{ConfigID: "config-id"}},
+					Mounts:  []mount.Mount{{Type: mount.TypeVolume, Source: "volume-name"}},
+				}},
+			},
+			Endpoint:      swarm.Endpoint{VirtualIPs: []swarm.EndpointVirtualIP{{NetworkID: "overlay"}}},
+			ServiceStatus: &swarm.ServiceStatus{DesiredTasks: 5, RunningTasks: 4, CompletedTasks: 3},
 		},
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -254,18 +295,25 @@ func TestListServicesFiltersByNetworkBeforePagination(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	service := NewService(newSettingsDockerService(t, newSwarmTestDockerClient(t, server)), func(context.Context) error { return nil }, nil)
-	params := pagination.QueryParams{
-		Params:     pagination.Params{Start: 1, Limit: 1},
-		Filters:    map[string]string{"networkId": "overlay"},
-		SortParams: pagination.SortParams{Sort: "name", Order: pagination.SortAsc},
-	}
+	for _, filter := range []map[string]string{{"networkId": "overlay"}, {"secretId": "secret-id"}, {"configId": "config-id"}, {"volumeName": "volume-name"}, {"serviceIds": "dnsrr,vip"}} {
+		params := pagination.QueryParams{
+			Params:     pagination.Params{Start: 1, Limit: 1},
+			Filters:    filter,
+			SortParams: pagination.SortParams{Sort: "name", Order: pagination.SortAsc},
+		}
 
-	items, page, err := service.ListServicesPaginated(t.Context(), params)
-	require.NoError(t, err)
-	require.Len(t, items, 1)
-	require.Equal(t, "vip", items[0].ID)
-	require.EqualValues(t, 2, page.TotalItems)
-	require.Equal(t, "overlay", params.Filters["networkId"])
+		items, page, err := service.ListServicesPaginated(t.Context(), params)
+		require.NoError(t, err)
+		require.Len(t, items, 1)
+		require.Equal(t, "vip", items[0].ID)
+		require.True(t, items[0].StatusObserved)
+		require.Equal(t, uint64(3), *items[0].CompletedReplicas)
+		require.Equal(t, "secret-id", items[0].Secrets[0].ID)
+		require.Equal(t, "config-id", items[0].Configs[0].ID)
+		require.Equal(t, []string{"overlay"}, items[0].NetworkIDs)
+		require.EqualValues(t, 2, page.TotalItems)
+		require.Equal(t, filter, params.Filters)
+	}
 }
 
 func TestAggregateMergesEnvironments(t *testing.T) {

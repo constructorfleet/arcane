@@ -227,6 +227,7 @@ func mergeImageRepository(copies []types.ImageSummary) types.ImageSummary {
 		return cmp.Or(cmp.Compare(b.Created, a.Created), cmp.Compare(a.EnvironmentID, b.EnvironmentID), cmp.Compare(a.ID, b.ID))
 	})
 	row := copies[0]
+	row.RunningContainers, row.UsedBy = runningRepositoryConsumers(copies)
 	row.LogicalID = row.ArtifactKey
 	if row.Repo == "<none>" || row.Repo == "" {
 		row.LogicalID = "image-local:" + row.ID + "|" + row.Platform
@@ -266,6 +267,37 @@ func mergeImageRepository(copies []types.ImageSummary) types.ImageSummary {
 	group.Digests = sortedUnique(group.Digests)
 	row.RepositoryGroup = group
 	return row
+}
+
+func runningRepositoryConsumers(copies []types.ImageSummary) (*int, []types.ImageUsedBy) {
+	runningContainers := 0
+	countedCopies := make(map[string]bool)
+	consumerIdentities := make(map[string]bool)
+	var consumers []types.ImageUsedBy
+	for _, observation := range copies {
+		if !observation.InUse {
+			continue
+		}
+		if observation.RunningContainers == nil {
+			return nil, nil
+		}
+		copyIdentity := observation.EnvironmentID + "\x00" + observation.ID
+		if !countedCopies[copyIdentity] {
+			runningContainers += *observation.RunningContainers
+			countedCopies[copyIdentity] = true
+		}
+		for _, consumer := range observation.UsedBy {
+			identity := observation.EnvironmentID + "\x00" + consumer.Type + "\x00" + cmp.Or(consumer.ID, consumer.Name)
+			if consumerIdentities[identity] {
+				continue
+			}
+			consumerIdentities[identity] = true
+			consumers = append(consumers, types.ImageUsedBy{
+				EnvironmentTag: observation.EnvironmentTag, Type: consumer.Type, Name: consumer.Name, ID: consumer.ID,
+			})
+		}
+	}
+	return new(runningContainers), consumers
 }
 
 func imageVariant(observation types.ImageSummary) (string, string) {

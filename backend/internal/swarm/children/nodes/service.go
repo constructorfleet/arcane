@@ -132,10 +132,18 @@ func (s *Service) ListNodesPaginated(ctx context.Context, environmentID string, 
 		return nil, pagination.Response{}, fmt.Errorf("failed to list swarm nodes: %w", err)
 	}
 	nodes := nodesResult.Items
+	tasksResult, tasksErr := s.docker.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.TaskListResult, error) {
+		return dockerClient.TaskList(ctx, client.TaskListOptions{})
+	})
+	runningTasks := runningTaskCounts(tasksResult.Items)
 
 	items := make([]types.SwarmNode, 0, len(nodes))
 	for _, node := range nodes {
-		items = append(items, types.NewSwarmNode(node))
+		summary := types.NewSwarmNode(node)
+		if tasksErr == nil {
+			summary.RunningTasks = new(runningTasks[node.ID])
+		}
+		items = append(items, summary)
 	}
 
 	s.enrichNodeAgentStatuses(ctx, environmentID, items)
@@ -789,8 +797,21 @@ func (s *Service) buildNodePaginationConfig() pagination.Config[types.SwarmNode]
 			func(node types.SwarmNode) (string, error) { return node.Status, nil },
 			func(node types.SwarmNode) (string, error) { return node.Availability, nil },
 		},
+		FilterAccessors: []pagination.FilterAccessor[types.SwarmNode]{
+			{Key: "role", Fn: func(node types.SwarmNode, value string) bool {
+				if value == "leader" {
+					return node.Role == "manager" && node.ManagerStatus == "leader"
+				}
+				return node.Role == value
+			}},
+			{Key: "status", Fn: func(node types.SwarmNode, value string) bool { return node.Status == value }},
+			{Key: "availability", Fn: func(node types.SwarmNode, value string) bool { return node.Availability == value }},
+		},
 		SortBindings: []pagination.SortBinding[types.SwarmNode]{
 			{Key: "hostname", Fn: func(a, b types.SwarmNode) int { return strings.Compare(a.Hostname, b.Hostname) }},
+			{Key: "runningTasks", Fn: func(a, b types.SwarmNode) int {
+				return cmp.Compare(kit.FromPtr(a.RunningTasks), kit.FromPtr(b.RunningTasks))
+			}},
 			{Key: "role", Fn: func(a, b types.SwarmNode) int { return strings.Compare(a.Role, b.Role) }},
 			{Key: "status", Fn: func(a, b types.SwarmNode) int { return strings.Compare(a.Status, b.Status) }},
 			{Key: "availability", Fn: func(a, b types.SwarmNode) int { return strings.Compare(a.Availability, b.Availability) }},
@@ -910,4 +931,14 @@ func buildNodeAgentCandidates(environments []environment.Environment) []types.No
 		})
 	}
 	return candidates
+}
+
+func runningTaskCounts(tasks []swarm.Task) map[string]int {
+	counts := map[string]int{}
+	for _, task := range tasks {
+		if task.NodeID != "" && task.Status.State == swarm.TaskStateRunning {
+			counts[task.NodeID]++
+		}
+	}
+	return counts
 }

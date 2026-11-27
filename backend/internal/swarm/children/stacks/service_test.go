@@ -54,6 +54,18 @@ var fullStackSourceSubmitted = map[string]bool{
 	"files":           true,
 }
 
+func TestStackTaskCountsRequireCompleteServiceStatus(t *testing.T) {
+	running, desired := stackTaskCounts([]swarm.Service{
+		{ServiceStatus: &swarm.ServiceStatus{RunningTasks: 2, DesiredTasks: 3}},
+		{ServiceStatus: &swarm.ServiceStatus{RunningTasks: 4, DesiredTasks: 4}},
+	})
+	require.Equal(t, uint64(6), *running)
+	require.Equal(t, uint64(7), *desired)
+	running, desired = stackTaskCounts([]swarm.Service{{}})
+	require.Nil(t, running)
+	require.Nil(t, desired)
+}
+
 func setupSwarmServiceTestDB(t *testing.T) *database.DB {
 	t.Helper()
 	t.Setenv("ARCANE_PROJECTS_DIRECTORY", t.TempDir())
@@ -92,6 +104,52 @@ func stubStackSourceUpdateDeploy(t *testing.T) *stackSourceDeployRecorder {
 	return rec
 }
 
+func TestService_ListStacksObservesCompleteTaskCounts(t *testing.T) {
+	ctx := t.Context()
+	db := setupSwarmServiceTestDB(t)
+	t.Setenv("ARCANE_SWARM_STACK_SOURCES_DIRECTORY", t.TempDir())
+	settingsSvc, err := newSettingsServiceForSwarmTest(t, ctx, db)
+	require.NoError(t, err)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch strings.TrimPrefix(r.URL.Path, "/v1.41") {
+		case "/services":
+			observed := r.URL.Query().Get("status") == "true" || r.URL.Query().Get("status") == "1"
+			var status *swarm.ServiceStatus
+			if observed {
+				status = &swarm.ServiceStatus{RunningTasks: 2, DesiredTasks: 3}
+			}
+			service := swarm.Service{
+				Spec: swarm.ServiceSpec{Annotations: swarm.Annotations{
+					Name: "stack_web", Labels: map[string]string{types.SwarmStackNamespaceLabel: "stack"},
+				}},
+				ServiceStatus: status,
+			}
+			if marshalErr := json.MarshalWrite(w, []swarm.Service{service}); marshalErr != nil {
+				t.Error(marshalErr)
+			}
+		case "/info":
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	cli, err := client.New(client.WithHost(server.URL), client.WithAPIVersion("1.41"), client.WithHTTPClient(server.Client()))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = cli.Close() })
+	svc := NewService(ServiceParams{
+		DockerService: dockerInternal.NewDockerClientService(ctx, db, settingsSvc, dockerInternal.ClientOptions{}).WithClient(cli),
+		EnsureManager: func(context.Context) error { return nil }, SettingsService: settingsSvc,
+	})
+	items, _, err := svc.ListStacksPaginated(ctx, "0", pagination.QueryParams{Params: pagination.Params{Limit: 20}})
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.NotNil(t, items[0].RunningTasks)
+	require.Equal(t, uint64(2), *items[0].RunningTasks)
+	require.Equal(t, uint64(3), *items[0].DesiredTasks)
+}
+
 func TestService_UpdateAndGetStackSource_UsesStoredFilesWithoutSwarmManager(t *testing.T) {
 	ctx := t.Context()
 	db := setupSwarmServiceTestDB(t)
@@ -115,11 +173,7 @@ func TestService_UpdateAndGetStackSource_UsesStoredFilesWithoutSwarmManager(t *t
 	})
 	require.NoError(t, err)
 	require.Equal(t, "demo-stack", updated.Name)
-	// Saving stack source must trigger an actual stack deploy (#3463).
-	require.Equal(t, 1, deployRec.calls)
-	// The edit-path redeploy must carry registry auth, the same as Git Sync (#3778):
-	// a service added in the edit has no previous spec to fall back on.
-	require.True(t, deployRec.lastReq.WithRegistryAuth)
+	require.Zero(t, deployRec.calls, "saving source must never deploy")
 
 	composePath := filepath.Join(rootDir, "0", "demo-stack", "compose.yaml")
 	envPath := filepath.Join(rootDir, "0", "demo-stack", ".env")
@@ -144,7 +198,7 @@ func TestService_UpdateAndGetStackSource_UsesStoredFilesWithoutSwarmManager(t *t
 		Submitted: fullStackSourceSubmitted,
 	})
 	require.NoError(t, err)
-	require.Equal(t, "FOO=baz\n", deployRec.lastReq.EnvContent)
+	require.Zero(t, deployRec.calls)
 	require.FileExists(t, filepath.Join(rootDir, "0", "demo-stack", "config", "nginx.conf"))
 	require.FileExists(t, filepath.Join(rootDir, "0", "demo-stack", "scripts", "setup.sh"))
 
@@ -271,7 +325,7 @@ func TestService_UpdateAndGetStackSource_RoundTripsOverride(t *testing.T) {
 	require.Empty(t, source.OverrideContent)
 }
 
-func TestService_UpdateStackSource_PrunesAndRestoresOnDeployFailure(t *testing.T) {
+func TestService_UpdateStackSource_PreservesDraftIndependentlyOfDeployment(t *testing.T) {
 	ctx := t.Context()
 	db := setupSwarmServiceTestDB(t)
 	rootDir := t.TempDir()
@@ -286,14 +340,9 @@ func TestService_UpdateStackSource_PrunesAndRestoresOnDeployFailure(t *testing.T
 
 	original := deployStackAfterSourceUpdate
 	t.Cleanup(func() { deployStackAfterSourceUpdate = original })
-	var lastReq types.SwarmStackDeployRequest
-	var deployErr error
-	deployStackAfterSourceUpdate = func(_ *Service, _ context.Context, _ string, req types.SwarmStackDeployRequest) (*types.SwarmStackDeployResponse, error) {
-		lastReq = req
-		if deployErr != nil {
-			return nil, deployErr
-		}
-		return &types.SwarmStackDeployResponse{Name: req.Name}, nil
+	deployStackAfterSourceUpdate = func(_ *Service, _ context.Context, _ string, _ types.SwarmStackDeployRequest) (*types.SwarmStackDeployResponse, error) {
+		t.Fatal("saving must not invoke deployment")
+		return nil, errors.New("deployment unavailable")
 	}
 
 	firstCompose := "services:\n  web:\n    image: nginx:alpine\n"
@@ -304,23 +353,17 @@ func TestService_UpdateStackSource_PrunesAndRestoresOnDeployFailure(t *testing.T
 		Submitted: fullStackSourceSubmitted,
 	})
 	require.NoError(t, err)
-	// The saved source is the full stack spec: services removed from it must
-	// be pruned from the swarm on redeploy.
-	require.True(t, lastReq.Prune)
-
-	deployErr = errors.New("deploy failed")
 	_, err = svc.UpdateStackSource(ctx, "0", "demo-stack", StackSourceUpdate{
 		Source: types.SwarmStackSource{
 			ComposeContent: "services:\n  web:\n    image: nginx:broken\n",
 		},
 		Submitted: fullStackSourceSubmitted,
 	})
-	require.ErrorContains(t, err, "deploy failed")
+	require.NoError(t, err)
 
-	// A failed deploy must not commit the edited source.
 	source, err := svc.GetStackSource(ctx, "0", "demo-stack")
 	require.NoError(t, err)
-	require.Equal(t, firstCompose, source.ComposeContent)
+	require.Equal(t, "services:\n  web:\n    image: nginx:broken\n", source.ComposeContent)
 }
 
 func stacksScopeContext(t *testing.T, target string, bodies map[string]any) context.Context {
@@ -423,7 +466,7 @@ func TestService_UpStack_DeploysSavedSource(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, svc.UpStack(ctx, "0", " demo-stack "))
-	require.Equal(t, 2, deployRec.calls)
+	require.Equal(t, 1, deployRec.calls)
 	require.Equal(t, "demo-stack", deployRec.lastReq.Name)
 	require.Equal(t, "services:\n  web:\n    image: nginx:alpine\n", deployRec.lastReq.ComposeContent)
 	require.Equal(t, "FOO=bar\n", deployRec.lastReq.EnvContent)

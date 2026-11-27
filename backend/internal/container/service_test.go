@@ -247,6 +247,25 @@ func TestBuildContainerFilterAccessors_FiltersStandaloneContainers(t *testing.T)
 	require.Equal(t, int64(1), result.TotalCount)
 }
 
+func TestBuildContainerFilterAccessorsResourceIdentity(t *testing.T) {
+	items := []types.ContainerSummary{
+		{ID: "first", State: "running", ImageID: "sha256:active", Mounts: []types.ContainerMount{{Type: "volume", Name: "data"}}},
+		{ID: "second", State: "running", ImageID: "sha256:active", Mounts: []types.ContainerMount{{Type: "volume", Name: "data"}}},
+		{ID: "stopped", State: "exited", ImageID: "sha256:active", Mounts: []types.ContainerMount{{Type: "volume", Name: "data"}}},
+		{ID: "different-image", ImageID: "sha256:other", Mounts: []types.ContainerMount{{Type: "volume", Name: "data"}}},
+		{ID: "bind", ImageID: "sha256:active", Mounts: []types.ContainerMount{{Type: "bind", Source: "data"}}},
+		{ID: "prefix", ImageID: "sha256:active", Mounts: []types.ContainerMount{{Type: "volume", Name: "database"}}},
+	}
+	paginationConfig := pagination.Config[types.ContainerSummary]{FilterAccessors: (&ContainerService{}).buildContainerPaginationConfig().FilterAccessors}
+	result := paginationConfig.SearchOrderAndPaginate(items, pagination.QueryParams{
+		Params:  pagination.Params{Start: 1, Limit: 1},
+		Filters: map[string]string{"imageId": "sha256:active", "volumeName": "data", "status": "running"},
+	})
+	require.Equal(t, int64(2), result.TotalCount)
+	require.Len(t, result.Items, 1)
+	require.Equal(t, "second", result.Items[0].ID)
+}
+
 func TestBuildContainerFilterAccessors_FiltersByLabel(t *testing.T) {
 	service := &ContainerService{}
 	items := []types.ContainerSummary{

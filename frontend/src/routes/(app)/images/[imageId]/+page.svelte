@@ -10,13 +10,22 @@
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import ImageReleaseNotesDialog from '#lib/components/dialogs/image-release-notes-dialog.svelte';
 	import ImageUpdateItem from '#lib/components/image-update-item.svelte';
+	import ResourceConsumers from '#lib/components/resource-consumers.svelte';
 	import { DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { CopyButton } from '#lib/components/ui/copy-button/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import VulnerabilityScanPanel from '#lib/components/vulnerability/vulnerability-scan-panel.svelte';
 	import { useUrlTab } from '#lib/hooks/use-url-tab.svelte.js';
-	import { TagIcon, ImagesIcon, LayersIcon, ShieldCheckIcon, InspectIcon, FileTextIcon } from '#lib/icons/index.js';
+	import {
+		ContainersIcon,
+		TagIcon,
+		ImagesIcon,
+		LayersIcon,
+		ShieldCheckIcon,
+		InspectIcon,
+		FileTextIcon
+	} from '#lib/icons/index.js';
 	import TabbedPageLayout from '#lib/layouts/tabbed-page-layout.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { imageDetailQuery } from '#lib/query/images.js';
@@ -56,6 +65,8 @@
 	const urlTab = useUrlTab({
 		tabs: () => [
 			{ value: 'overview', label: m.common_overview(), icon: ImagesIcon },
+			{ value: 'containers', label: m.containers(), icon: ContainersIcon },
+			{ value: 'services', label: m.services(), icon: LayersIcon },
 			{ value: 'history', label: m.images_history_title(), icon: LayersIcon },
 			{ value: 'attestations', label: m.images_attestations_title(), icon: InspectIcon },
 			{ value: 'hardened', label: m.docker_hardened_image(), icon: ShieldCheckIcon, visible: !!image?.hardened },
@@ -370,6 +381,20 @@
 						</KeyValueGrid>
 					</DetailSection>
 
+					<DetailSection title={m.linked_resources()}
+						><KeyValueGrid
+							><KeyValueCard label={m.containers()} valueFormat="custom"
+								><button class="text-primary-text hover:underline" onclick={() => urlTab.select('containers')}
+									>{m.containers()}</button
+								></KeyValueCard
+							><KeyValueCard label={m.services()} valueFormat="custom"
+								><button class="text-primary-text hover:underline" onclick={() => urlTab.select('services')}
+									>{m.services()}</button
+								></KeyValueCard
+							></KeyValueGrid
+						></DetailSection
+					>
+
 					{#if hasPinnedRefs}
 						<div class="space-y-2">
 							<span class="inline-flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
@@ -432,6 +457,22 @@
 				</div>
 			</Tabs.Content>
 
+			<Tabs.Content value="containers" layout="panel"
+				>{#if activeTab === 'containers'}<ResourceConsumers
+						kind="containers"
+						sources={data.repositoryCopies
+							.filter((copy) => copy.inUse)
+							.map((copy) => ({ environmentId: copy.environmentId, environmentName: copy.environmentName, imageId: copy.id }))}
+					/>{/if}</Tabs.Content
+			>
+			<Tabs.Content value="services" layout="panel"
+				>{#if activeTab === 'services'}<ResourceConsumers
+						kind="services"
+						sources={data.repositoryCopies
+							.filter((copy) => copy.inUse)
+							.map((copy) => ({ environmentId: copy.environmentId, environmentName: copy.environmentName, imageId: copy.id }))}
+					/>{/if}</Tabs.Content
+			>
 			<Tabs.Content value="history" layout="table">
 				<ImageHistoryPanel imageId={image.id} environmentId={currentEnvId} />
 			</Tabs.Content>

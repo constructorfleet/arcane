@@ -339,7 +339,7 @@ func TestGetAllTemplatesPaginated_FiltersByType(t *testing.T) {
 	localTemplates := []ComposeTemplate{
 		{
 			ID: "local-one", CreatedAt: now, UpdatedAt: &now,
-			Metadata:    &ComposeTemplateMetadata{IconURL: new("nginx")},
+			Metadata:    &ComposeTemplateMetadata{IconURL: new("nginx"), Tags: []string{"infra"}, Author: new("operator")},
 			Name:        "Local One",
 			Description: "Local template",
 			Content:     "services: {}",
@@ -381,13 +381,20 @@ func TestGetAllTemplatesPaginated_FiltersByType(t *testing.T) {
 	})
 
 	tests := []struct {
-		name       string
-		typeFilter string
-		catalog    string
-		wantIDs    []string
+		name           string
+		typeFilter     string
+		registryFilter string
+		tagFilter      string
+		authorFilter   string
+		catalog        string
+		wantIDs        []string
 	}{
 		{name: "local", typeFilter: "false", wantIDs: []string{"local-one", "local-two", "local-variants"}},
 		{name: "remote", typeFilter: "true", wantIDs: []string{"remote-one"}},
+		{name: "registry independently", registryFilter: "registry-one", wantIDs: []string{"remote-one"}},
+		{name: "tag", tagFilter: "infra", wantIDs: []string{"local-one"}},
+		{name: "author", authorFilter: "operator", wantIDs: []string{"local-one"}},
+		{name: "registry plus local type", registryFilter: "registry-one", typeFilter: "false", wantIDs: []string{}},
 		{name: "both", typeFilter: "false,true", wantIDs: []string{"local-one", "local-two", "local-variants", "remote-one"}},
 		{name: "preferred catalog", typeFilter: "false,true", catalog: "dashboard-icons", wantIDs: []string{"local-one", "local-two", "local-variants", "remote-one"}},
 	}
@@ -400,9 +407,22 @@ func TestGetAllTemplatesPaginated_FiltersByType(t *testing.T) {
 					Preferences: types.UserPreferences{IconCatalog: new(tt.catalog)},
 				})
 			}
+			filters := map[string]string{}
+			if tt.typeFilter != "" {
+				filters["type"] = tt.typeFilter
+			}
+			if tt.registryFilter != "" {
+				filters["registry"] = tt.registryFilter
+			}
+			if tt.tagFilter != "" {
+				filters["tags"] = tt.tagFilter
+			}
+			if tt.authorFilter != "" {
+				filters["author"] = tt.authorFilter
+			}
 			templates, _, err := service.GetAllTemplatesPaginated(ctx, pagination.QueryParams{
 				Start: 0, Limit: 20,
-				Filters: map[string]string{"type": tt.typeFilter},
+				Filters: filters,
 			})
 			require.NoError(t, err)
 			require.ElementsMatch(t, tt.wantIDs, templateIDs(templates))

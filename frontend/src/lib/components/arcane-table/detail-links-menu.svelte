@@ -10,19 +10,24 @@
 		href,
 		tabs,
 		disabled = false,
-		details
+		details,
+		related
 	}: {
 		href: string;
 		tabs: (TabItem & { visible?: boolean; related?: boolean })[];
 		disabled?: boolean;
 		details?: Snippet;
+		related?: Snippet;
 	} = $props();
 
 	const visibleTabs = $derived.by(() => {
 		const destinations = new Set<string>();
 		return tabs.filter((tab) => {
-			if (tab.visible === false || destinations.has(tab.value)) return false;
-			destinations.add(tab.value);
+			const destination = new URL(tab.href ?? tabHref(tab.value), 'http://arcane.local');
+			destination.searchParams.sort();
+			const key = destination.href;
+			if (tab.visible === false || destinations.has(key)) return false;
+			destinations.add(key);
 			return true;
 		});
 	});
@@ -40,7 +45,7 @@
 {#if overview}
 	<DropdownMenu.Item disabled={disabled || overview.disabled}>
 		{#snippet child({ props })}
-			<a {...props} href={disabled || overview.disabled ? undefined : tabHref('overview')}>
+			<a {...props} href={disabled || overview.disabled ? undefined : (overview.href ?? tabHref('overview'))}>
 				<InspectIcon class="size-4" />{m.common_view_details()}
 			</a>
 		{/snippet}
@@ -52,7 +57,7 @@
 		{@const Icon = tab.icon ?? InspectIcon}
 		<DropdownMenu.Item disabled={disabled || tab.disabled}>
 			{#snippet child({ props })}
-				<a {...props} href={disabled || tab.disabled ? undefined : tabHref(tab.value)}>
+				<a {...props} href={disabled || tab.disabled ? undefined : (tab.href ?? tabHref(tab.value))}>
 					<Icon class="size-4" />{tab.label}
 				</a>
 			{/snippet}
@@ -70,11 +75,12 @@
 	</DropdownMenu.Sub>
 {/if}
 
-{#if relatedTabs.length > 0}
+{#if relatedTabs.length > 0 || related}
 	<DropdownMenu.Sub>
 		<DropdownMenu.SubTrigger {disabled}><ExternalLinkIcon class="size-4" />{m.related_resources()}</DropdownMenu.SubTrigger>
 		<DropdownMenu.SubContent>
 			{@render tabLinks(relatedTabs)}
+			{@render related?.()}
 		</DropdownMenu.SubContent>
 	</DropdownMenu.Sub>
 {/if}

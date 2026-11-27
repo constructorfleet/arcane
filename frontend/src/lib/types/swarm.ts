@@ -189,6 +189,7 @@ export interface SwarmNodeAgentDeployment {
 }
 
 export interface SwarmNode {
+	runningTasks?: number | null;
 	id: string;
 	environmentId?: string;
 	environmentName?: string;
@@ -230,6 +231,12 @@ export interface SwarmServiceMount {
 
 export type SwarmServiceModeName = 'replicated' | 'global' | 'replicated-job' | 'global-job' | 'unknown';
 
+export interface SwarmResourceReference {
+	id: string;
+	name: string;
+	target?: string;
+}
+
 export interface SwarmServiceSummary {
 	id: string;
 	environmentId?: string;
@@ -239,6 +246,8 @@ export interface SwarmServiceSummary {
 	mode: SwarmServiceModeName;
 	replicas: number;
 	runningReplicas: number;
+	completedReplicas?: number | null;
+	statusObserved?: boolean;
 	runningImageVersions?: string[];
 	ports: SwarmServicePort[];
 	createdAt: string;
@@ -247,6 +256,9 @@ export interface SwarmServiceSummary {
 	stackName?: string;
 	nodes: string[];
 	networks: string[];
+	networkIds?: string[];
+	secrets?: SwarmResourceReference[];
+	configs?: SwarmResourceReference[];
 	mounts: SwarmServiceMount[];
 }
 
@@ -385,6 +397,8 @@ export interface SwarmServiceScaleRequest {
 }
 
 export interface SwarmStackSummary {
+	runningTasks?: number | null;
+	desiredTasks?: number | null;
 	id: string;
 	environmentId?: string;
 	environmentName?: string;
@@ -398,6 +412,8 @@ export interface SwarmStackSummary {
 }
 
 export interface SwarmStackInspect {
+	runningTasks?: number | null;
+	desiredTasks?: number | null;
 	name: string;
 	namespace: string;
 	services: number;
@@ -453,6 +469,7 @@ export interface SwarmStackDeployResponse {
 }
 
 export interface SwarmTaskSummary {
+	stackName?: string;
 	id: string;
 	environmentId?: string;
 	environmentName?: string;

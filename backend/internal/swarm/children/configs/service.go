@@ -5,7 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/moby/moby/api/types/swarm"
@@ -63,8 +65,18 @@ func (s *Service) ListConfigs(ctx context.Context, params pagination.QueryParams
 		return nil, pagination.Response{}, fmt.Errorf("failed to list swarm configs: %w", err)
 	}
 
+	ids := strings.Split(params.Filters["ids"], ",")
+	stackName := params.Filters["stackName"]
+	scoped := params.Filters["ids"] != "" || stackName != ""
+	params.Filters = maps.Clone(params.Filters)
+	delete(params.Filters, "ids")
+	delete(params.Filters, "stackName")
 	items := make([]types.SwarmConfig, 0, len(listResult.Items))
 	for _, item := range listResult.Items {
+		owned := stackName != "" && item.Spec.Labels[types.SwarmStackNamespaceLabel] == stackName
+		if scoped && !owned && !slices.Contains(ids, item.ID) {
+			continue
+		}
 		items = append(items, configMetadata(types.NewSwarmConfig(item)))
 	}
 	result := configPagination.SearchOrderAndPaginate(items, params)
@@ -72,7 +84,15 @@ func (s *Service) ListConfigs(ctx context.Context, params pagination.QueryParams
 }
 
 func (s *Service) Aggregate(ctx context.Context, params pagination.QueryParams) (types.Paginated[types.SwarmConfig], error) {
-	collection, err := httpx.CollectEnvironments[types.Paginated[types.SwarmConfig]](ctx, url.Values{"start": {"0"}, "limit": {"-1"}})
+	values := url.Values{"start": {"0"}, "limit": {"-1"}}
+	params.Filters = maps.Clone(params.Filters)
+	for _, key := range []string{"ids", "stackName"} {
+		if value := params.Filters[key]; value != "" {
+			values.Set(key, value)
+			delete(params.Filters, key)
+		}
+	}
+	collection, err := httpx.CollectEnvironments[types.Paginated[types.SwarmConfig]](ctx, values)
 	if err != nil {
 		return types.Paginated[types.SwarmConfig]{}, err
 	}

@@ -21,6 +21,8 @@ type (
 	}
 
 	ListSwarmSecretsInput struct {
+		IDs           string `query:"ids" doc:"Exact resource IDs, comma-separated"`
+		StackName     string `query:"stackName" doc:"Include resources owned by this exact stack namespace"`
 		EnvironmentID string `path:"id" doc:"Environment ID"`
 		Search        string `query:"search" doc:"Search query"`
 		Sort          string `query:"sort" doc:"Column to sort by"`
@@ -61,6 +63,7 @@ func NewHandler(
 
 func (h *Handler) ListSecrets(ctx context.Context, input *ListSwarmSecretsInput) (*handlerutil.Page[types.SwarmSecret], error) {
 	params := handlerutil.PaginationParams(input.Start, input.Limit, input.Sort, input.Order, input.Search)
+	params.Filters = map[string]string{"ids": input.IDs, "stackName": input.StackName}
 	if _, ok := httpx.EnvironmentScopeFromContext(ctx); ok {
 		body, err := h.service.Aggregate(ctx, params)
 		if err != nil {

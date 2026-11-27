@@ -15,7 +15,6 @@
 	import * as ArcaneTooltip from '#lib/components/arcane-tooltip/index.js';
 	import IconImage from '#lib/components/icon-image.svelte';
 	import IfPermitted from '#lib/components/if-permitted.svelte';
-	import ProjectTagEditor from '#lib/components/project-tag-editor.svelte';
 	import ProjectUpdateItem from '#lib/components/project-update-item.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
@@ -36,7 +35,7 @@
 	import { projectService } from '#lib/services/project-service.js';
 	import { environmentStore } from '#lib/stores/environment.store.svelte.js';
 	import type { Paginated } from '#lib/types/base.js';
-	import type { Project, ProjectTagColor, ProjectTagOption } from '#lib/types/project.js';
+	import type { Project, ProjectTagOption } from '#lib/types/project.js';
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { hasAnyLoadingState } from '#lib/utils/bulk-actions.js';
@@ -48,7 +47,8 @@
 		getProjectUpdateVariant
 	} from '#lib/utils/docker.js';
 	import { type EnvironmentPage, type EnvironmentRow, hasShownPermission, rowKey } from '#lib/utils/environments.js';
-	import { capitalizeFirstLetter, formatDateTimeShort } from '#lib/utils/formatting.js';
+	import { capitalizeFirstLetter, formatRelativeTime } from '#lib/utils/formatting.js';
+	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 	import { summarizeUpdateCheckResult } from '#lib/utils/update-actions.js';
 
@@ -127,15 +127,6 @@
 		}
 	}
 
-	async function handleTagToggle(project: ProjectRow, name: string, attached: boolean, color: ProjectTagColor) {
-		const response = await projectService.updateProjectTag(project.id, name, attached, color, project.environmentId);
-		if (attached && !tagCatalog.some((tag) => tag.name === name)) {
-			tagCatalog = [...tagCatalog, { name, color }].sort((a, b) => a.name.localeCompare(b.name));
-		}
-		await refreshProjects();
-		return response.tags;
-	}
-
 	function getConfigurationErrorMessage(project: Project): string | undefined {
 		const configurationError = project.configurationError;
 		if (!configurationError) return undefined;
@@ -199,13 +190,14 @@
 				{ accessorKey: 'name', title: m.common_name(), sortable: true, cell: NameCell },
 				{
 					id: 'tags',
+					hidden: true,
 					accessorFn: (row) => row.tags?.map((tag) => tag.name) ?? [],
 					title: m.common_tags(),
 					cell: TagsCell,
 					filterOptions: tagCatalog.map((tag) => ({ label: tag.name, value: tag.name }))
 				},
-				{ accessorKey: 'path', title: m.common_working_directory(), sortable: true, cell: DirectoryCell },
-				{ accessorKey: 'gitOpsManagedBy', title: m.projects_col_provider(), cell: ProviderCell },
+				{ hidden: true, accessorKey: 'path', title: m.common_working_directory(), sortable: true, cell: DirectoryCell },
+				{ accessorKey: 'gitOpsManagedBy', title: m.configuration_source(), cell: ProviderCell },
 				{ accessorKey: 'status', title: m.common_status(), sortable: true, cell: StatusCell },
 				{
 					id: 'updates',
@@ -214,20 +206,20 @@
 					sortable: false,
 					cell: UpdatesCell
 				},
-				{ accessorKey: 'createdAt', title: m.common_created(), sortable: true, cell: CreatedCell },
+				{ hidden: true, accessorKey: 'createdAt', title: m.common_created(), sortable: true, cell: CreatedCell },
 				{ accessorKey: 'serviceCount', title: m.services(), sortable: true }
 			] satisfies ColumnSpec<ProjectRow>[]
 	);
 
 	const mobileFields = [
 		{ id: 'id', label: m.common_id(), defaultVisible: false },
-		{ id: 'directory', label: m.common_working_directory(), defaultVisible: true },
-		{ id: 'provider', label: m.projects_col_provider(), defaultVisible: true },
+		{ id: 'directory', label: m.common_working_directory(), defaultVisible: false },
+		{ id: 'provider', label: m.configuration_source(), defaultVisible: true },
 		{ id: 'status', label: m.common_status(), defaultVisible: true },
-		{ id: 'tags', label: m.common_tags(), defaultVisible: true },
+		{ id: 'tags', label: m.common_tags(), defaultVisible: false },
 		{ id: 'updates', label: m.updates(), defaultVisible: true },
 		{ id: 'serviceCount', label: m.services(), defaultVisible: true },
-		{ id: 'createdAt', label: m.common_created(), defaultVisible: true }
+		{ id: 'createdAt', label: m.common_created(), defaultVisible: false }
 	];
 
 	const selectionDisabledReason = $derived.by(() => {
@@ -317,8 +309,10 @@
 		/>
 		<a
 			class="font-medium hover:underline"
-			href={resolve(`/(app)/projects/[projectId]?env=${encodeURIComponent(item.environmentId)}`, { projectId: item.id })}
-			>{item.name}</a
+			href={resourceTableHref(
+				resolve(`/(app)/projects/[projectId]?env=${encodeURIComponent(item.environmentId)}&tab=overview`, { projectId: item.id }),
+				requestOptions.pagination?.page
+			)}>{item.name}</a
 		>
 		{#if item.isArchived}
 			<span class="rounded-xl bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground"
@@ -329,12 +323,10 @@
 {/snippet}
 
 {#snippet TagsCell({ item }: { item: ProjectRow })}
-	<ProjectTagEditor
-		tags={item.tags ?? []}
-		availableTags={tagCatalog}
-		canEdit={hasPermission('projects:update', item.environmentId) && !item.isDiscovered}
-		onToggle={(name, attached, color) => handleTagToggle(item, name, attached, color)}
-	/>
+	<div class="flex max-w-64 flex-wrap gap-1">
+		{#each (item.tags ?? []).slice(0, 3) as tag (tag.name)}<Badge variant="outline">{tag.name}</Badge
+			>{/each}{#if (item.tags?.length ?? 0) > 3}<Badge variant="outline">+{item.tags!.length - 3}</Badge>{/if}
+	</div>
 {/snippet}
 
 {#snippet DirectoryCell({ item }: { item: ProjectRow })}
@@ -351,11 +343,14 @@
 
 {#snippet ProviderCell({ item }: { item: ProjectRow })}
 	<div class="flex items-center gap-2">
-		{#if item.gitOpsManagedBy}
+		{#if item.gitOpsManagedBy || item.gitRepositoryURL}
 			<GitBranchIcon class="size-4" />
 			<a class="font-medium hover:underline" href={resolve(`/(app)/gitops?env=${encodeURIComponent(item.environmentId)}`)}>
 				{m.git()}
 			</a>
+			{#if item.lastSyncCommit}<span class="font-mono text-xs text-muted-foreground" title={item.lastSyncCommit}
+					>{item.lastSyncCommit.slice(0, 7)}</span
+				>{/if}
 		{:else}
 			<ProjectsIcon class="size-4" />
 			<span>{m.local()}</span>
@@ -406,7 +401,7 @@
 {/snippet}
 
 {#snippet CreatedCell({ value }: { value: unknown })}
-	{#if value}{formatDateTimeShort(String(value))}{/if}
+	{#if value}{formatRelativeTime(String(value))}{/if}
 {/snippet}
 
 {#snippet ProjectMobileCardSnippet({
@@ -425,7 +420,7 @@
 			alt: item.name
 		})}
 		title={(item: ProjectRow) => item.name}
-		subtitle={(item: ProjectRow) => ((mobileFieldVisibility['id'] ?? true) ? item.id : null)}
+		subtitle={(item: ProjectRow) => ((mobileFieldVisibility['id'] ?? false) ? item.id : null)}
 		badges={[
 			(item: ProjectRow) =>
 				(mobileFieldVisibility['status'] ?? true)
@@ -457,7 +452,7 @@
 				type: 'component',
 				getValue: (item: ProjectRow) => ({ item }),
 				component: TagsCell,
-				show: mobileFieldVisibility['tags'] ?? true
+				show: mobileFieldVisibility['tags'] ?? false
 			},
 			{
 				label: m.common_working_directory(),
@@ -465,14 +460,14 @@
 					showProjectsRoot && item.projectsRoot ? item.path : item.relativePath || item.dirName || item.path,
 				icon: FolderOpenIcon,
 				iconVariant: 'gray' as const,
-				show: mobileFieldVisibility['directory'] ?? true
+				show: mobileFieldVisibility['directory'] ?? false
 			},
 			{
-				label: m.projects_col_provider(),
+				label: m.configuration_source(),
 				type: 'component',
 				getValue: (item: ProjectRow) => ({
-					icon: item.gitOpsManagedBy ? GitBranchIcon : ProjectsIcon,
-					text: item.gitOpsManagedBy ? m.git() : m.local()
+					icon: item.gitOpsManagedBy || item.gitRepositoryURL ? GitBranchIcon : ProjectsIcon,
+					text: item.gitOpsManagedBy || item.gitRepositoryURL ? m.git() : m.local()
 				}),
 				component: ProviderField,
 				show: mobileFieldVisibility['provider'] ?? true
@@ -488,15 +483,19 @@
 				show: mobileFieldVisibility['serviceCount'] ?? true
 			}
 		]}
-		footer={(mobileFieldVisibility['createdAt'] ?? true) && item.createdAt
+		footer={(mobileFieldVisibility['createdAt'] ?? false) && item.createdAt
 			? {
 					label: m.common_created(),
-					getValue: (item: ProjectRow) => formatDateTimeShort(item.createdAt),
+					getValue: (item: ProjectRow) => formatRelativeTime(item.createdAt),
 					icon: CalendarIcon
 				}
 			: undefined}
 		rowActions={RowActions}
-		href={() => resolve(`/(app)/projects/[projectId]?env=${encodeURIComponent(item.environmentId)}`, { projectId: item.id })}
+		href={() =>
+			resourceTableHref(
+				resolve(`/(app)/projects/[projectId]?env=${encodeURIComponent(item.environmentId)}&tab=overview`, { projectId: item.id }),
+				requestOptions.pagination?.page
+			)}
 	/>
 {/snippet}
 
@@ -508,8 +507,12 @@
 	{@const archivedTitle = getRowArchivedTitle(item, configurationBlocked)}
 	<RowActionsMenu name={item.name}>
 		<DetailLinksMenu
-			href={resolve(`/(app)/projects/[projectId]?env=${encodeURIComponent(envId)}`, { projectId: item.id })}
+			href={resourceTableHref(
+				resolve(`/(app)/projects/[projectId]?env=${encodeURIComponent(envId)}&tab=overview`, { projectId: item.id }),
+				requestOptions.pagination?.page
+			)}
 			tabs={[
+				{ value: 'overview', label: m.common_overview() },
 				{ value: 'services', label: m.services(), icon: ContainersIcon, related: true },
 				{ value: 'compose', label: m.common_configuration() },
 				{

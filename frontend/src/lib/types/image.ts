@@ -26,6 +26,8 @@ export interface ImageUpdateInfo {
 }
 
 export interface ImageUsedBy {
+	environmentId?: string;
+	environmentName?: string;
 	type: 'project' | 'container';
 	name: string;
 	id?: string;
@@ -51,6 +53,7 @@ export interface ImageRepositoryGroup {
 }
 
 export interface ImageSummary {
+	runningContainers?: number | null;
 	artifactKey?: string;
 	platform?: string;
 	logicalId?: string;

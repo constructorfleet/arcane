@@ -2,11 +2,9 @@ import { error, redirect } from '@sveltejs/kit';
 
 import { m } from '#lib/paraglide/messages.js';
 import { queryKeys } from '#lib/query/query-keys.js';
-import { containerService } from '#lib/services/container-service.js';
 import { volumeService } from '#lib/services/volume-service.js';
 import { environmentStore } from '#lib/stores/environment.store.svelte.js';
-import type { Volume, VolumeConsumer } from '#lib/types/volume.js';
-import { extractApiErrorMessage } from '#lib/utils/api.js';
+import type { Volume } from '#lib/types/volume.js';
 import { hasPermission } from '#lib/utils/auth.js';
 import {
 	environmentRows,
@@ -72,49 +70,12 @@ export const load: PageLoad = async ({ params, parent, url }) => {
 				queryFn: () => volumeService.getVolumeForEnvironment(envId, volumeName)
 			});
 
-			let containersDetailed: VolumeConsumer[] = [];
-			if (volume.containers && volume.containers.length > 0) {
-				containersDetailed = await Promise.all(
-					volume.containers.map(async (id: string) => {
-						const operationResult = await tryCatch(
-							(async () => {
-								const c = await queryClient.query({
-									queryKey: queryKeys.containers.detail(envId, id),
-									queryFn: () => containerService.getContainerForEnvironment(envId, id)
-								});
-								const idVal = c?.id || id;
-								const nameVal = c?.name || idVal.substring(0, 12);
-								const labels = c?.labels ?? {};
-								return {
-									id: idVal,
-									name: nameVal,
-									volumeHelper:
-										labels['com.getarcaneapp.internal.resource']?.trim().toLowerCase() === 'true' &&
-										labels['com.getarcaneapp.volume-helper']?.trim().toLowerCase() === 'true'
-								};
-							})()
-						);
-						if (operationResult.error !== null) {
-							return {
-								id,
-								name: id.substring(0, 12),
-								volumeHelper: null,
-								detailsError: extractApiErrorMessage(operationResult.error)
-							};
-						} else {
-							return operationResult.data;
-						}
-					})
-				);
-			}
-
 			return {
 				envId,
 				volume,
 				logicalVolume,
 				logicalFailures,
-				logicalExcluded,
-				containersDetailed
+				logicalExcluded
 			};
 		})()
 	);

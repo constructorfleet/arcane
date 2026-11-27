@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { useQueryClient } from '@tanstack/svelte-query';
+	import { useQueryClient, type QueryKey } from '@tanstack/svelte-query';
 	import { mode } from 'mode-watcher';
 	import { PersistedState } from 'runed';
 	import { onMount } from 'svelte';
@@ -82,6 +82,7 @@
 		getContainerStatusLabel,
 		type ActionStatus
 	} from '../container-table.helpers';
+	import ContainerOwnerLinks from './container-owner-links.svelte';
 	import { ContainerResourcePoller } from './container-resource-poller.svelte';
 	import ContainerStatsCell from './container-stats-cell.svelte';
 	import { ContainerStatsManager } from './container-stats-manager.svelte';
@@ -102,6 +103,7 @@
 		loading = false,
 		onRetry,
 		refreshError,
+		invalidateKey,
 		showEnvironment = true
 	}: {
 		showEnvironment?: boolean;
@@ -115,6 +117,7 @@
 		loading?: boolean;
 		onRetry: () => Promise<unknown>;
 		refreshError?: unknown;
+		invalidateKey?: QueryKey;
 	} = $props();
 
 	const actionStatus = $state<Record<string, ActionStatus>>({});
@@ -160,7 +163,7 @@
 	}
 
 	function invalidateContainers() {
-		return queryClient.invalidateQueries({ queryKey: queryKeys.containers.listPrefix(scope) });
+		return queryClient.invalidateQueries({ queryKey: invalidateKey ?? queryKeys.containers.listPrefix(scope) });
 	}
 
 	const tableRequestOptions = $derived(
@@ -376,8 +379,9 @@
 	}
 
 	const columns = $derived([
-		...(showEnvironment ? environmentColumns<ContainerRow>() : []),
+		...(showEnvironment ? environmentColumns<ContainerRow>().map((column) => ({ ...column, hidden: false })) : []),
 		{ accessorKey: 'id', title: m.common_id(), cell: IdCell, hidden: true },
+		{ id: 'owner', title: m.owner(), hidden: true, cell: OwnerCell },
 		{
 			accessorKey: 'names',
 			id: 'name',
@@ -422,7 +426,7 @@
 			card: 'meter',
 			cell: MemoryCell
 		},
-		{ accessorKey: 'status', title: m.common_status(), card: 'footerEnd', cell: StatusCell },
+
 		{
 			accessorKey: 'networkSettings',
 			id: 'ipAddress',
@@ -460,11 +464,11 @@
 
 	const mobileFields = [
 		{ id: 'id', label: m.common_id(), defaultVisible: false },
+		{ id: 'owner', label: m.owner(), defaultVisible: false },
 		{ id: 'state', label: m.common_state(), defaultVisible: true },
 		{ id: 'updates', label: m.updates(), defaultVisible: true },
-		{ id: 'cpuUsage', label: m.cpu_usage(), defaultVisible: false },
-		{ id: 'memoryUsage', label: m.memory_usage(), defaultVisible: false },
-		{ id: 'status', label: m.common_status(), defaultVisible: true },
+		{ id: 'cpuUsage', label: m.cpu_usage(), defaultVisible: true },
+		{ id: 'memoryUsage', label: m.memory_usage(), defaultVisible: true },
 		{ id: 'image', label: m.common_image(), defaultVisible: true },
 		{
 			id: 'ipAddress',
@@ -796,7 +800,7 @@
 					{/if}
 				</div>
 				<a
-					class="block w-0 min-w-full truncate font-mono text-xs text-muted-foreground hover:text-foreground hover:underline"
+					class="block w-0 min-w-full truncate font-mono text-xs text-primary-text hover:underline"
 					title={item.image}
 					href={resolve(`/(app)/images/[imageId]?env=${encodeURIComponent(item.environmentId)}`, { imageId: item.imageId })}
 					>{item.image}</a
@@ -806,32 +810,40 @@
 	{/if}
 {/snippet}
 
+{#snippet OwnerCell({ item }: { item: ContainerRow })}<ContainerOwnerLinks
+		environmentId={item.environmentId}
+		containerId={item.id}
+		presentation="summary"
+	/>{/snippet}
 {#snippet IdCell({ item }: { item: ContainerSummary })}
 	<span class="font-mono text-sm">{String(item.id)}</span>
 {/snippet}
 
 {#snippet StateCell({ item, view }: { item: ContainerRow; view: TableViewMode })}
 	{@const status = getRowActionStatus(item)}
-	<div class="flex items-center gap-2">
-		{#if status === 'updating'}
-			<Badge variant="primary" minWidth="20" beam>{getActionStatusMessage(status)}</Badge>
-		{:else if status}
-			<div class="flex items-center gap-1.5">
-				<Spinner class="size-3.5" />
-				<span class="text-xs font-medium text-muted-foreground">
-					{getActionStatusMessage(status)}
-				</span>
-			</div>
-		{:else}
-			<Badge variant={getStateBadgeVariant(item.state)} minWidth="20">{getContainerStatusLabel(item.state)}</Badge>
-		{/if}
-		{#if view === 'list'}
-			<div class="flex items-center gap-1">
-				{@render StateActions(item, status)}
-			</div>
-		{:else}
-			{@render HealthIndicator(item)}
-		{/if}
+	<div class="flex flex-col items-start gap-1">
+		<div class="flex items-center gap-2">
+			{#if status === 'updating'}
+				<Badge variant="primary" minWidth="20" beam>{getActionStatusMessage(status)}</Badge>
+			{:else if status}
+				<div class="flex items-center gap-1.5">
+					<Spinner class="size-3.5" />
+					<span class="text-xs font-medium text-muted-foreground">
+						{getActionStatusMessage(status)}
+					</span>
+				</div>
+			{:else}
+				<Badge variant={getStateBadgeVariant(item.state)} minWidth="20">{getContainerStatusLabel(item.state)}</Badge>
+			{/if}
+			{#if view === 'list'}
+				<div class="flex items-center gap-1">
+					{@render StateActions(item, status)}
+				</div>
+			{:else}
+				{@render HealthIndicator(item)}
+			{/if}
+		</div>
+		{#if view === 'list'}<div class="max-w-64 text-xs text-muted-foreground">{@render StatusCell({ item, view })}</div>{/if}
 	</div>
 {/snippet}
 
@@ -944,6 +956,13 @@
 		]}
 		fields={[
 			{
+				label: m.owner(),
+				getValue: (item: ContainerRow) => ({ item }),
+				type: 'component',
+				component: OwnerCell,
+				show: mobileFieldVisibility['owner'] ?? false
+			},
+			{
 				label: m.common_image(),
 				getValue: (item: ContainerSummary) => item.image,
 				icon: ImagesIcon,
@@ -958,7 +977,7 @@
 				getValue: (item: ContainerSummary) => item.status,
 				icon: ClockIcon,
 				iconVariant: 'purple' as const,
-				show: (mobileFieldVisibility['status'] ?? true) && !(mobileFieldVisibility['state'] ?? true) && item.status !== undefined
+				show: item.status !== undefined
 			},
 			{
 				label: m.common_ports(),
@@ -1001,7 +1020,7 @@
 				},
 				icon: ClockIcon,
 				iconVariant: 'orange' as const,
-				show: mobileFieldVisibility['cpuUsage'] ?? false
+				show: mobileFieldVisibility['cpuUsage'] ?? true
 			},
 			{
 				label: m.memory_usage(),
@@ -1017,7 +1036,7 @@
 				},
 				icon: ClockIcon,
 				iconVariant: 'purple' as const,
-				show: mobileFieldVisibility['memoryUsage'] ?? false
+				show: mobileFieldVisibility['memoryUsage'] ?? true
 			}
 		]}
 		footer={(mobileFieldVisibility['created'] ?? false)
@@ -1041,8 +1060,11 @@
 		{#if view === 'grid'}
 			{@render StateActions(item, getRowActionStatus(item))}
 		{/if}
+		{#snippet ownershipLinks()}<ContainerOwnerLinks environmentId={envId} containerId={item.id} />{/snippet}
+
 		<RowActionsMenu name={getContainerDisplayName(item)}>
 			<DetailLinksMenu
+				related={item.labels['com.docker.swarm.service.id'] ? ownershipLinks : undefined}
 				disabled={isBulkActionRunning || !!status}
 				href={resourceDetailHref(
 					resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(envId)}`, { containerId: item.id })

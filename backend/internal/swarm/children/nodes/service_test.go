@@ -12,6 +12,7 @@ import (
 
 	"github.com/labstack/echo/v5"
 	"github.com/libtnb/sqlite"
+	"github.com/moby/moby/api/types/swarm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -502,4 +503,24 @@ func TestNodeAgentCoverage(t *testing.T) {
 			require.Len(t, node.Agent.Candidates, 2)
 		})
 	}
+}
+
+func TestNodeRoleFilterUsesElectionBeforePagination(t *testing.T) {
+	nodes := []types.SwarmNode{{ID: "worker", Role: "worker"}, {ID: "manager", Role: "manager", ManagerStatus: "manager"}, {ID: "leader", Role: "manager", ManagerStatus: "leader"}}
+	paginationConfig := (&Service{}).buildNodePaginationConfig()
+	result := paginationConfig.SearchOrderAndPaginate(nodes, pagination.QueryParams{Params: pagination.Params{Limit: 1}, Filters: map[string]string{"role": "leader"}})
+	require.EqualValues(t, 1, result.TotalCount)
+	require.Equal(t, "leader", result.Items[0].ID)
+	managers := paginationConfig.SearchOrderAndPaginate(nodes, pagination.QueryParams{Params: pagination.Params{Limit: 20}, Filters: map[string]string{"role": "manager"}})
+	require.Len(t, managers.Items, 2)
+}
+
+func TestRunningTaskCountsUseCurrentStateAndExactNode(t *testing.T) {
+	tasks := []swarm.Task{
+		{NodeID: "one", Status: swarm.TaskStatus{State: swarm.TaskStateRunning}},
+		{NodeID: "one", Status: swarm.TaskStatus{State: swarm.TaskStateShutdown}},
+		{NodeID: "two", Status: swarm.TaskStatus{State: swarm.TaskStateRunning}, DesiredState: swarm.TaskStateShutdown},
+		{Status: swarm.TaskStatus{State: swarm.TaskStatePending}},
+	}
+	require.Equal(t, map[string]int{"one": 1, "two": 1}, runningTaskCounts(tasks))
 }

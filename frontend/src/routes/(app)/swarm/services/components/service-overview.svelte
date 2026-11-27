@@ -1,17 +1,22 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+
 	import { KeyValueCard } from '#lib/components/resource-detail/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import { InfoIcon, ConnectionIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { SwarmServiceInspect } from '#lib/types/swarm.js';
+	import { hasPermission } from '#lib/utils/auth.js';
 	import {
 		SWARM_STACK_LABEL,
 		getSwarmServiceModeLabel,
 		getSwarmServiceModeVariant,
 		isSwarmServiceModeScalable
 	} from '#lib/utils/docker.js';
+	import { environmentHref } from '#lib/utils/environments.js';
 	import { formatDateTimeShort, formatRelativeTime, truncateImageDigest } from '#lib/utils/formatting.js';
+	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 
 	interface Props {
 		service: SwarmServiceInspect;
@@ -20,14 +25,15 @@
 		serviceMode: string;
 		desiredReplicas: number;
 		labels: Record<string, string>;
+		environmentId: string;
 	}
 
-	let { service, serviceName, serviceImage, serviceMode, desiredReplicas, labels }: Props = $props();
+	let { service, serviceName, serviceImage, serviceMode, desiredReplicas, labels, environmentId }: Props = $props();
 
 	const stackName = $derived(labels?.[SWARM_STACK_LABEL] || '');
 	const nodes = $derived((service?.nodes as string[]) || []);
 	const versionIndex = $derived(service?.version?.index ?? service?.version?.Index ?? 0);
-	const updateStatus = $derived(service?.updateStatus as Record<string, any> | null | undefined);
+	const updateStatus = $derived(service?.updateStatus as Record<string, unknown> | null | undefined);
 	const updateStatusVariant = $derived.by(() => {
 		switch (updateStatus?.['State']) {
 			case 'completed':
@@ -59,15 +65,6 @@
 				</div>
 				<div class="cursor-pointer text-base font-semibold break-all text-foreground select-all">
 					{serviceName}
-				</div>
-			</div>
-
-			<div>
-				<div class="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-					{m.swarm_stack()}
-				</div>
-				<div class="text-base font-semibold text-foreground">
-					{stackName || m.common_na()}
 				</div>
 			</div>
 
@@ -153,3 +150,20 @@
 		</div>
 	</Card.Content>
 </Card.Root>
+
+{#if stackName}
+	<Card.Root>
+		<Card.Header icon={InfoIcon}><Card.Title>{m.linked_resources()}</Card.Title></Card.Header>
+		<Card.Content
+			><KeyValueCard label={m.owned_by()} valueFormat="custom">
+				{#if hasPermission('swarm-stacks:read', environmentId)}
+					<a
+						class="text-primary-text hover:underline"
+						href={resourceDetailHref(environmentHref(resolve('/(app)/swarm/stacks/[name]', { name: stackName }), environmentId))}
+						>{stackName}</a
+					>
+				{:else}{stackName}{/if}
+			</KeyValueCard></Card.Content
+		>
+	</Card.Root>
+{/if}

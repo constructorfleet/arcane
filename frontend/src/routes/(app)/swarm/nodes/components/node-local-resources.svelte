@@ -8,7 +8,7 @@
 	import { TabBar } from '#lib/components/tab-bar/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { useUrlTab } from '#lib/hooks/use-url-tab.svelte.js';
-	import { ContainersIcon, ImagesIcon, JobsIcon, NetworksIcon, VolumesIcon } from '#lib/icons/index.js';
+	import { ContainersIcon, ImagesIcon, NetworksIcon, VolumesIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { containerService } from '#lib/services/container-service.js';
 	import { imageService } from '#lib/services/image-service.js';
@@ -21,23 +21,16 @@
 	import { bytes } from '#lib/utils/formatting.js';
 	import { resourceTableHref, resourceTablePage } from '#lib/utils/resource-navigation.js';
 
-	import ScopedTasksPanel from '../../tasks/components/scoped-tasks-panel.svelte';
-
-	let { nodeId, managerId, agentId }: { nodeId: string; managerId: string; agentId?: string } = $props();
+	let { nodeId, agentId }: { nodeId: string; agentId?: string } = $props();
 
 	const tabs = [
 		{ value: 'containers', label: m.containers(), icon: ContainersIcon },
 		{ value: 'networks', label: m.resource_networks_cap(), icon: NetworksIcon },
 		{ value: 'images', label: m.images(), icon: ImagesIcon },
-		{ value: 'volumes', label: m.resource_volumes_cap(), icon: VolumesIcon },
-		{ value: 'tasks', label: m.tasks(), icon: JobsIcon }
+		{ value: 'volumes', label: m.resource_volumes_cap(), icon: VolumesIcon }
 	] as const;
 	type Resource = (typeof tabs)[number]['value'];
-	const available = $derived(
-		tabs.filter(({ value }) =>
-			value === 'tasks' ? hasPermission('swarm-nodes:read', managerId) : !!agentId && hasPermission(`${value}:list`, agentId)
-		)
-	);
+	const available = $derived(tabs.filter(({ value }) => !!agentId && hasPermission(`${value}:list`, agentId)));
 	const tab = useUrlTab({
 		tabs: () => available,
 		defaultTab: () => 'networks',
@@ -46,7 +39,7 @@
 		ready: () => available.length > 0
 	});
 	const resource = $derived(tab.value);
-	type LocalResource = Exclude<Resource, 'tasks'>;
+	type LocalResource = Resource;
 
 	function initialRequest(kind: LocalResource): SearchPaginationSortRequest {
 		const url = page.shallow?.url ?? page.url;
@@ -65,16 +58,19 @@
 	);
 
 	function networkAddresses(network: NetworkSummary) {
-		return network.ipam?.config
-			?.flatMap((config) =>
-				[
-					config.subnet && `${m.common_subnet()} ${config.subnet}`,
-					config.gateway && `${m.common_gateway()} ${config.gateway}`,
-					config.ipRange && `${m.networks_ipam_iprange_label()} ${config.ipRange}`,
-					...Object.entries(config.auxAddress ?? {}).map(([label, address]) => `${label} ${address}`)
-				].filter(Boolean)
-			)
-			.join(' · ');
+		const configs = network.ipam?.config ?? [];
+		const displayed = configs.slice(0, 2).flatMap((config) => {
+			const auxiliary = Object.entries(config.auxAddress ?? {});
+			return [
+				config.subnet && m.common_subnet() + ' ' + config.subnet,
+				config.gateway && m.common_gateway() + ' ' + config.gateway,
+				config.ipRange && m.networks_ipam_iprange_label() + ' ' + config.ipRange,
+				...auxiliary.slice(0, 2).map(([label, address]) => label + ' ' + address),
+				auxiliary.length > 2 ? '+' + (auxiliary.length - 2) : ''
+			];
+		});
+		if (configs.length > 2) displayed.push('+' + (configs.length - 2));
+		return displayed.filter(Boolean).join(' · ');
 	}
 
 	async function list(
@@ -84,7 +80,7 @@
 		options: SearchPaginationSortRequest,
 		signal: AbortSignal
 	) {
-		if (!environmentId || kind === 'tasks') return undefined;
+		if (!environmentId) return undefined;
 		switch (kind) {
 			case 'containers': {
 				const { data, pagination } = await containerService.getContainersForEnvironment(environmentId, options, { signal });
@@ -147,12 +143,12 @@
 		volumes: [m.common_driver(), m.common_scope()]
 	};
 	const resources = createQuery(() => {
-		const options = resource === 'tasks' ? {} : $state.snapshot(requests[resource]);
+		const options = $state.snapshot(requests[resource]);
 		const key = [agentId, nodeId, resource, options] as const;
 		return {
 			queryKey: ['node-local-resources', ...key],
 			queryFn: ({ signal }) => list(key[2], key[0], key[1], key[3], signal),
-			enabled: !!agentId && resource !== 'tasks' && available.some(({ value }) => value === resource)
+			enabled: !!agentId && available.some(({ value }) => value === resource)
 		};
 	});
 	const canInspect = $derived(!!agentId && hasPermission(`${resource}:read`, agentId));
@@ -163,9 +159,7 @@
 	<Tabs.Root value={resource} onValueChange={tab.select}>
 		<TabBar items={tab.items} />
 		<Tabs.Content value={resource} class="mt-4">
-			{#if resource === 'tasks'}
-				<ScopedTasksPanel environmentId={managerId} resourceId={nodeId} scope="node" />
-			{:else if agentId}
+			{#if agentId}
 				{#key resource}
 					<RelatedResourceTable
 						columns={columns[resource]}

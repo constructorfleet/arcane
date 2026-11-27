@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/containerd/errdefs"
+	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
@@ -90,6 +91,14 @@ func (s *Service) ListServicesPaginated(ctx context.Context, params pagination.Q
 	}
 
 	items := servicesResult.Items
+	items = slices.DeleteFunc(items, func(service swarm.Service) bool {
+		return !serviceMatchesResources(service, params.Filters)
+	})
+	params.Filters = maps.Clone(params.Filters)
+	delete(params.Filters, "secretId")
+	delete(params.Filters, "configId")
+	delete(params.Filters, "volumeName")
+	delete(params.Filters, "serviceIds")
 	if networkID := params.Filters["networkId"]; networkID != "" {
 		params.Filters = maps.Clone(params.Filters)
 		delete(params.Filters, "networkId")
@@ -98,6 +107,35 @@ func (s *Service) ListServicesPaginated(ctx context.Context, params pagination.Q
 		})
 	}
 	return s.PaginateSummaries(ctx, items, params)
+}
+
+func serviceMatchesResources(service swarm.Service, filters map[string]string) bool {
+	container := service.Spec.TaskTemplate.ContainerSpec
+	if serviceIDs := filters["serviceIds"]; serviceIDs != "" && !slices.Contains(strings.Split(serviceIDs, ","), service.ID) {
+		return false
+	}
+	if volumeName := filters["volumeName"]; volumeName != "" {
+		if container == nil || !slices.ContainsFunc(container.Mounts, func(item mount.Mount) bool {
+			return item.Type == mount.TypeVolume && item.Source == volumeName
+		}) {
+			return false
+		}
+	}
+	if secretID := filters["secretId"]; secretID != "" {
+		if container == nil || !slices.ContainsFunc(container.Secrets, func(ref *swarm.SecretReference) bool {
+			return ref != nil && ref.SecretID == secretID
+		}) {
+			return false
+		}
+	}
+	if configID := filters["configId"]; configID != "" {
+		if container == nil || !slices.ContainsFunc(container.Configs, func(ref *swarm.ConfigReference) bool {
+			return ref != nil && ref.ConfigID == configID
+		}) {
+			return false
+		}
+	}
+	return true
 }
 
 func serviceUsesNetwork(service swarm.Service, networkID string) bool {
@@ -124,6 +162,13 @@ func (s *Service) PaginateSummaries(
 
 func (s *Service) Aggregate(ctx context.Context, params pagination.QueryParams) (types.Paginated[types.SwarmServiceSummary], error) {
 	values := url.Values{"start": {"0"}, "limit": {"-1"}}
+	params.Filters = maps.Clone(params.Filters)
+	for _, key := range []string{"secretId", "configId", "volumeName", "serviceIds"} {
+		if value := params.Filters[key]; value != "" {
+			values.Set(key, value)
+			delete(params.Filters, key)
+		}
+	}
 	if networkID := params.Filters["networkId"]; networkID != "" {
 		params.Filters = maps.Clone(params.Filters)
 		delete(params.Filters, "networkId")

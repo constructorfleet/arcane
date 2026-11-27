@@ -32,9 +32,16 @@ export default defineConfig({
 			}
 		}
 	]),
-	webServer: {
-		command: 'vp -C ../../frontend dev --config conformance/vite.config.ts',
-		url: 'http://127.0.0.1:4175',
-		reuseExistingServer: !process.env.CI
-	}
+	webServer: [
+		{
+			command: 'vp -C ../../frontend dev --config conformance/vite.config.ts --strictPort',
+			url: 'http://127.0.0.1:4175',
+			reuseExistingServer: !process.env.CI
+		},
+		{
+			command: 'vp -C ../../frontend preview --port 4176 --host 127.0.0.1 --strictPort',
+			url: 'http://127.0.0.1:4176',
+			reuseExistingServer: !process.env.CI
+		}
+	]
 });

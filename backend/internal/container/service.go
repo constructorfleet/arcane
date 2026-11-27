@@ -1973,6 +1973,12 @@ func (s *ContainerService) ListContainersPaginated(
 	items := s.BuildSummaries(ctx, dockerContainers, updateInfoMap, currentContainerID, currentContainerErr)
 
 	config := s.buildContainerPaginationConfig()
+	resourceScope := pagination.QueryParams{Filters: map[string]string{
+		"imageId": params.Filters["imageId"], "volumeName": params.Filters["volumeName"],
+	}}
+	items = slices.DeleteFunc(items, func(item types.ContainerSummary) bool {
+		return !config.MatchesSearchAndFilters(item, resourceScope)
+	})
 	counts := s.CalculateStatusCounts(items)
 
 	if groupBy == containerGroupByProject {
@@ -2497,6 +2503,14 @@ func (s *ContainerService) buildContainerPaginationConfig() pagination.Config[ty
 			},
 		},
 		FilterAccessors: []pagination.FilterAccessor[types.ContainerSummary]{
+			{Key: "imageId", Fn: func(c types.ContainerSummary, value string) bool {
+				return value == "" || c.ImageID == value
+			}},
+			{Key: "volumeName", Fn: func(c types.ContainerSummary, value string) bool {
+				return value == "" || slices.ContainsFunc(c.Mounts, func(mount types.ContainerMount) bool {
+					return mount.Type == "volume" && mount.Name == value
+				})
+			}},
 			{
 				Key: "updates",
 				Fn: func(c types.ContainerSummary, filterValue string) bool {

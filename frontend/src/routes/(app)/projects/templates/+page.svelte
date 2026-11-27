@@ -216,7 +216,7 @@
 				</div>
 
 				<Tabs.Content value="browse">
-					<TemplateGallery {templates} bind:requestOptions={pageState.requestOptions} />
+					<TemplateGallery {templates} {registries} bind:requestOptions={pageState.requestOptions} />
 				</Tabs.Content>
 
 				<Tabs.Content value="registries">

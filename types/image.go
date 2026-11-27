@@ -45,6 +45,7 @@ type (
 	}
 
 	ImageUsedBy struct {
+		EnvironmentTag
 		Type string `json:"type"`
 		Name string `json:"name"`
 		ID   string `json:"id,omitempty"`
@@ -81,18 +82,19 @@ type (
 		Hardened          *HardenedImageInfo        `json:"hardened,omitempty"`
 
 		EnvironmentTag
-		RepositoryGroup  *ImageRepositoryGroup `json:"repositoryGroup,omitempty"`
-		ArtifactKey      string                `json:"artifactKey,omitempty"`
-		Platform         string                `json:"platform,omitempty"`
-		LogicalID        string                `json:"logicalId,omitempty"`
-		ID               string                `json:"id" sortable:"true"`
-		Repo             string                `json:"repo" sortable:"true"`
-		Tag              string                `json:"tag" sortable:"true"`
-		RepoTags         []string              `json:"repoTags"`
-		RepoDigests      []string              `json:"repoDigests"`
-		UsedBy           []ImageUsedBy         `json:"usedBy,omitempty"`
-		ActiveReferences []string              `json:"activeReferences,omitempty"`
-		PinnedReferences []string              `json:"pinnedReferences,omitempty"`
+		RepositoryGroup   *ImageRepositoryGroup `json:"repositoryGroup,omitempty"`
+		ArtifactKey       string                `json:"artifactKey,omitempty"`
+		Platform          string                `json:"platform,omitempty"`
+		LogicalID         string                `json:"logicalId,omitempty"`
+		ID                string                `json:"id" sortable:"true"`
+		Repo              string                `json:"repo" sortable:"true"`
+		Tag               string                `json:"tag" sortable:"true"`
+		RepoTags          []string              `json:"repoTags"`
+		RepoDigests       []string              `json:"repoDigests"`
+		UsedBy            []ImageUsedBy         `json:"usedBy,omitempty"`
+		RunningContainers *int                  `json:"runningContainers,omitempty"`
+		ActiveReferences  []string              `json:"activeReferences,omitempty"`
+		PinnedReferences  []string              `json:"pinnedReferences,omitempty"`
 
 		Created     int64 `json:"created" sortable:"true"`
 		Size        int64 `json:"size" sortable:"true"`

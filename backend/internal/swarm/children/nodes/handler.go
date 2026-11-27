@@ -39,6 +39,9 @@ type (
 		Search        string `query:"search" doc:"Search query"`
 		Sort          string `query:"sort" doc:"Column to sort by"`
 		Order         string `query:"order" default:"asc" doc:"Sort direction (asc or desc)"`
+		Role          string `query:"role" doc:"Node role including elected leader"`
+		Status        string `query:"status" doc:"Node readiness"`
+		Availability  string `query:"availability" doc:"Node scheduling availability"`
 		Start         int    `query:"start" default:"0" doc:"Start index for pagination"`
 		Limit         int    `query:"limit" default:"20" doc:"Number of items per page"`
 	}
@@ -107,6 +110,8 @@ type (
 		Search        string `query:"search" doc:"Search query"`
 		Sort          string `query:"sort" doc:"Column to sort by"`
 		Order         string `query:"order" default:"asc" doc:"Sort direction (asc or desc)"`
+		CurrentState  string `query:"currentState" doc:"Current task state"`
+		DesiredState  string `query:"desiredState" doc:"Desired task state"`
 		Start         int    `query:"start" default:"0" doc:"Start index for pagination"`
 		Limit         int    `query:"limit" default:"20" doc:"Number of items per page"`
 	}
@@ -129,6 +134,12 @@ func NewHandler(p HandlerParams) *Handler {
 
 func (h *Handler) ListNodes(ctx context.Context, input *ListSwarmNodesInput) (*handlerutil.Page[types.SwarmNode], error) {
 	params := handlerutil.PaginationParams(input.Start, input.Limit, input.Sort, input.Order, input.Search)
+	params.Filters = map[string]string{"role": input.Role, "status": input.Status, "availability": input.Availability}
+	for key, value := range params.Filters {
+		if value == "" {
+			delete(params.Filters, key)
+		}
+	}
 	if _, ok := httpx.EnvironmentScopeFromContext(ctx); ok {
 		body, err := h.service.Aggregate(ctx, params)
 		if err != nil {
@@ -343,6 +354,13 @@ func (h *Handler) RunNodeAction(ctx context.Context, input *SwarmNodeActionInput
 
 func (h *Handler) ListNodeTasks(ctx context.Context, input *ListSwarmNodeTasksInput) (*handlerutil.Page[types.SwarmTaskSummary], error) {
 	params := handlerutil.PaginationParams(input.Start, input.Limit, input.Sort, input.Order, input.Search)
+	params.Filters = map[string]string{}
+	if input.CurrentState != "" {
+		params.Filters["currentState"] = input.CurrentState
+	}
+	if input.DesiredState != "" {
+		params.Filters["desiredState"] = input.DesiredState
+	}
 	items, paginationResp, err := h.service.ListNodeTasksPaginated(ctx, input.NodeID, params)
 	if err != nil {
 		return nil, h.mapError(err, "Failed to list swarm tasks: "+err.Error())

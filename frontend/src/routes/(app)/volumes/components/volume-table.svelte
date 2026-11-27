@@ -32,9 +32,19 @@
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import ResourceName from '#lib/components/resource-name.svelte';
 	import { EmptyState } from '#lib/components/states/index.js';
+	import { swarmEnvironmentsQueryOptions } from '#lib/components/swarm/swarm-environments.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import { TrashIcon, BackupIcon, VolumesIcon, CalendarIcon, EditIcon, FolderOpenIcon } from '#lib/icons/index.js';
+	import {
+		LayersIcon,
+		ContainersIcon,
+		TrashIcon,
+		BackupIcon,
+		VolumesIcon,
+		CalendarIcon,
+		EditIcon,
+		FolderOpenIcon
+	} from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import type { APIRequestConfig } from '#lib/services/api-service.js';
@@ -61,7 +71,7 @@
 		rowKey,
 		withFailedEnvironments
 	} from '#lib/utils/environments.js';
-	import { formatDateTimeShort } from '#lib/utils/formatting.js';
+	import { formatRelativeTime } from '#lib/utils/formatting.js';
 	import { bytes } from '#lib/utils/formatting.js';
 	import { inUseBadge } from '#lib/utils/mobile-card-badges.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
@@ -139,6 +149,7 @@
 	let columnVisibility = $state<ColumnVisibilityState>({});
 	let tablePreferencesReady = $state(false);
 	const queryClient = useQueryClient();
+	const ownerManagers = createQuery(() => swarmEnvironmentsQueryOptions('swarm-stacks:read', { all: true }));
 
 	async function readBackupVolumeNames(
 		environments: EnvironmentRef[],
@@ -189,9 +200,7 @@
 		return configured === undefined || name === configured;
 	};
 	const isBackupVolume = (item: VolumeRow) => isBackupVolumeName(item.name, item.environmentId);
-	const sizesEnabled = $derived(
-		tablePreferencesReady && columnVisibility['size'] !== false && hasShownPermission('volumes:read')
-	);
+	const sizesEnabled = $derived(tablePreferencesReady && columnVisibility['size'] === true && hasShownPermission('volumes:read'));
 	const sizesQuery = createQuery(() => {
 		const queryScope = scope;
 		const environments = readableEnvironments('volumes:list');
@@ -325,23 +334,52 @@
 		});
 	}
 
+	function stackOwnerHref(item: VolumeRow): string | undefined {
+		const name = item.clusterId ? item.labels?.['com.docker.stack.namespace'] : undefined;
+		if (!name) return undefined;
+		const manager = ownerManagers.data?.managers.find(
+			(manager) =>
+				ownerManagers.data?.clusterIds?.get(manager.id) === item.clusterId && hasPermission('swarm-stacks:read', manager.id)
+		);
+		if (!manager) return undefined;
+		return resourceDetailHref(
+			resolve(
+				`/(app)/swarm/stacks/[name]?env=${encodeURIComponent(manager.id)}&cluster=${encodeURIComponent(item.clusterId ?? '')}`,
+				{ name }
+			)
+		);
+	}
+
 	const columns = $derived([
-		...(showEnvironment ? environmentColumns<VolumeRow>() : []),
+		...(showEnvironment
+			? environmentColumns<VolumeRow>().map((column) => ({
+					...column,
+					hidden: false,
+					cell: AttachmentCell,
+					cellComponent: undefined
+				}))
+			: []),
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
+		{ id: 'owner', title: m.owner(), hidden: true, cell: OwnerCell },
 		{ accessorKey: 'name', title: m.common_name(), sortable: true, cell: NameCell },
 		{ accessorKey: 'inUse', title: m.common_status(), sortable: true, cell: StatusCell },
-		{ accessorKey: 'size', title: m.common_size(), sortable: true, cell: SizeCell, align: 'right' },
+		{ accessorKey: 'size', title: m.common_size(), hidden: true, sortable: true, cell: SizeCell, align: 'right' },
 		{ id: 'filesystemUsage', title: m.filesystem_disk_usage(), cell: FilesystemUsageCell, align: 'right' },
-		{ accessorKey: 'createdAt', title: m.common_created(), sortable: true, cell: CreatedCell },
-		{ accessorKey: 'driver', title: m.common_driver(), sortable: true }
+		{ accessorKey: 'createdAt', title: m.common_created(), hidden: true, sortable: true, cell: CreatedCell },
+		{ accessorKey: 'driver', title: m.common_driver(), sortable: true },
+		{ accessorKey: 'mountpoint', title: m.common_mountpoint(), hidden: true },
+		{ accessorKey: 'scope', title: m.docker_scope(), hidden: true }
 	] satisfies ColumnSpec<VolumeRow>[]);
 
 	const mobileFields = [
 		{ id: 'id', label: m.common_id(), defaultVisible: false },
+		{ id: 'owner', label: m.owner(), defaultVisible: false },
+		{ id: 'mountpoint', label: m.common_mountpoint(), defaultVisible: false },
+		{ id: 'scope', label: m.docker_scope(), defaultVisible: false },
 		{ id: 'inUse', label: m.common_status(), defaultVisible: true },
-		{ id: 'size', label: m.common_size(), defaultVisible: true },
+		{ id: 'size', label: m.common_size(), defaultVisible: false },
 		{ id: 'filesystemUsage', label: m.filesystem_disk_usage(), defaultVisible: true },
-		{ id: 'createdAt', label: m.common_created(), defaultVisible: true },
+		{ id: 'createdAt', label: m.common_created(), defaultVisible: false },
 		{ id: 'driver', label: m.common_driver(), defaultVisible: true }
 	];
 
@@ -363,6 +401,17 @@
 	let mobileFieldVisibility = $state<Record<string, boolean>>({});
 </script>
 
+{#snippet OwnerCell({ item }: { item: VolumeRow })}{@const href = stackOwnerHref(item)}{@const name = item.clusterId
+		? item.labels?.['com.docker.stack.namespace']
+		: undefined}{#if href}<a class="text-primary-text hover:underline" {href}>{name}</a>{:else}<span
+			class="text-sm text-muted-foreground">{name ?? m.common_unknown()}</span
+		>{/if}
+{/snippet}
+{#snippet AttachmentCell({ item }: { item: VolumeRow })}<div class="flex flex-col text-sm">
+		<span>{item.environmentName}</span><span class="text-xs text-muted-foreground"
+			>{item.inUse ? m.common_in_use() : m.common_unused()}</span
+		>
+	</div>{/snippet}
 {#snippet NameCell({ item }: { item: VolumeRow })}
 	<ResourceName name={item.name} href={volumeDetailHref(item)} class="font-mono text-xs-plus leading-5 font-medium" />
 {/snippet}
@@ -400,7 +449,7 @@
 {/snippet}
 
 {#snippet CreatedCell({ value }: { value: unknown })}
-	{formatDateTimeShort(String(value))}
+	<span title={String(value)}>{formatRelativeTime(String(value))}</span>
 {/snippet}
 
 {#snippet FilesystemUsageCell({ item }: { item: VolumeRow })}
@@ -429,6 +478,18 @@
 		badges={[inUseBadge(mobileFieldVisibility['inUse'] ?? true)]}
 		fields={[
 			{
+				label: m.owner(),
+				getValue: (item: VolumeRow) =>
+					item.clusterId ? (item.labels?.['com.docker.stack.namespace'] ?? m.common_unknown()) : m.common_unknown(),
+				show: mobileFieldVisibility['owner'] ?? false
+			},
+			{
+				label: m.common_mountpoint(),
+				getValue: (item: VolumeRow) => item.mountpoint,
+				show: mobileFieldVisibility['mountpoint'] ?? false
+			},
+			{ label: m.docker_scope(), getValue: (item: VolumeRow) => item.scope, show: mobileFieldVisibility['scope'] ?? false },
+			{
 				label: m.common_driver(),
 				getValue: (item: VolumeRow) => item.driver,
 				icon: VolumesIcon,
@@ -440,7 +501,7 @@
 				getValue: (item: VolumeRow) => ({ item }),
 				type: 'component',
 				component: SizeCell,
-				show: mobileFieldVisibility['size'] ?? true
+				show: mobileFieldVisibility['size'] ?? false
 			},
 			{
 				label: m.filesystem_disk_usage(),
@@ -450,10 +511,10 @@
 				show: mobileFieldVisibility['filesystemUsage'] ?? true
 			}
 		]}
-		footer={(mobileFieldVisibility['createdAt'] ?? true)
+		footer={(mobileFieldVisibility['createdAt'] ?? false)
 			? {
 					label: m.common_created(),
-					getValue: (item) => formatDateTimeShort(String(item.createdAt)),
+					getValue: (item) => formatRelativeTime(String(item.createdAt)),
 					icon: CalendarIcon
 				}
 			: undefined}
@@ -468,6 +529,16 @@
 			href={volumeDetailHref(item)}
 			tabs={[
 				{ value: 'overview', label: m.common_overview() },
+				{
+					value: 'owning-stack',
+					label: m.swarm_stack(),
+					icon: LayersIcon,
+					related: true,
+					href: stackOwnerHref(item),
+					visible: !!stackOwnerHref(item)
+				},
+				{ value: 'containers', label: m.containers(), icon: ContainersIcon, related: true },
+				{ value: 'services', label: m.services(), icon: LayersIcon, related: true },
 				{
 					value: 'backups',
 					label: m.volumes_nav_backups(),

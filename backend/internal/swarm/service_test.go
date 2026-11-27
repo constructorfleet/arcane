@@ -159,3 +159,17 @@ func TestAggregateStatusReportsEachEnvironment(t *testing.T) {
 	}, body.Environments)
 	require.Len(t, body.FailedEnvironments, 1)
 }
+
+func TestTaskHistoryFilteringKeepsDiagnosticsBeforePagination(t *testing.T) {
+	items := []types.SwarmTaskSummary{
+		{ID: "old", DesiredState: "shutdown", CurrentState: "shutdown"},
+		{ID: "retiring", DesiredState: "shutdown", CurrentState: "running"},
+		{ID: "failed", DesiredState: "shutdown", CurrentState: "failed"},
+		{ID: "rejected", DesiredState: "shutdown", CurrentState: "rejected"},
+	}
+	result := taskPagination.SearchOrderAndPaginate(items, pagination.QueryParams{Params: pagination.Params{Limit: 1}, Filters: map[string]string{"history": "active"}})
+	require.EqualValues(t, 3, result.TotalCount)
+	require.NotEqual(t, "old", result.Items[0].ID)
+	history := taskPagination.SearchOrderAndPaginate(items, pagination.QueryParams{Params: pagination.Params{Limit: 20}, Filters: map[string]string{"history": "all"}})
+	require.Len(t, history.Items, 4)
+}

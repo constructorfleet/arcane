@@ -44,9 +44,9 @@
 </script>
 
 <div class={cn('space-y-5 md:space-y-7', className)}>
-	<header class="flex flex-wrap items-start justify-between gap-x-4">
+	<header class="flex flex-col items-stretch justify-between gap-x-4 gap-y-2 sm:flex-row sm:flex-wrap sm:items-start sm:gap-y-0">
 		<h1 class="text-2xl font-bold sm:text-3xl">{title}</h1>
-		<div class="min-w-0 flex-1">
+		<div class="w-full min-w-0 sm:w-auto sm:flex-1" data-slot="resource-list-actions">
 			<ActionButtonGroup buttons={actionButtons} />
 		</div>
 		{#if subtitle}

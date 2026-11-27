@@ -3,6 +3,7 @@
 	import { untrack } from 'svelte';
 
 	import { swarmEnvironmentsQueryOptions } from '#lib/components/swarm/swarm-environments.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { JobsIcon } from '#lib/icons/index.js';
 	import { ResourcePageLayout, type StatCardConfig } from '#lib/layouts/index.js';
 	import { m } from '#lib/paraglide/messages.js';
@@ -68,6 +69,19 @@
 	{statCards}
 >
 	{#snippet mainContent()}
+		<div class="mb-4 flex items-center gap-2">
+			<Switch
+				id="task-history"
+				checked={pageState.requestOptions.filters?.['history'] === 'all'}
+				onCheckedChange={(checked) => {
+					pageState.requestOptions = {
+						...pageState.requestOptions,
+						pagination: { page: 1, limit: pageState.requestOptions.pagination?.limit ?? 20 },
+						filters: { ...pageState.requestOptions.filters, history: checked ? 'all' : 'active' }
+					};
+				}}
+			/><label for="task-history" class="text-sm">{m.show_shutdown_history()}</label>
+		</div>
 		<SwarmTasksTable {tasks} bind:requestOptions={pageState.requestOptions} onRetry={() => tasksQuery.refetch()} />
 	{/snippet}
 </ResourcePageLayout>

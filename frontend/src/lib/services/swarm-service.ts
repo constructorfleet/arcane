@@ -119,9 +119,9 @@ class SwarmService extends BaseAPIService {
 		return res.data;
 	}
 
-	async getNode(nodeId: string, environmentId: string): Promise<SwarmNode> {
+	async getNode(nodeId: string, environmentId: string, config?: APIRequestConfig): Promise<SwarmNode> {
 		return this.handleResponse(
-			this.api.get(`/agents/${environmentId}/swarm/nodes/${encodeURIComponent(nodeId)}`, { timeout: 15_000 })
+			this.api.get(`/agents/${environmentId}/swarm/nodes/${encodeURIComponent(nodeId)}`, { timeout: 15_000, ...config })
 		);
 	}
 

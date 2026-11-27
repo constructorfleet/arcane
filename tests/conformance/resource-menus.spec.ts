@@ -184,6 +184,18 @@ test('resources without an Overview keep their other destinations', async ({ pag
 	await expect(page.getByRole('menuitem', { name: 'Configuration', exact: true })).toBeVisible();
 });
 
+test('related owners keep their exact destination and canonical duplicates are omitted', async ({
+	page
+}) => {
+	await openActions(page, 'owners');
+	await openSubmenu(page, 'Related resources');
+	await expect(page.getByRole('menuitem', { name: 'Owning stack', exact: true })).toHaveAttribute(
+		'href',
+		'/swarm/stacks/observability?env=manager&tab=overview'
+	);
+	await expect(page.getByRole('menuitem', { name: 'Duplicate stack', exact: true })).toHaveCount(0);
+});
+
 test('resource-specific details actions remain actionable in the Details group', async ({
 	page
 }) => {

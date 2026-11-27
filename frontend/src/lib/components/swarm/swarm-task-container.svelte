@@ -3,6 +3,8 @@
 	import { resolve } from '$app/paths';
 
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+	import { ContainersIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { containerService } from '#lib/services/container-service.js';
 	import { swarmService } from '#lib/services/swarm-service.js';
@@ -11,21 +13,42 @@
 	import { extractApiErrorMessage, handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
-	import { getSwarmTaskContainerTarget } from '#lib/utils/swarm-tasks.js';
+	import { getSwarmTaskContainerTarget, isSwarmTaskContainerRunning } from '#lib/utils/swarm-tasks.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
-	let { task, environmentId, tablePage }: { task: SwarmTaskSummary; environmentId: string; tablePage?: number } = $props();
-	const key = $derived(`${environmentId}:${task.id}:${task.nodeId}:${task.containerId ?? ''}`);
+	let {
+		task,
+		environmentId,
+		tablePage,
+		verified = false,
+		onVerified,
+		onUnavailable,
+		unavailable = '',
+		menu = false
+	}: {
+		task: SwarmTaskSummary;
+		environmentId: string;
+		tablePage?: number;
+		verified?: boolean;
+		onVerified?: (verified: boolean) => void;
+		menu?: boolean;
+		onUnavailable?: (error: string) => void;
+		unavailable?: string;
+	} = $props();
+	const key = $derived(
+		`${environmentId}:${task.id}:${task.nodeId}:${task.containerId ?? ''}:${task.currentState}:${task.updatedAt}`
+	);
 	let operation = $state({ key: '', loading: false, error: '' });
 	const loading = $derived(operation.key === key && operation.loading);
-	const error = $derived(operation.key === key ? operation.error : '');
+	const error = $derived((operation.key === key ? operation.error : '') || unavailable);
 	const canResolve = $derived(hasPermission('swarm-nodes:read', environmentId));
 
 	async function openContainer() {
-		if (loading || !task.nodeId || !task.containerId || !canResolve) return;
+		if (loading || !task.nodeId || !task.containerId || task.currentState !== 'running' || !canResolve) return;
 		const requestedKey = key;
 		const selected = { ...task };
 		const source = environmentId;
+		onUnavailable?.('');
 		operation = { key: requestedKey, loading: true, error: '' };
 		const result = await tryCatch(
 			(async () => {
@@ -37,10 +60,14 @@
 				const container = await containerService.getContainerForEnvironment(target.environmentId, target.containerId, {
 					timeout: 15_000
 				});
-				if (container.id !== target.containerId || container.labels?.['com.docker.swarm.task.id'] !== selected.id) {
-					throw new Error(m.task_container_identity_mismatch());
+				if (!isSwarmTaskContainerRunning(selected, container)) {
+					throw new Error(m.task_container_not_running());
 				}
 				if (requestedKey !== key) return;
+				if (!verified) {
+					onVerified?.(true);
+					return;
+				}
 				await goto(
 					resourceTableHref(
 						resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(target.environmentId)}`, {
@@ -59,29 +86,40 @@
 				if (requestedKey === key) operation = { ...operation, loading: value };
 			},
 			onError: (failure) => {
-				if (requestedKey === key) operation = { key: requestedKey, loading: false, error: extractApiErrorMessage(failure) };
+				if (requestedKey === key) {
+					onVerified?.(false);
+					onUnavailable?.(extractApiErrorMessage(failure));
+					operation = { key: requestedKey, loading: false, error: extractApiErrorMessage(failure) };
+				}
 			}
 		});
 	}
 </script>
 
-<div class="flex flex-col items-start gap-1">
-	{#if !task.nodeId || !task.containerId}
-		<span class="text-xs text-muted-foreground">{m.task_has_no_container()}</span>
-	{:else if !canResolve}
-		<span class="text-xs text-muted-foreground">{m.common_access_denied()}</span>
-	{:else}
-		<ArcaneButton
-			action="base"
-			tone="outline"
-			size="sm"
-			customLabel={m.view_task_container()}
-			onclick={openContainer}
-			{loading}
-			disabled={loading}
-		/>
-	{/if}
-	{#if error}
-		<span class="max-w-72 text-xs break-words text-destructive" role="status">{m.task_container_unavailable({ error })}</span>
-	{/if}
-</div>
+{#if menu}
+	<DropdownMenu.Item onclick={openContainer} disabled={!verified || loading}
+		><ContainersIcon class="size-4" />{m.view_task_container()}</DropdownMenu.Item
+	>
+{:else}
+	<div class="flex flex-col items-start gap-1">
+		{#if !task.nodeId || !task.containerId}
+			<span class="text-xs text-muted-foreground">{m.task_has_no_container()}</span>
+		{:else if task.currentState !== 'running'}<span class="text-xs text-muted-foreground">{m.task_container_not_running()}</span>
+		{:else if !canResolve}
+			<span class="text-xs text-muted-foreground">{m.common_access_denied()}</span>
+		{:else}
+			<ArcaneButton
+				action="base"
+				tone="outline"
+				size="sm"
+				customLabel={verified ? m.view_task_container() : m.verify_task_container()}
+				onclick={openContainer}
+				{loading}
+				disabled={loading}
+			/>
+		{/if}
+		{#if error}
+			<span class="max-w-72 text-xs break-words text-destructive" role="status">{m.task_container_unavailable({ error })}</span>
+		{/if}
+	</div>
+{/if}

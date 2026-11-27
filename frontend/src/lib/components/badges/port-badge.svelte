@@ -122,8 +122,7 @@
 							<span class="flex items-center pr-2.5 pl-0.5 leading-none text-muted-foreground tabular-nums">
 								<ArrowRightIcon class="size-3.5 shrink-0 opacity-50" />
 								<span>
-									<span class="text-foreground">{p.containerPort}</span>{#if p.proto}<span class="lowercase opacity-70"
-											>/{p.proto}</span
+									<span class="text-foreground">{p.containerPort}</span>{#if p.proto}<span class="lowercase">/{p.proto}</span
 										>{/if}
 								</span>
 							</span>
@@ -151,7 +150,7 @@
 						class="inline-flex h-6.5 shrink-0 items-center gap-1.5 rounded-xl border border-border px-2.5 font-mono text-xs font-medium text-muted-foreground tabular-nums"
 					>
 						<span
-							>{p.containerPort}{#if p.proto}<span class="lowercase opacity-70">/{p.proto}</span>{/if}</span
+							>{p.containerPort}{#if p.proto}<span class="lowercase">/{p.proto}</span>{/if}</span
 						>
 					</span>
 				</ArcaneTooltip.Trigger>

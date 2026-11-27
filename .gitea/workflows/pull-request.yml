@@ -79,7 +79,7 @@ jobs:
   ui-contracts:
     name: UI contracts
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -94,7 +94,9 @@ jobs:
         run: vp -C tests exec playwright install --with-deps chromium
       - name: Generate SvelteKit configuration
         run: vp -C frontend exec svelte-kit sync
-      - name: Validate shared resource UI contracts
+      - name: Build production UI for page contracts
+        run: vp -C frontend run build
+      - name: Validate resource page and menu contracts
         run: vp -C tests exec playwright test --config conformance/playwright.config.ts --workers=2
       - name: Preserve browser verification artifacts
         if: always()

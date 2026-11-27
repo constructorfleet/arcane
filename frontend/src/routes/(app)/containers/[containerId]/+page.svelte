@@ -11,9 +11,8 @@
 
 	import type { ActionButton } from '#lib/components/action-button-group/types.js';
 	import ActionButtons from '#lib/components/action-buttons.svelte';
-	import ImageReleaseNotesDialog from '#lib/components/dialogs/image-release-notes-dialog.svelte';
-	import EnvironmentDestinationSelect from '#lib/components/form/environment-destination-select.svelte';
 	import IconImage from '#lib/components/icon-image.svelte';
+	import { DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
 	import ResourceNotFound from '#lib/components/resource-not-found.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
@@ -34,7 +33,7 @@
 	import { EditIcon, ProjectsIcon } from '#lib/icons/index.js';
 	import TabbedPageLayout from '#lib/layouts/tabbed-page-layout.svelte';
 	import { m } from '#lib/paraglide/messages.js';
-	import { containerDetailQuery } from '#lib/query/containers.js';
+	import { containerOwnershipQuery, containerDetailQuery } from '#lib/query/containers.js';
 	import { projectDetailQuery } from '#lib/query/projects.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { APIError } from '#lib/services/api-service.js';
@@ -45,21 +44,19 @@
 	import settingsStore from '#lib/stores/config-store.svelte.js';
 	import type { ContainerDetails, ContainerNetworkSettings, ContainerStats as ContainerStatsType } from '#lib/types/container.js';
 	import type { ProjectIncludeFile } from '#lib/types/project.js';
-	import type { DashboardWidgetConfig } from '#lib/types/user.js';
 	import { extractApiErrorMessage } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { runContainerLifecycleAction, confirmAndUpdateContainer } from '#lib/utils/container-actions.js';
 	import { isAutoUpdateLabelDisabled } from '#lib/utils/container-auto-update.js';
 	import { createContainerUpdateActivityTracker } from '#lib/utils/container-update-activities.js';
-	import { createDashboardWidget, pinDashboardAction } from '#lib/utils/dashboard-layout.js';
 	import { calculateMemoryUsage, getCustomHostname, getThemedIconUrl } from '#lib/utils/docker.js';
 	import { environmentHref, listScopes } from '#lib/utils/environments.js';
 	import { bytes } from '#lib/utils/formatting.js';
 	import { blockedUpdateTitle } from '#lib/utils/image-updates.js';
 	import { quadletUnitHref } from '#lib/utils/podman.js';
+	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
-	import ContainerCommitDialog from '../components/container-commit-dialog.svelte';
 	import ContainerComposePanel from '../components/container-compose-panel.svelte';
 	import ContainerConfiguration from '../components/container-configuration.svelte';
 	import ContainerDetailStatsSync from '../components/container-detail-stats-sync.svelte';
@@ -172,7 +169,6 @@
 		hasPermission('containers:update', currentEnvId) && !container?.composeInfo && !container?.redeployDisabled
 	);
 	const canKillContainer = $derived(hasPermission('containers:kill', currentEnvId));
-	const canCommitImage = $derived(hasPermission('images:commit', currentEnvId));
 	const canConvertToCompose = $derived(
 		hasPermission('projects:create', currentEnvId) &&
 			!container?.composeInfo &&
@@ -183,8 +179,6 @@
 	const isContainerPaused = $derived(containerStatus === 'paused');
 
 	let killDialogOpen = $state(false);
-	let commitDialogOpen = $state(false);
-	let releaseNotesOpen = $state(false);
 	let lifecycleStatus = $state<'pausing' | 'unpausing' | ''>('');
 	const isLifecycleActionPending = $derived(lifecycleStatus !== '');
 
@@ -192,9 +186,6 @@
 	// policy; an older agent that omits it reports no status rather than "up to date".
 	const updateInfo = $derived(hasPermission('image-updates:read', currentEnvId) ? (container?.updateInfo ?? null) : null);
 	const blockedTitle = $derived(blockedUpdateTitle(updateInfo));
-	const canReadReleaseNotes = $derived(
-		hasPermission('image-updates:read', currentEnvId) && !!container?.image && !container.image.startsWith('sha256:')
-	);
 	let updateLoading = $state(false);
 	let updateViewMounted = false;
 	const updateActivities = createContainerUpdateActivityTracker(
@@ -332,6 +323,12 @@
 			}
 		}
 	);
+	const swarmServiceId = $derived(container?.labels?.['com.docker.swarm.service.id'] ?? '');
+	const ownership = createQuery(() => ({
+		...containerOwnershipQuery({ environmentId: currentEnvId, containerId: container?.id ?? '' }),
+		enabled: !!swarmServiceId
+	}));
+
 	const quadletHref = $derived(quadletUnitHref(container?.labels, currentEnvId));
 	const composeServiceName = $derived(composeInfo?.serviceName ?? '');
 	const rootComposeFilename = $derived.by(() => {
@@ -487,39 +484,6 @@
 				onclick: isContainerPaused ? handleUnpauseContainer : handlePauseContainer
 			});
 		}
-		if (canReadReleaseNotes) {
-			list.push({
-				id: 'release-notes',
-				action: 'base',
-				label: m.image_update_release_notes_button(),
-				icon: FileTextIcon,
-				group: 'manage',
-				onclick: () => (releaseNotesOpen = true)
-			});
-		}
-		if (canCommitImage) {
-			list.push({
-				id: 'commit',
-				action: 'commit',
-				label: m.commit(),
-				group: 'manage',
-				onclick: () => (commitDialogOpen = true)
-			});
-		}
-		const target: DashboardWidgetConfig = {
-			resourceKind: 'containers',
-			environmentIds: [currentEnvId],
-			resourceId: container.id
-		};
-		list.push(pinDashboardAction('pin-dashboard', m.pin_to_dashboard(), () => createDashboardWidget('resource', target)));
-		if (showStats) {
-			list.push(
-				pinDashboardAction('pin-stats', m.pin_stats_to_dashboard(), () => createDashboardWidget('containerStats', target))
-			);
-		}
-		if (canViewLogs) {
-			list.push(pinDashboardAction('pin-logs', m.pin_logs_to_dashboard(), () => createDashboardWidget('containerLogs', target)));
-		}
 		if (canKillContainer && (isContainerRunning || isContainerPaused)) {
 			list.push({
 				id: 'kill',
@@ -544,7 +508,6 @@
 			class="size-5"
 			containerClass="size-9 shrink-0"
 		/>
-		<EnvironmentDestinationSelect value={currentEnvId} variant="prefix" readonly />
 		<h1 class="min-w-0 truncate font-semibold" title={containerDisplayName}>{containerDisplayName}</h1>
 		{#if container?.state}
 			<Badge variant={getStateBadgeVariant(container.state.status)} minWidth="20"
@@ -555,24 +518,6 @@
 			<Badge variant="amber" minWidth="20" title={blockedTitle}>{m.blocked()}</Badge>
 		{:else if updateInfo?.hasUpdate}
 			<Badge variant="amber" minWidth="20">{m.sidebar_update_available()}</Badge>
-		{/if}
-		{#if quadletHref}
-			<Badge variant="purple" size="sm" href={quadletHref} title={m.podman_quadlet_update_disabled()}>
-				{m.podman_managed_by_quadlet()}
-			</Badge>
-		{/if}
-		{#if project && composeInfo}
-			<Badge
-				variant="gray"
-				size="sm"
-				href={environmentHref(`/projects/${project.id}`, currentEnvId)}
-				title={m.projects_title()}
-				class="max-w-40"
-			>
-				<span class="block min-w-0 truncate">
-					{composeInfo.projectName}
-				</span>
-			</Badge>
 		{/if}
 	</div>
 {/snippet}
@@ -595,10 +540,54 @@
 	{/await}
 {/snippet}
 
+{#snippet containerOwnership()}
+	{#if swarmServiceId}<DetailSection title={m.stack_resources()}
+			><KeyValueGrid>
+				<KeyValueCard label={m.swarm_service()} valueFormat="custom"
+					>{#if ownership.data}{#if hasPermission('swarm-services:read', ownership.data.manager.id)}<a
+								class="text-primary-text hover:underline"
+								href={resourceDetailHref(
+									environmentHref(
+										`${resolve('/(app)/swarm/services/[serviceId]', { serviceId: swarmServiceId })}?cluster=${encodeURIComponent(ownership.data.manager.clusterId)}`,
+										ownership.data.manager.id
+									)
+								)}>{ownership.data.serviceName}</a
+							>{:else}<span>{ownership.data.serviceName}</span>{/if}{:else}<span role="status"
+							>{ownership.isFetching ? m.common_loading() : m.common_unavailable()}</span
+						>{/if}</KeyValueCard
+				>
+				{#if ownership.data?.stackName}<KeyValueCard label={m.swarm_stack()} valueFormat="custom"
+						>{#if hasPermission('swarm-stacks:read', ownership.data.manager.id)}<a
+								class="text-primary-text hover:underline"
+								href={resourceDetailHref(
+									environmentHref(
+										`${resolve('/(app)/swarm/stacks/[name]', { name: ownership.data.stackName })}?cluster=${encodeURIComponent(ownership.data.manager.clusterId)}`,
+										ownership.data.manager.id
+									)
+								)}>{ownership.data.stackName}</a
+							>{:else}<span>{ownership.data.stackName}</span>{/if}</KeyValueCard
+					>{/if}
+			</KeyValueGrid></DetailSection
+		>{/if}
+	{#if (project && composeInfo) || quadletHref}<DetailSection title={m.linked_resources()}
+			><KeyValueGrid
+				>{#if project && composeInfo}<KeyValueCard label={m.projects_title()} valueFormat="custom"
+						><a
+							class="text-primary-text hover:underline"
+							href={resourceDetailHref(environmentHref(`/projects/${project.id}`, currentEnvId))}>{composeInfo.projectName}</a
+						></KeyValueCard
+					>{/if}{#if quadletHref}<KeyValueCard label={m.podman_managed_by_quadlet()} valueFormat="custom"
+						><a class="text-primary-text hover:underline" href={quadletHref}>{m.podman_managed_by_quadlet()}</a></KeyValueCard
+					>{/if}</KeyValueGrid
+			></DetailSection
+		>{/if}
+{/snippet}
+
 {#snippet containerTabs(container: ContainerDetails, activeTab: string)}
 	<Tabs.Content value="overview" layout="panel">
 		<ContainerOverview
 			{container}
+			linkedResources={containerOwnership}
 			environmentId={currentEnvId}
 			{primaryIpAddress}
 			{autoUpdateEnabled}
@@ -734,18 +723,6 @@
 				killDialogOpen = false;
 				return refreshContainerDetails();
 			}}
-		/>
-	{/if}
-	{#if releaseNotesOpen && canReadReleaseNotes}
-		<ImageReleaseNotesDialog bind:open={releaseNotesOpen} environmentId={currentEnvId} imageRef={container.image} />
-	{/if}
-	{#if commitDialogOpen && canCommitImage}
-		<ContainerCommitDialog
-			bind:open={commitDialogOpen}
-			containerId={container.id}
-			containerName={containerDisplayName}
-			environmentId={currentEnvId}
-			onCommitted={refreshContainerDetails}
 		/>
 	{/if}
 {:else}

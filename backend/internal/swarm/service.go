@@ -116,6 +116,9 @@ var (
 			{Key: "serviceName", Fn: func(a, b types.SwarmTaskSummary) int { return strings.Compare(a.ServiceName, b.ServiceName) }},
 		},
 		FilterAccessors: []pagination.FilterAccessor[types.SwarmTaskSummary]{
+			{Key: "history", Fn: func(task types.SwarmTaskSummary, value string) bool {
+				return value != "active" || task.DesiredState != "shutdown" || task.CurrentState != "shutdown"
+			}},
 			{Key: "nodeName", Fn: func(task types.SwarmTaskSummary, value string) bool { return task.NodeName == value }},
 			{Key: "currentState", Fn: func(task types.SwarmTaskSummary, value string) bool { return task.CurrentState == value }},
 			{Key: "desiredState", Fn: func(task types.SwarmTaskSummary, value string) bool { return task.DesiredState == value }},
@@ -265,6 +268,12 @@ func (s *SwarmService) ListTasksPaginated(ctx context.Context, params pagination
 		return nil, pagination.Response{}, err
 	}
 
+	filters := map[string]string{"history": "active"}
+	maps.Copy(filters, params.Filters)
+	params.Filters = filters
+	if params.Filters["history"] != "all" {
+		params.Filters["history"] = "active"
+	}
 	return s.listTasksPaginatedWithFilters(ctx, nil, params)
 }
 
@@ -494,8 +503,10 @@ func (s *SwarmService) listTasksPaginatedWithFilters(ctx context.Context, filter
 	}
 
 	serviceNameByID := make(map[string]string, len(servicesResult.Items))
+	stackNameByServiceID := make(map[string]string, len(servicesResult.Items))
 	for _, service := range servicesResult.Items {
 		serviceNameByID[service.ID] = service.Spec.Name
+		stackNameByServiceID[service.ID] = service.Spec.Labels[types.SwarmStackNamespaceLabel]
 	}
 
 	nodesResult, err := s.dockerService.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.NodeListResult, error) {
@@ -532,6 +543,7 @@ func (s *SwarmService) listTasksPaginatedWithFilters(ctx context.Context, filter
 			continue
 		}
 		summary := types.NewSwarmTaskSummary(task, serviceNameByID[task.ServiceID], nodeNameByID[task.NodeID])
+		summary.StackName = stackNameByServiceID[task.ServiceID]
 		summary.MixedImageVersions = task.Status.State == swarm.TaskStateRunning && len(versions[task.ServiceID]) > 1
 		items = append(items, summary)
 	}
@@ -551,6 +563,7 @@ func taskUsesNetwork(task swarm.Task, networkID string) bool {
 
 func (s *SwarmService) AggregateTasks(ctx context.Context, params pagination.QueryParams) (types.Paginated[types.SwarmTaskSummary], error) {
 	values := url.Values{"start": {"0"}, "limit": {"-1"}}
+	values.Set("history", cmp.Or(params.Filters["history"], "active"))
 	if networkID := params.Filters["networkId"]; networkID != "" {
 		values.Set("networkId", networkID)
 		params.Filters = maps.Clone(params.Filters)

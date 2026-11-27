@@ -1,3 +1,4 @@
+import type { ContainerDetails } from '#lib/types/container.js';
 import type { SwarmNode, SwarmTaskSummary } from '#lib/types/swarm.js';
 import { instantEpochMilliseconds } from '#lib/utils/formatting.js';
 
@@ -58,4 +59,18 @@ export function getSwarmTaskContainerTarget(
 	)
 		return null;
 	return { environmentId: agent.environmentId, containerId: task.containerId };
+}
+
+export function isSwarmTaskContainerRunning(
+	task: Pick<SwarmTaskSummary, 'id' | 'containerId' | 'currentState'>,
+	container: Pick<ContainerDetails, 'id' | 'state' | 'labels'>
+): boolean {
+	return (
+		task.currentState === 'running' &&
+		!!task.containerId &&
+		container.id === task.containerId &&
+		container.labels?.['com.docker.swarm.task.id'] === task.id &&
+		container.state.running === true &&
+		container.state.status === 'running'
+	);
 }

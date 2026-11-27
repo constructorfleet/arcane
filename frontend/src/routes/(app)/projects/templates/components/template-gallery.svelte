@@ -31,7 +31,7 @@
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { templateService } from '#lib/services/template-service.js';
 	import type { Paginated } from '#lib/types/base.js';
-	import type { Template } from '#lib/types/template.js';
+	import type { Template, TemplateRegistry } from '#lib/types/template.js';
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { getThemedIconUrl } from '#lib/utils/docker.js';
@@ -44,9 +44,11 @@
 
 	let {
 		templates,
+		registries = [],
 		requestOptions = $bindable()
 	}: {
 		templates: Paginated<Template>;
+		registries?: TemplateRegistry[];
 		requestOptions: SearchPaginationSortRequest;
 	} = $props();
 
@@ -61,19 +63,31 @@
 
 	const columns = $derived([
 		{ accessorKey: 'name', title: m.common_name(), sortable: true, card: 'title', cell: TemplateName },
-		{ accessorKey: 'description', title: m.common_description(), sortable: true, card: 'field' },
 		{
 			id: 'type',
 			accessorFn: (item) => item.isRemote,
-			title: m.common_type(),
+			title: m.source(),
 			filterOptions: templateTypeFilters,
 			card: 'badge',
 			cell: TemplateSource
 		},
-		{ id: 'registry', accessorFn: (item) => item.registry?.name, title: m.common_registry(), card: 'context' },
+		{
+			id: 'registry',
+			accessorFn: (item) => item.registry?.name,
+			title: m.common_registry(),
+			hidden: true,
+			filterOptions: registries.map((registry) => ({ label: registry.name, value: registry.id }))
+		},
 		{ id: 'tags', accessorFn: (item) => item.metadata?.tags, title: m.common_tags(), card: 'badge', cell: TemplateTags },
 		{ id: 'author', accessorFn: (item) => item.metadata?.author, title: m.common_author(), card: 'hidden', hidden: true },
-		{ id: 'version', accessorFn: (item) => item.metadata?.version, title: m.common_version(), card: 'hidden', hidden: true }
+		{
+			id: 'version',
+			accessorFn: (item) => item.metadata?.version,
+			title: m.common_version(),
+			card: 'hidden',
+			hidden: true,
+			sortable: true
+		}
 	] satisfies ColumnSpec<Template>[]);
 
 	async function handleDeleteTemplate(template: Template) {
@@ -122,7 +136,7 @@
 {#snippet TemplateName({ item }: { item: Template })}
 	<a
 		class="flex min-w-0 items-center gap-2 font-medium hover:underline"
-		href={resourceDetailHref(resolve('/(app)/projects/templates/[id]', { id: item.id }))}
+		href={resourceDetailHref(resolve('/(app)/projects/templates/[id]', { id: item.id }) + '?tab=overview')}
 	>
 		<IconImage
 			src={getThemedIconUrl(item.metadata, mode.current) ?? item.metadata?.iconUrl}
@@ -130,19 +144,30 @@
 			class="size-4"
 			containerClass="size-7 shrink-0"
 		/>
-		<span class="truncate" title={item.name}>{item.name}</span>
+		<div class="min-w-0">
+			<span class="block truncate" title={item.name}>{item.name}</span>{#if item.description}<span
+					class="block max-w-80 truncate text-xs font-normal text-muted-foreground"
+					title={item.description}>{item.description}</span
+				>{/if}
+		</div>
 	</a>
 {/snippet}
 
 {#snippet TemplateSource({ item }: { item: Template })}
-	<Badge variant={item.isRemote ? 'blue' : 'gray'}>{item.isRemote ? m.templates_remote() : m.local()}</Badge>
+	<div class="space-y-1">
+		<Badge variant={item.isRemote ? 'blue' : 'gray'}>{item.isRemote ? m.templates_remote() : m.local()}</Badge
+		>{#if item.registry?.name}<div class="max-w-48 truncate text-xs text-muted-foreground" title={item.registry.name}>
+				{item.registry.name}
+			</div>{/if}
+	</div>
 {/snippet}
 
 {#snippet TemplateTags({ item }: { item: Template })}
 	<div class="flex flex-wrap gap-1">
-		{#each withOccurrenceKeys(item.metadata?.tags ?? []) as tag (tag.key)}
+		{#each withOccurrenceKeys((item.metadata?.tags ?? []).slice(0, 3)) as tag (tag.key)}
 			<Badge variant="outline">{tag.value}</Badge>
 		{/each}
+		{#if (item.metadata?.tags?.length ?? 0) > 3}<Badge variant="outline">+{item.metadata!.tags!.length - 3}</Badge>{/if}
 	</div>
 {/snippet}
 
@@ -153,7 +178,7 @@
 			: undefined}
 	<RowActionsMenu name={item.name}>
 		<DetailLinksMenu
-			href={resourceDetailHref(resolve('/(app)/projects/templates/[id]', { id: item.id }))}
+			href={resourceDetailHref(resolve('/(app)/projects/templates/[id]', { id: item.id }) + '?tab=overview')}
 			tabs={[
 				{ value: 'overview', label: m.common_overview() },
 				{ value: 'compose', label: m.compose(), icon: CodeIcon },
@@ -161,7 +186,7 @@
 					value: 'env',
 					label: m.common_environment_variables(),
 					icon: FileTextIcon,
-					visible: !!item.envContent || !!item.metadata?.envUrl
+					visible: item.isRemote && (!!item.envContent || !!item.metadata?.envUrl)
 				}
 			]}
 		/>

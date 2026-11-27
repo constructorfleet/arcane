@@ -9,6 +9,7 @@
 	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import { DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
+	import { swarmManagerQueryOptions } from '#lib/components/swarm/swarm-environments.js';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
@@ -25,7 +26,9 @@
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { isSwarmGatewayBridge } from '#lib/utils/docker.js';
 	import { collectAcrossEnvironments } from '#lib/utils/environments.js';
+	import { environmentHref } from '#lib/utils/environments.js';
 	import { formatDateTimeShort } from '#lib/utils/formatting.js';
+	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	import NetworkSwarmResources from '../components/network-swarm-resources.svelte';
@@ -37,6 +40,16 @@
 	let isRemoving = $state(false);
 
 	const network = $derived(data.network);
+	const ownerName = $derived(network?.labels?.['com.docker.stack.namespace'] ?? '');
+	const ownerManager = createQuery(() => ({
+		...swarmManagerQueryOptions({
+			environmentId: data.envId,
+			clusterId: network?.clusterId,
+			nodeId: network?.nodeId,
+			permission: 'swarm-stacks:read'
+		}),
+		enabled: !!ownerName
+	}));
 	const shortId = $derived(network?.id?.substring(0, 12) ?? m.common_unknown());
 	const createdDate = $derived(network?.created ? formatDateTimeShort(network.created) : m.common_unknown());
 
@@ -254,21 +267,7 @@
 		<div class="flex min-h-9 min-w-0 items-center gap-2">
 			<NetworksIcon class="size-5 shrink-0 text-primary" />
 			<h1 class="min-w-0 truncate font-semibold" title={network.name}>{network.name}</h1>
-			<Badge variant="secondary" mono title={network.id}>{m.common_id()}: {shortId}</Badge>
-			{#if network.labels?.['com.docker.stack.namespace']}
-				<Badge variant="secondary">{m.swarm_stack_namespace({ namespace: network.labels['com.docker.stack.namespace'] })}</Badge>
-			{/if}
-			{#if swarmGateway}
-				<Badge variant="blue">{m.network_swarm_gateway()}</Badge>
-			{:else if !swarmScoped}
-				<Badge variant={inUse ? 'green' : 'amber'}>
-					{inUse ? m.networks_in_use_count({ count: localContainerCount }) : m.common_unused()}
-				</Badge>
-			{/if}
-			{#if isPredefined}
-				<Badge variant="blue">{m.networks_predefined()}</Badge>
-			{/if}
-			<Badge variant="purple">{network.driver ?? m.common_unknown()}</Badge>
+			{#if !swarmScoped}<Badge variant={inUse ? 'green' : 'amber'}>{inUse ? m.common_in_use() : m.common_unused()}</Badge>{/if}
 		</div>
 	{/snippet}
 	{#snippet headerActions()}<ActionButtonGroup buttons={actions} />{/snippet}
@@ -302,6 +301,14 @@
 				>
 					<KeyValueGrid>
 						<KeyValueCard label={m.common_id()}>{network.id}</KeyValueCard>
+						<KeyValueCard label={m.common_driver()} valueFormat="text">{network.driver ?? m.common_unknown()}</KeyValueCard>
+						{#if network.labels?.['com.docker.stack.namespace']}<KeyValueCard label={m.namespace()} valueFormat="text"
+								>{network.labels['com.docker.stack.namespace']}</KeyValueCard
+							>{/if}
+						{#if swarmGateway}<KeyValueCard label={m.network_swarm_gateway()} valueFormat="text">{m.common_yes()}</KeyValueCard
+							>{/if}
+						{#if isPredefined}<KeyValueCard label={m.networks_predefined()} valueFormat="text">{m.common_yes()}</KeyValueCard
+							>{/if}
 						<KeyValueCard label={m.common_scope()} valueFormat="text">{network.scope ?? m.common_unknown()}</KeyValueCard>
 						<KeyValueCard label={m.common_created()} valueFormat="text">{createdDate}</KeyValueCard>
 					</KeyValueGrid>
@@ -315,6 +322,23 @@
 						</div>
 					{/if}
 				</DetailSection>
+				{#if ownerName}<DetailSection title={m.linked_resources()}
+						><KeyValueGrid
+							><KeyValueCard label={m.swarm_stack()} valueFormat="custom"
+								>{#if ownerManager.data}<a
+										class="text-primary-text hover:underline"
+										href={resourceDetailHref(
+											environmentHref(
+												`${resolve('/(app)/swarm/stacks/[name]', { name: ownerName })}?cluster=${encodeURIComponent(ownerManager.data.clusterId)}`,
+												ownerManager.data.id
+											)
+										)}>{ownerName}</a
+									>{:else}<span>{ownerName}</span><span class="ml-2 text-xs text-muted-foreground" role="status"
+										>{ownerManager.isPending ? m.common_loading() : m.common_unavailable()}</span
+									>{/if}</KeyValueCard
+							></KeyValueGrid
+						></DetailSection
+					>{/if}
 				{@render networkIpam(network)}
 				{@render keyValueSection(m.common_labels(), TagIcon, network.labels)}
 				{@render keyValueSection(m.networks_options_title(), SettingsIcon, network.options)}

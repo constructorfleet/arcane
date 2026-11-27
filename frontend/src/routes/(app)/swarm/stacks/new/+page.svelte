@@ -310,10 +310,15 @@
 				),
 			failureMessage: (name) => m.common_update_failed({ resource: `${m.swarm_stack()} "${name}"` }),
 			onSuccess: async (_result, { name }) => {
-				toast.success(m.common_update_success({ resource: `${m.swarm_stack()} "${name}"` }));
-				goto(resolve(`/(app)/swarm/stacks/[name]?env=${encodeURIComponent(destinationId)}`, { name: encodeURIComponent(name) }), {
-					refreshAll: true
-				});
+				toast.success(m.saved_not_deployed());
+				goto(
+					resolve(`/(app)/swarm/stacks/[name]?env=${encodeURIComponent(destinationId)}&tab=source`, {
+						name: encodeURIComponent(name)
+					}),
+					{
+						refreshAll: true
+					}
+				);
 			}
 		});
 	}

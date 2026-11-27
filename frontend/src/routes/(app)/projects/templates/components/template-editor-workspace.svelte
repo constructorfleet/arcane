@@ -39,7 +39,8 @@
 		saving = false,
 		lockNameAndDescription = false,
 		onSubmit,
-		toolbarActions
+		toolbarActions,
+		embedded = false
 	}: {
 		inputs: FormInputs<NamedTemplateValues>;
 		validation: ValidationState;
@@ -52,6 +53,7 @@
 		lockNameAndDescription?: boolean;
 		onSubmit: () => void;
 		toolbarActions: Snippet;
+		embedded?: boolean;
 	} = $props();
 
 	let nameInputRef = $state<HTMLInputElement | null>(null);
@@ -60,43 +62,44 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col">
-	<div class="sticky top-0 mb-2 border-b">
-		<div class="mx-auto flex h-16 max-w-full items-center justify-between gap-4 px-6">
-			<div class="flex min-w-0 items-center gap-4">
-				<ArcaneButton
-					action="base"
-					tone="ghost"
-					class="gap-2 bg-transparent"
-					icon={ArrowLeftIcon}
-					customLabel={m.common_back()}
-					onclick={() => goto(resolve('/(app)/projects/templates'))}
-				/>
-				<div class="hidden h-4 w-px bg-border sm:block"></div>
-				<div class="hidden min-w-0 items-center gap-3 sm:flex">
-					<EditableName
-						bind:value={inputs.name.value}
-						bind:ref={nameInputRef}
-						variant="inline"
-						error={inputs.name.error ?? undefined}
-						originalValue={originalName}
-						placeholder={m.templates_template_name_placeholder()}
-						canEdit={!saving && !lockNameAndDescription}
-						disabledMessage={lockedMessage}
-						class="hidden sm:block"
+	{#if !embedded}
+		<div class="sticky top-0 mb-2 border-b">
+			<div class="mx-auto flex h-16 max-w-full items-center justify-between gap-4 px-6">
+				<div class="flex min-w-0 items-center gap-4">
+					<ArcaneButton
+						action="base"
+						tone="ghost"
+						class="gap-2 bg-transparent"
+						icon={ArrowLeftIcon}
+						customLabel={m.common_back()}
+						onclick={() => goto(resolve('/(app)/projects/templates'))}
 					/>
+					<div class="hidden h-4 w-px bg-border sm:block"></div>
+					<div class="hidden min-w-0 items-center gap-3 sm:flex">
+						<EditableName
+							bind:value={inputs.name.value}
+							bind:ref={nameInputRef}
+							variant="inline"
+							error={inputs.name.error ?? undefined}
+							originalValue={originalName}
+							placeholder={m.templates_template_name_placeholder()}
+							canEdit={!saving && !lockNameAndDescription}
+							disabledMessage={lockedMessage}
+							class="hidden sm:block"
+						/>
+					</div>
+				</div>
+
+				<div class="flex items-center gap-2">
+					{@render toolbarActions()}
 				</div>
 			</div>
-
-			<div class="flex items-center gap-2">
-				{@render toolbarActions()}
-			</div>
 		</div>
-	</div>
-
+	{/if}
 	<div class="flex min-h-0 flex-1 overflow-hidden">
 		<div class="mx-auto flex h-full w-full max-w-full min-w-0 flex-col px-2 pb-6 sm:px-6 sm:pb-6">
 			<form class="flex min-h-0 flex-1 flex-col gap-4" onsubmit={preventDefault(onSubmit)}>
-				<div class="block flex-shrink-0 py-4 sm:hidden">
+				<div class={embedded ? 'block flex-shrink-0 py-4' : 'block flex-shrink-0 py-4 sm:hidden'}>
 					<EditableName
 						bind:value={inputs.name.value}
 						bind:ref={nameInputRef}

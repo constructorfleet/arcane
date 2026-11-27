@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { useQueryClient } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
+	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import type { ColumnSpec, MobileFieldVisibility } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
@@ -19,7 +19,6 @@
 		StopIcon,
 		PauseIcon,
 		PlayIcon,
-		InspectIcon,
 		NetworksIcon,
 		ContainersIcon,
 		VolumesIcon,
@@ -42,7 +41,7 @@
 		type EnvironmentPage,
 		type EnvironmentRow
 	} from '#lib/utils/environments.js';
-	import { capitalizeFirstLetter } from '#lib/utils/formatting.js';
+	import { capitalizeFirstLetter, formatRelativeTime } from '#lib/utils/formatting.js';
 	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
@@ -215,7 +214,7 @@
 	function nodeDetailsHref(node: NodeRow) {
 		if (!hasPermission('swarm-nodes:read', node.environmentId)) return undefined;
 		return resourceTableHref(
-			environmentHref(resolve('/(app)/swarm/nodes/[nodeId]', { nodeId: node.id }), node.environmentId),
+			environmentHref(resolve('/(app)/swarm/nodes/[nodeId]', { nodeId: node.id }) + '?tab=overview', node.environmentId),
 			requestOptions.pagination?.page
 		);
 	}
@@ -278,9 +277,31 @@
 	const columns = [
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
 		{ accessorKey: 'hostname', title: m.hostname(), sortable: true, cell: HostnameCell },
-		{ accessorKey: 'role', title: m.common_role(), sortable: true, cell: RoleCell },
-		{ accessorKey: 'status', title: m.common_status(), sortable: true, cell: StatusCell },
-		{ accessorKey: 'availability', title: m.swarm_availability(), sortable: true, cell: AvailabilityCell },
+		{
+			accessorKey: 'role',
+			title: m.common_role(),
+			sortable: true,
+			cell: RoleCell,
+			filterOptions: [
+				{ label: m.manager(), value: 'manager' },
+				{ label: m.worker(), value: 'worker' },
+				{ label: m.leader(), value: 'leader' }
+			]
+		},
+		{
+			accessorKey: 'status',
+			title: m.common_status(),
+			sortable: true,
+			cell: StatusCell,
+			filterOptions: ['ready', 'down', 'unknown', 'disconnected'].map((value) => ({ label: value, value }))
+		},
+		{
+			accessorKey: 'availability',
+			title: m.scheduling(),
+			sortable: true,
+			cell: AvailabilityCell,
+			filterOptions: ['active', 'drain', 'pause'].map((value) => ({ label: value, value }))
+		},
 		{
 			id: 'agentId',
 			hidden: true,
@@ -297,13 +318,19 @@
 			accessorFn: (node) => node.agent?.state ?? 'none',
 			cell: AgentConnectionCell
 		},
-		{ accessorKey: 'engineVersion', title: m.swarm_engine_version(), sortable: true }
+		{ accessorKey: 'runningTasks', title: m.running_tasks(), hidden: true, sortable: true, cell: RunningTasksCell },
+		{ accessorKey: 'engineVersion', title: m.swarm_engine_version(), hidden: true },
+		{ accessorKey: 'platform', title: m.platform(), hidden: true },
+		{ accessorKey: 'address', title: m.swarm_node_address(), hidden: true },
+		{ accessorKey: 'reachability', title: m.swarm_node_reachability(), hidden: true },
+		{ accessorKey: 'createdAt', id: 'created', title: m.common_created(), hidden: true, cell: DateCell, sortable: true },
+		{ accessorKey: 'updatedAt', id: 'updated', title: m.common_updated(), hidden: true, cell: DateCell, sortable: true }
 	] satisfies ColumnSpec<NodeRow>[];
 
 	const mobileFields = [
 		{ id: 'role', label: m.common_role(), defaultVisible: true },
 		{ id: 'status', label: m.common_status(), defaultVisible: true },
-		{ id: 'availability', label: m.swarm_availability(), defaultVisible: true },
+		{ id: 'availability', label: m.scheduling(), defaultVisible: true },
 		{ id: 'agentId', label: m.swarm_node_agent_environment_id(), defaultVisible: false },
 		{ id: 'agent', label: m.swarm_node_agent_connection(), defaultVisible: false },
 		{ id: 'engineVersion', label: m.swarm_engine_version(), defaultVisible: false }
@@ -326,8 +353,17 @@
 	{/if}
 {/snippet}
 
-{#snippet RoleCell({ value }: { value: unknown })}
-	<span class="text-sm">{capitalizeFirstLetter(String(value ?? ''))}</span>
+{#snippet RunningTasksCell({ value }: { value: unknown })}{typeof value === 'number' ? value : m.unavailable()}{/snippet}
+
+{#snippet DateCell({ value }: { value: unknown })}
+	{formatRelativeTime(String(value ?? ''))}
+{/snippet}
+
+{#snippet RoleCell({ item }: { item: NodeRow })}
+	<div class="flex gap-1">
+		<Badge variant={item.role === 'manager' ? 'purple' : 'blue'}>{capitalizeFirstLetter(item.role)}</Badge
+		>{#if item.role === 'manager' && item.managerStatus === 'leader'}<Badge variant="green">{m.leader()}</Badge>{/if}
+	</div>
 {/snippet}
 
 {#snippet StatusCell({ value }: { value: unknown })}
@@ -337,6 +373,8 @@
 {#snippet AvailabilityCell({ value }: { value: unknown })}
 	<Badge variant={availabilityVariant(String(value ?? ''))} minWidth="20">{String(value ?? m.common_unknown())}</Badge>
 {/snippet}
+
+{#snippet MobileRole(item: NodeRow)}{@render RoleCell({ item })}{/snippet}
 
 {#snippet AgentIdCell({ value }: { value: unknown })}
 	{@const agentId = typeof value === 'string' ? value : ''}
@@ -377,13 +415,15 @@
 		fields={[
 			{
 				label: m.common_role(),
-				getValue: (item: NodeRow) => capitalizeFirstLetter(item.role),
+				getValue: (item: NodeRow) => item,
+				type: 'component',
+				component: MobileRole,
 				icon: EnvironmentsIcon,
 				iconVariant: 'gray' as const,
 				show: mobileFieldVisibility['role'] ?? true
 			},
 			{
-				label: m.swarm_availability(),
+				label: m.scheduling(),
 				getValue: (item: NodeRow) => capitalizeFirstLetter(item.availability),
 				icon: EnvironmentsIcon,
 				iconVariant: 'gray' as const,
@@ -405,23 +445,24 @@
 	<RowActionsMenu name={item.hostname}>
 		{@const detailsHref = nodeDetailsHref(item)}
 		{#if detailsHref}
-			<DropdownMenu.Item onclick={() => goto(detailsHref)}><InspectIcon />{m.common_inspect()}</DropdownMenu.Item>
-			{#each nodeResourceViews as view (view.id)}
-				{#if item.agent?.environmentId && hasPermission(`${view.id}:list`, item.agent.environmentId)}
-					<DropdownMenu.Item onclick={() => goto(detailsHref + `&tab=resources&resource=${view.id}`)}
-						><view.icon />{view.label}</DropdownMenu.Item
-					>
-				{/if}
-			{/each}
-			<DropdownMenu.Item onclick={() => goto(detailsHref + '&tab=host')}>{m.swarm_node_hardware_host()}</DropdownMenu.Item>
-			<DropdownMenu.Item onclick={() => goto(detailsHref + '&tab=docker')}>{m.engine()}</DropdownMenu.Item>
-			<DropdownMenu.Item onclick={() => goto(detailsHref + '&tab=agent')}
-				><AgentConnectionIcon />{m.resource_view_agent()}</DropdownMenu.Item
-			>
-			<DropdownMenu.Item onclick={() => goto(detailsHref + '&tab=resources&resource=tasks')}>
-				<JobsIcon class="size-4" />
-				{m.view_tasks()}
-			</DropdownMenu.Item>
+			<DetailLinksMenu
+				href={detailsHref}
+				tabs={[
+					{ value: 'overview', label: m.common_overview() },
+					{ value: 'host', label: m.swarm_node_hardware_host(), icon: EnvironmentsIcon },
+					{ value: 'docker', label: m.engine(), icon: ContainersIcon },
+					{ value: 'agent', label: m.agent(), icon: AgentConnectionIcon },
+					{ value: 'tasks', label: m.tasks(), icon: JobsIcon, related: true },
+					...nodeResourceViews.map((view) => ({
+						value: view.id,
+						label: view.label,
+						icon: view.icon,
+						related: true,
+						href: detailsHref + '&tab=resources&resource=' + view.id,
+						visible: !!item.agent?.environmentId && hasPermission(view.id + ':list', item.agent.environmentId)
+					}))
+				]}
+			/>
 		{/if}
 		{#if canUpdateNode(item)}
 			<DropdownMenu.Item onclick={() => openAgentDialog(item)}>

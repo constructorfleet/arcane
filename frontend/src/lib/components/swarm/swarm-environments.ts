@@ -1,9 +1,13 @@
+import type { QueryFunctionContext } from '@tanstack/svelte-query';
+
+import { m } from '#lib/paraglide/messages.js';
 import { queryKeys } from '#lib/query/query-keys.js';
 import { swarmService } from '#lib/services/swarm-service.js';
 import { environmentStore, type EnvironmentRef } from '#lib/stores/environment.store.svelte.js';
 import { hasPermission } from '#lib/utils/auth.js';
 import {
 	readableEnvironments,
+	collectAcrossEnvironments,
 	readEachEnvironment,
 	sumAcrossEnvironments,
 	type EnvironmentFailure
@@ -58,5 +62,46 @@ export function swarmEnvironmentsQueryOptions(permission: string, { all = false 
 			all
 		],
 		queryFn: () => loadSwarmEnvironments(permission, { all })
+	};
+}
+export function swarmManagerQueryOptions(scope: {
+	environmentId: string;
+	clusterId?: string;
+	nodeId?: string;
+	permission: string;
+}) {
+	return {
+		queryKey: ['swarm', 'resource-manager', scope.environmentId, scope.clusterId ?? '', scope.nodeId ?? '', scope.permission],
+		queryFn: async ({ client, signal }: QueryFunctionContext): Promise<(EnvironmentRef & { clusterId: string }) | null> => {
+			const inventory = await client.fetchQuery({
+				...swarmEnvironmentsQueryOptions(scope.permission, { all: true }),
+				staleTime: 30_000
+			});
+			const clusterId = scope.clusterId || inventory.clusterIds?.get(scope.environmentId);
+			if (clusterId) {
+				const candidates = inventory.managers.filter((manager) => inventory.clusterIds?.get(manager.id) === clusterId);
+				const manager = candidates.find((candidate) => candidate.id === scope.environmentId) ?? candidates[0];
+				return manager ? { ...manager, clusterId } : null;
+			}
+			if (!scope.nodeId) return null;
+			const candidates = inventory.environments.filter((manager) => hasPermission('swarm-nodes:read', manager.id));
+			const observations = [];
+			for (let start = 0; start < candidates.length; start += 4) {
+				observations.push(
+					await collectAcrossEnvironments(candidates.slice(start, start + 4), (manager, config) =>
+						swarmService.getNode(scope.nodeId!, manager, { ...config, signal })
+					)
+				);
+			}
+			const values = observations.flatMap((observation) => observation.values);
+			const failures = observations.flatMap((observation) => observation.failures);
+			const matches = values.filter(({ value }) => value.id === scope.nodeId);
+			if (matches.length > 1) throw new Error(m.resource_cluster_unverified());
+			const match = matches[0];
+			const resolvedCluster = match && inventory.clusterIds?.get(match.environment.id);
+			if (match && resolvedCluster) return { ...match.environment, clusterId: resolvedCluster };
+			if (failures.length > 0) throw new Error(failures.map(({ message }) => message).join('\n'));
+			return null;
+		}
 	};
 }

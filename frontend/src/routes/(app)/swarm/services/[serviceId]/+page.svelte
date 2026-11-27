@@ -10,8 +10,8 @@
 	import ResourceNotFound from '#lib/components/resource-not-found.svelte';
 	import SheetFooterActions from '#lib/components/sheets/sheet-footer-actions.svelte';
 	import { confirmForceUpdateService } from '#lib/components/swarm/force-update-service.js';
+	import SwarmKvScopedPanel from '#lib/components/swarm/swarm-kv-scoped-panel.svelte';
 	import { type TabItem } from '#lib/components/tab-bar/index.js';
-	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import * as ResponsiveDialog from '#lib/components/ui/responsive-dialog/index.js';
@@ -34,6 +34,7 @@
 	import { swarmService } from '#lib/services/swarm-service.js';
 	import type {
 		SwarmServiceInspect,
+		SwarmResourceReference,
 		SwarmServiceModeSpec,
 		SwarmServiceMount,
 		SwarmServiceNetworkDetail,
@@ -49,12 +50,7 @@
 	} from '#lib/types/ui/swarm.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
-	import {
-		getSwarmServiceModeFromSpec,
-		getSwarmServiceModeLabel,
-		getSwarmServiceModeVariant,
-		isSwarmServiceModeScalable
-	} from '#lib/utils/docker.js';
+	import { getSwarmServiceModeFromSpec, isSwarmServiceModeScalable } from '#lib/utils/docker.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	import ScopedTasksPanel from '../../tasks/components/scoped-tasks-panel.svelte';
@@ -75,6 +71,8 @@
 	let editOpen = $state(false);
 
 	type ServiceContainerSpecShape = {
+		Secrets?: { SecretID: string; SecretName: string; File?: { Name: string } }[];
+		Configs?: { ConfigID: string; ConfigName: string; File?: { Name: string } }[];
 		Image?: string;
 		Env?: string[];
 		Mounts?: RawSwarmServiceMount[];
@@ -99,6 +97,12 @@
 	const containerSpec = $derived(spec?.TaskTemplate?.ContainerSpec);
 	const serviceName = $derived(spec?.Name || '');
 	const serviceImage = $derived(containerSpec?.Image || '');
+	const secretReferences = $derived<SwarmResourceReference[]>(
+		(containerSpec?.Secrets ?? []).map((ref) => ({ id: ref.SecretID, name: ref.SecretName, target: ref.File?.Name }))
+	);
+	const configReferences = $derived<SwarmResourceReference[]>(
+		(containerSpec?.Configs ?? []).map((ref) => ({ id: ref.ConfigID, name: ref.ConfigName, target: ref.File?.Name }))
+	);
 
 	const serviceMode = $derived(getSwarmServiceModeFromSpec(spec?.Mode));
 	const showsReplicas = $derived(isSwarmServiceModeScalable(serviceMode));
@@ -248,7 +252,13 @@
 		{ value: 'tasks', label: m.tasks(), icon: JobsIcon },
 		...(showConfiguration ? [{ value: 'config', label: m.common_configuration(), icon: SettingsIcon }] : []),
 		{ value: 'network', label: m.resource_networks_cap(), icon: NetworksIcon },
-		{ value: 'storage', label: m.storage(), icon: VolumesIcon }
+		{ value: 'storage', label: m.resource_volumes_cap(), icon: VolumesIcon },
+		...(hasPermission('swarm-secrets:list', envId)
+			? [{ value: 'secrets', label: m.swarm_secrets_title(), icon: FileTextIcon }]
+			: []),
+		...(hasPermission('swarm-configs:list', envId)
+			? [{ value: 'configs', label: m.swarm_configs_title(), icon: FileTextIcon }]
+			: [])
 	]);
 
 	const urlTab = useUrlTab({ history: true, validTabs: () => tabItems.map((tab) => tab.value), defaultTab: () => 'overview' });
@@ -373,12 +383,6 @@
 				<h1 class="min-w-0 truncate text-sm font-semibold" title={serviceName}>
 					{serviceName}
 				</h1>
-				<Badge variant={getSwarmServiceModeVariant(serviceMode)} minWidth="20">{getSwarmServiceModeLabel(serviceMode)}</Badge>
-				{#if showsReplicas}
-					<Badge variant="secondary">
-						{m.resource_header_count({ resource: m.swarm_replicas(), count: desiredReplicas })}
-					</Badge>
-				{/if}
 			</div>
 		{/snippet}
 
@@ -390,7 +394,7 @@
 
 		{#snippet tabContent(_activeTab)}
 			<Tabs.Content value="overview">
-				<ServiceOverview {service} {serviceName} {serviceImage} {serviceMode} {desiredReplicas} {labels} />
+				<ServiceOverview {service} {serviceName} {serviceImage} {serviceMode} {desiredReplicas} {labels} environmentId={envId} />
 			</Tabs.Content>
 
 			<Tabs.Content value="logs" class="h-full">
@@ -431,6 +435,20 @@
 			<Tabs.Content value="storage" layout="table">
 				<ServiceStorage {mounts} environmentId={envId} serviceId={service.id} />
 			</Tabs.Content>
+			<Tabs.Content value="secrets" layout="table"
+				>{#if selectedTab === 'secrets'}<SwarmKvScopedPanel
+						kind="secrets"
+						environmentId={envId}
+						references={secretReferences}
+					/>{/if}</Tabs.Content
+			>
+			<Tabs.Content value="configs" layout="table"
+				>{#if selectedTab === 'configs'}<SwarmKvScopedPanel
+						kind="configs"
+						environmentId={envId}
+						references={configReferences}
+					/>{/if}</Tabs.Content
+			>
 		{/snippet}
 	</TabbedPageLayout>
 

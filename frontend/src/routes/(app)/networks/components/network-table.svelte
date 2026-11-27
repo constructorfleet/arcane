@@ -20,7 +20,7 @@
 </script>
 
 <script lang="ts">
-	import { useQueryClient } from '@tanstack/svelte-query';
+	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
@@ -31,10 +31,11 @@
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import { EmptyState } from '#lib/components/states/index.js';
+	import { swarmEnvironmentsQueryOptions } from '#lib/components/swarm/swarm-environments.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { DEFAULT_NETWORK_NAMES } from '#lib/constants.js';
-	import { NetworksIcon, GlobeIcon, TrashIcon, LayersIcon, JobsIcon } from '#lib/icons/index.js';
+	import { NetworksIcon, TrashIcon, LayersIcon, JobsIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { networkService } from '#lib/services/network-service.js';
@@ -46,9 +47,10 @@
 	import { bulkConfirmAndRun } from '#lib/utils/bulk-actions.js';
 	import { isSwarmGatewayBridge } from '#lib/utils/docker.js';
 	import { type EnvironmentPage, type EnvironmentRow, hasShownPermission, rowKey } from '#lib/utils/environments.js';
-	import { capitalizeFirstLetter } from '#lib/utils/formatting.js';
+	import { capitalizeFirstLetter, formatRelativeTime } from '#lib/utils/formatting.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
+	import { networkSource } from '../network-table.helpers';
 	type FieldVisibility = Record<string, boolean>;
 	type NetworkRow = EnvironmentRow<NetworkSummary>;
 	type NetworkPage = EnvironmentPage<NetworksPaginatedResponse>;
@@ -70,6 +72,7 @@
 	} = $props();
 
 	const queryClient = useQueryClient();
+	const sourceManagers = createQuery(() => swarmEnvironmentsQueryOptions('swarm-stacks:read', { all: true }));
 
 	const isLoading = $state({
 		remove: false
@@ -170,36 +173,56 @@
 		return { variant: 'amber', text: m.common_unused() };
 	}
 
+	function sourceText(item: NetworkSummary): string {
+		const source = networkSource(item);
+		switch (source.kind) {
+			case 'stack':
+				return source.name;
+			case 'docker':
+				return m.docker();
+			case 'system':
+				return m.system();
+			default:
+				return m.common_unknown();
+		}
+	}
+
+	function stackOwnerHref(item: NetworkRow): string | undefined {
+		const source = networkSource(item);
+		if (source.kind !== 'stack') return undefined;
+		const manager = sourceManagers.data?.managers.find(
+			(manager) =>
+				sourceManagers.data?.clusterIds?.get(manager.id) === source.clusterId && hasPermission('swarm-stacks:read', manager.id)
+		);
+		if (!manager) return undefined;
+		return resourceDetailHref(
+			resolve(
+				`/(app)/swarm/stacks/[name]?env=${encodeURIComponent(manager.id)}&cluster=${encodeURIComponent(source.clusterId)}`,
+				{ name: source.name }
+			)
+		);
+	}
+
 	const columns = $derived([
-		...(showEnvironment ? environmentColumns<NetworkRow>().map((column) => ({ ...column, title: m.query_agent() })) : []),
+		...(showEnvironment
+			? environmentColumns<NetworkRow>().map((column) => ({ ...column, title: m.query_connection(), hidden: true }))
+			: []),
 		{ accessorKey: 'id', title: m.common_id(), cell: IdCell, hidden: true },
 		{ accessorKey: 'name', title: m.common_name(), sortable: true, cell: NameCell },
 		{ accessorKey: 'inUse', title: m.common_status(), sortable: true, cell: StatusCell },
-		{ accessorKey: 'driver', title: m.common_driver(), sortable: true, cell: DriverCell },
-		{ accessorKey: 'scope', title: m.common_scope(), sortable: true, cell: ScopeCell },
-		{
-			id: 'subnet',
-			accessorFn: (row) => ipamValues(row, 'subnet').join(', '),
-			title: m.common_subnet(),
-			sortable: true,
-			cell: SubnetCell
-		},
-		{
-			id: 'gateway',
-			accessorFn: (row) => ipamValues(row, 'gateway').join(', '),
-			title: m.common_gateway(),
-			sortable: true,
-			cell: GatewayCell
-		}
+		{ id: 'source', title: m.source(), cell: SourceCell },
+		{ accessorKey: 'driver', title: m.driver_scope(), sortable: true, cell: DriverCell },
+		{ id: 'addressing', title: m.addressing(), cell: AddressingCell },
+		{ accessorKey: 'created', title: m.common_created(), hidden: true, sortable: true, cell: CreatedCell }
 	] satisfies ColumnSpec<NetworkRow>[]);
 
 	const mobileFields = [
 		{ id: 'id', label: m.common_id(), defaultVisible: false },
 		{ id: 'inUse', label: m.common_status(), defaultVisible: true },
-		{ id: 'driver', label: m.common_driver(), defaultVisible: true },
-		{ id: 'scope', label: m.common_scope(), defaultVisible: true },
-		{ id: 'subnet', label: m.common_subnet(), defaultVisible: true },
-		{ id: 'gateway', label: m.common_gateway(), defaultVisible: true }
+		{ id: 'source', label: m.source(), defaultVisible: true },
+		{ id: 'driver', label: m.driver_scope(), defaultVisible: true },
+		{ id: 'addressing', label: m.addressing(), defaultVisible: true },
+		{ id: 'created', label: m.common_created(), defaultVisible: false }
 	];
 
 	const bulkActions = $derived.by<BulkAction[]>(() => {
@@ -228,39 +251,30 @@
 	<span class="truncate font-mono text-sm">{String(item.id)}</span>
 {/snippet}
 
+{#snippet SourceCell({ item }: { item: NetworkRow })}{@const href = stackOwnerHref(item)}{#if href}<a
+			class="text-sm text-primary-text hover:underline"
+			{href}>{sourceText(item)}</a
+		>{:else}<span class="text-sm text-muted-foreground">{sourceText(item)}</span>{/if}
+{/snippet}
 {#snippet DriverCell({ item }: { item: NetworkRow })}
-	<span class="text-sm text-muted-foreground">{capitalizeFirstLetter(item.driver)}</span>
+	<div class="flex flex-col text-sm">
+		<span>{capitalizeFirstLetter(item.driver)}</span><span class="text-xs text-muted-foreground"
+			>{capitalizeFirstLetter(item.scope)}</span
+		>
+	</div>
 {/snippet}
-
-{#snippet ScopeCell({ item }: { item: NetworkRow })}
-	<span class="text-sm text-muted-foreground">{capitalizeFirstLetter(item.scope)}</span>
+{#snippet AddressingCell({ item }: { item: NetworkRow })}
+	{@const configs = item.ipam?.config ?? []}
+	<div class="flex flex-col gap-1 font-mono text-xs">
+		{#each configs.slice(0, 2) as config, index (index)}<div>
+				<div>{config.subnet ?? '—'}</div>
+				<div class="text-muted-foreground">{config.gateway ?? '—'}</div>
+			</div>{/each}{#if configs.length > 2}<span class="text-muted-foreground">+{configs.length - 2}</span
+			>{/if}{#if configs.length === 0}—{/if}
+	</div>
 {/snippet}
-
-{#snippet SubnetCell({ item }: { item: NetworkRow })}
-	{@const subnets = ipamValues(item, 'subnet')}
-	{#if subnets.length === 0}
-		<span class="text-muted-foreground">—</span>
-	{:else}
-		<div class="flex flex-col font-mono text-sm">
-			{#each subnets as subnet (subnet)}
-				<span>{subnet}</span>
-			{/each}
-		</div>
-	{/if}
-{/snippet}
-
-{#snippet GatewayCell({ item }: { item: NetworkRow })}
-	{@const gateways = ipamValues(item, 'gateway')}
-	{#if gateways.length === 0}
-		<span class="text-muted-foreground">—</span>
-	{:else}
-		<div class="flex flex-col font-mono text-sm">
-			{#each gateways as gateway (gateway)}
-				<span>{gateway}</span>
-			{/each}
-		</div>
-	{/if}
-{/snippet}
+{#snippet CreatedCell({ item }: { item: NetworkRow })}<span title={item.created}>{formatRelativeTime(item.created)}</span
+	>{/snippet}
 
 {#snippet StatusCell({ item }: { item: NetworkRow })}
 	{@const status = getNetworkStatusBadge(item, true)}
@@ -283,34 +297,28 @@
 		badges={[(item: NetworkRow) => getNetworkStatusBadge(item, mobileFieldVisibility['inUse'] ?? true)]}
 		fields={[
 			{
-				label: m.common_driver(),
-				getValue: (item: NetworkRow) => capitalizeFirstLetter(item.driver),
-				icon: NetworksIcon,
-				iconVariant: 'gray' as const,
+				label: m.source(),
+				getValue: (item: NetworkRow) => sourceText(item),
+				show: mobileFieldVisibility['source'] ?? true
+			},
+			{
+				label: m.driver_scope(),
+				getValue: (item: NetworkRow) => `${capitalizeFirstLetter(item.driver)} / ${capitalizeFirstLetter(item.scope)}`,
 				show: mobileFieldVisibility['driver'] ?? true
 			},
 			{
-				label: m.common_scope(),
-				getValue: (item: NetworkRow) => capitalizeFirstLetter(item.scope),
-				icon: GlobeIcon,
-				iconVariant: 'gray' as const,
-				show: mobileFieldVisibility['scope'] ?? true
+				label: m.addressing(),
+				getValue: (item: NetworkRow) =>
+					(item.ipam?.config ?? [])
+						.slice(0, 2)
+						.map((config) => `${config.subnet ?? '—'} / ${config.gateway ?? '—'}`)
+						.join(', ') + (ipamValues(item, 'subnet').length > 2 ? ` +${ipamValues(item, 'subnet').length - 2}` : '') || '—',
+				show: mobileFieldVisibility['addressing'] ?? true
 			},
 			{
-				label: m.common_subnet(),
-				getValue: (item: NetworkRow) => ipamValues(item, 'subnet').join(', ') || '—',
-				icon: NetworksIcon,
-				iconVariant: 'gray' as const,
-				type: 'mono' as const,
-				show: mobileFieldVisibility['subnet'] ?? true
-			},
-			{
-				label: m.common_gateway(),
-				getValue: (item: NetworkRow) => ipamValues(item, 'gateway').join(', ') || '—',
-				icon: GlobeIcon,
-				iconVariant: 'gray' as const,
-				type: 'mono' as const,
-				show: mobileFieldVisibility['gateway'] ?? true
+				label: m.common_created(),
+				getValue: (item: NetworkRow) => formatRelativeTime(item.created),
+				show: mobileFieldVisibility['created'] ?? false
 			}
 		]}
 		rowActions={RowActions}
@@ -325,6 +333,14 @@
 			href={networkDetailHref(item)}
 			tabs={[
 				{ value: 'overview', label: m.common_overview() },
+				{
+					value: 'owning-stack',
+					label: m.swarm_stack(),
+					icon: LayersIcon,
+					related: true,
+					href: stackOwnerHref(item),
+					visible: !!stackOwnerHref(item)
+				},
 				{ value: 'services', label: m.services(), icon: LayersIcon, related: true, visible: item.scope === 'swarm' },
 				{ value: 'tasks', label: m.tasks(), icon: JobsIcon, related: true, visible: item.scope === 'swarm' }
 			]}

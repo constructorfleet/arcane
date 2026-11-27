@@ -14,11 +14,11 @@
 	import CodePanel from '#lib/components/code-panel.svelte';
 	import { openConfirmDialog } from '#lib/components/confirm-dialog//index.js';
 	import EditorTabStrip from '#lib/components/editor-tab-strip.svelte';
-	import EnvironmentDestinationSelect from '#lib/components/form/environment-destination-select.svelte';
 	import ResizableSplit from '#lib/components/resizable-split.svelte';
+	import ResourceConsumers from '#lib/components/resource-consumers.svelte';
 	import { DetailSection, KeyValueCard, KeyValueGrid } from '#lib/components/resource-detail/index.js';
+	import { swarmManagerQueryOptions } from '#lib/components/swarm/swarm-environments.js';
 	import * as Alert from '#lib/components/ui/alert/index.js';
-	import { Badge } from '#lib/components/ui/badge/index.js';
 	// fallow-ignore-file code-duplication -- useUrlTab initialization is the hook's intended per-page integration surface
 	import * as Card from '#lib/components/ui/card/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
@@ -38,13 +38,15 @@
 	import { volumeBackupService } from '#lib/services/volume-backup-service.js';
 	import { volumeService } from '#lib/services/volume-service.js';
 	import { volumeWorkspaceService } from '#lib/services/volume-workspace-service.js';
+	import { environmentStore } from '#lib/stores/environment.store.svelte.js';
 	import type { VolumeWorkspaceFileContent } from '#lib/types/ui/volume.js';
-	import type { VolumeConsumer, VolumeBackupEntry, VolumeWorkspaceFileChange, Volume } from '#lib/types/volume.js';
+	import type { VolumeBackupEntry, VolumeWorkspaceFileChange, Volume } from '#lib/types/volume.js';
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { composeTreeSplitProps } from '#lib/utils/compose-flow.js';
-	import { formatDateTimeShort, truncateString } from '#lib/utils/formatting.js';
+	import { environmentHref } from '#lib/utils/environments.js';
+	import { formatDateTimeShort } from '#lib/utils/formatting.js';
 	import { bytes } from '#lib/utils/formatting.js';
 	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
@@ -72,10 +74,19 @@
 	let { data } = $props();
 	let volume = $derived(data.volume);
 	let active = true;
-	let containersDetailed = $derived<VolumeConsumer[]>(data.containersDetailed ?? []);
 
 	const currentEnvId = $derived(data.envId);
 	const logicalVolume = $derived(data.logicalVolume);
+	const ownerName = $derived(volume?.labels?.['com.docker.stack.namespace'] ?? '');
+	const ownerManager = createQuery(() => ({
+		...swarmManagerQueryOptions({
+			environmentId: currentEnvId,
+			clusterId: logicalVolume?.clusterId ?? volume?.clusterId,
+			nodeId: volume?.nodeId,
+			permission: 'swarm-stacks:read'
+		}),
+		enabled: !!ownerName
+	}));
 	const environmentSettings = useEnvironmentSettings(() => currentEnvId);
 	const volumeSettings = $derived(environmentSettings.current?.runtime);
 	// Until the backup volume name is known, the volume cannot be removed.
@@ -93,6 +104,8 @@
 
 	const tabItems = $derived([
 		{ value: 'overview', label: m.common_overview() },
+		{ value: 'containers', label: m.containers() },
+		{ value: 'services', label: m.services() },
 		{ value: 'workspace', label: m.workspace() },
 		{ value: 'backups', label: m.volumes_nav_backups() }
 	]);
@@ -897,63 +910,6 @@
 	}
 </script>
 
-{#snippet volumeContainers(volume: Volume)}
-	<DetailSection title={m.volumes_containers_using_title()} icon={ContainersIcon}>
-		{#if containersDetailed.some((consumer) => consumer.volumeHelper === true)}
-			<p class="text-sm text-muted-foreground">{m.volume_helpers_hold_mounts()}</p>
-		{/if}
-		{#if containersDetailed.length > 0}
-			<div class="divide-y rounded-lg border">
-				{#each containersDetailed as c (c.id)}
-					<div class="flex flex-col p-3 sm:flex-row sm:items-center">
-						<div class="mb-2 w-full font-medium break-all sm:mb-0 sm:w-1/3">
-							<a
-								href={resourceDetailHref(
-									resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(currentEnvId)}`, { containerId: c.id })
-								)}
-								class="flex items-center text-primary-text hover:underline"
-							>
-								<ContainersIcon class="mr-1.5 size-3.5 text-muted-foreground" />
-								{c.name}
-							</a>
-							{#if c.volumeHelper === true}
-								<Badge variant="blue">{m.volume_helper()}</Badge>
-							{:else if c.volumeHelper === null}
-								<Badge variant="gray">{m.common_unavailable()}</Badge>
-							{/if}
-							{#if c.detailsError}<p class="mt-1 text-xs text-muted-foreground">{c.detailsError}</p>{/if}
-						</div>
-						<div class="w-full pl-0 sm:w-2/3 sm:pl-4">
-							<code
-								class="cursor-pointer rounded-xl bg-muted px-1.5 py-0.5 font-mono text-xs break-all text-muted-foreground select-all sm:text-sm"
-								title={m.common_click_to_select()}
-							>
-								{truncateString(c.id, 48)}
-							</code>
-						</div>
-					</div>
-				{/each}
-			</div>
-		{:else if volume.containers && volume.containers.length > 0}
-			<div class="divide-y rounded-lg border">
-				{#each volume.containers as id (id)}
-					<div class="flex items-center justify-between gap-3 p-3">
-						<code class="font-mono text-sm break-all">{truncateString(id, 48)}</code>
-						<a
-							href={resourceDetailHref(
-								resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(currentEnvId)}`, { containerId: id })
-							)}
-							class="text-sm text-primary-text hover:underline">{m.common_view()}</a
-						>
-					</div>
-				{/each}
-			</div>
-		{:else}
-			<div class="text-muted-foreground">{m.volumes_no_containers_using()}</div>
-		{/if}
-	</DetailSection>
-{/snippet}
-
 {#snippet volumeWorkspaceFileEditor(volume: Volume, relativePath: string)}
 	{@const previewKey = `${currentEnvId}:${volume.name}:${relativePath}`}
 	{#if workspaceFileLoadErrors[relativePath]}
@@ -1194,6 +1150,12 @@
 	<DetailSection title={m.common_details_title({ resource: m.resource_volume_cap() })} class="border-t-0 pt-0">
 		<KeyValueGrid>
 			<KeyValueCard label={m.common_created()} valueFormat="text">{createdDate}</KeyValueCard>
+			<KeyValueCard label={m.common_driver()}>{volume.driver}</KeyValueCard>
+			<KeyValueCard label={m.docker_scope()}>{volume.scope}</KeyValueCard>
+			<KeyValueCard label={m.common_mountpoint()}>{volume.mountpoint}</KeyValueCard>
+			<KeyValueCard label={m.swarm_node()}
+				>{environmentStore.available.find((agent) => agent.id === currentEnvId)?.name ?? currentEnvId}</KeyValueCard
+			>
 			{#if filesystemStorage.data && !filesystemStorage.isError}
 				<KeyValueCard label={m.filesystem_disk_usage()}
 					>{m.filesystem_usage_ratio({
@@ -1204,6 +1166,32 @@
 			{/if}
 		</KeyValueGrid>
 	</DetailSection>
+
+	<DetailSection title={m.linked_resources()}
+		><KeyValueGrid>
+			<KeyValueCard label={m.containers()} valueFormat="custom"
+				><button class="text-primary-text hover:underline" onclick={() => onTabChange('containers')}>{m.containers()}</button
+				></KeyValueCard
+			>
+			<KeyValueCard label={m.services()} valueFormat="custom"
+				><button class="text-primary-text hover:underline" onclick={() => onTabChange('services')}>{m.services()}</button
+				></KeyValueCard
+			>
+			{#if ownerName}<KeyValueCard label={m.swarm_stack()} valueFormat="custom"
+					>{#if ownerManager.data}<a
+							class="text-primary-text hover:underline"
+							href={resourceDetailHref(
+								environmentHref(
+									`${resolve('/(app)/swarm/stacks/[name]', { name: ownerName })}?cluster=${encodeURIComponent(ownerManager.data.clusterId)}`,
+									ownerManager.data.id
+								)
+							)}>{ownerName}</a
+						>{:else}<span>{ownerName}</span><span class="ml-2 text-xs text-muted-foreground"
+							>{ownerManager.isPending ? m.common_loading() : m.common_unavailable()}</span
+						>{/if}</KeyValueCard
+				>{/if}
+		</KeyValueGrid></DetailSection
+	>
 
 	{#if volume.options && Object.keys(volume.options).length > 0}
 		<DetailSection title={m.common_driver_options()} icon={VolumesIcon}>
@@ -1226,7 +1214,6 @@
 	{/if}
 
 	<VolumeAgentRecords volume={logicalVolume ?? volume} environmentId={currentEnvId} />
-	{@render volumeContainers(volume)}
 {/snippet}
 
 {#if volume}
@@ -1234,15 +1221,8 @@
 		{#snippet headerInfo()}
 			<div class="flex min-h-9 min-w-0 items-center gap-2">
 				<VolumesIcon class="size-5 shrink-0 text-primary" />
-				<EnvironmentDestinationSelect value={currentEnvId} variant="prefix" readonly />
 				<h1 class="min-w-0 truncate font-semibold" title={volume.name}>{volume.name}</h1>
 				<InUseStatus inUse={volume.inUse} />
-				{#if volume.driver}
-					<Badge variant="blue" minWidth="20">{volume.driver}</Badge>
-				{/if}
-				{#if volume.scope && volume.scope !== volume.driver}
-					<Badge variant="purple" minWidth="20">{volume.scope}</Badge>
-				{/if}
 			</div>
 		{/snippet}
 
@@ -1272,6 +1252,19 @@
 					<Tabs.Content value="overview" layout="panel">
 						<div class="space-y-6">{@render volumeOverview(volume)}</div>
 					</Tabs.Content>
+				{:else if tab === 'containers' || tab === 'services'}
+					<Tabs.Content value={tab} layout="panel"
+						><ResourceConsumers
+							kind={tab}
+							sources={[
+								{
+									environmentId: currentEnvId,
+									environmentName: environmentStore.available.find((agent) => agent.id === currentEnvId)?.name,
+									volumeName: volume.name
+								}
+							]}
+						/></Tabs.Content
+					>
 				{:else if tab === 'workspace'}
 					{#if logicalVolume && logicalVolume.workspaceState !== 'active'}
 						<Alert.Root variant="warning-subtle" icon={AlertIcon}>

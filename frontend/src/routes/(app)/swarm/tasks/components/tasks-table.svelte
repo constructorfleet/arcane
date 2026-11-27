@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
+	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
 	import type { ColumnSpec, FilterOption, MobileFieldVisibility } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
@@ -11,14 +12,15 @@
 	import SwarmTaskContainer from '#lib/components/swarm/swarm-task-container.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
-	import { JobsIcon, ConnectionIcon, RestartIcon, InspectIcon, EditIcon } from '#lib/icons/index.js';
+	import { JobsIcon, ConnectionIcon, RestartIcon, InspectIcon, EditIcon, LayersIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import type { SwarmTaskSummary } from '#lib/types/swarm.js';
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import type { SwarmTasksPaginatedResponse } from '#lib/types/ui/swarm.js';
 	import { hasPermission } from '#lib/utils/auth.js';
+	import { parseImageRef } from '#lib/utils/docker.js';
 	import { environmentHref, type EnvironmentPage, type EnvironmentRow } from '#lib/utils/environments.js';
-	import { formatDateTimeShort } from '#lib/utils/formatting.js';
+	import { formatRelativeTime } from '#lib/utils/formatting.js';
 	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
 	import { getSwarmTaskIconVariant, getSwarmTaskStateVariant } from '#lib/utils/swarm-tasks.js';
 
@@ -77,15 +79,18 @@
 	].map((state) => ({ label: state, value: state }));
 
 	const serviceColumns: ColumnSpec<TaskRow>[] = [
-		{ accessorKey: 'updatedAt', id: 'updated', title: m.common_updated(), sortable: true, cell: UpdatedCell },
-		{ accessorKey: 'error', title: m.common_error(), cell: ErrorCell }
+		{ accessorKey: 'updatedAt', id: 'updated', title: m.common_updated(), sortable: true, cell: UpdatedCell, hidden: true },
+		{ accessorKey: 'error', title: m.common_error(), cell: ErrorCell, hidden: true },
+		{ accessorKey: 'createdAt', id: 'created', title: m.common_created(), hidden: true, sortable: true, cell: CreatedCell },
+		{ accessorKey: 'image', title: m.common_image(), hidden: true, cell: ImageCell }
 	];
 
 	const columns = $derived([
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
-		...(showEnvironment ? environmentColumns<TaskRow>() : []),
+		...(showEnvironment
+			? environmentColumns<TaskRow>().map((column) => ({ ...column, title: m.query_connection(), hidden: true, sortable: false }))
+			: []),
 		{ accessorKey: 'name', title: m.common_name(), sortable: true, cell: TaskNameCell },
-		{ id: 'container', title: m.container(), cell: ContainerCell },
 		...(serviceScoped
 			? []
 			: [{ accessorKey: 'serviceName', title: m.swarm_service(), sortable: true, cell: ServiceCell } as const]),
@@ -101,30 +106,45 @@
 			title: m.swarm_current_state(),
 			sortable: true,
 			cell: StateCell,
-			filterOptions: serviceScoped ? stateFilters : undefined
+			filterOptions: stateFilters
 		},
 		{
 			accessorKey: 'desiredState',
 			title: m.swarm_desired_state(),
 			sortable: true,
 			cell: DesiredStateCell,
-			filterOptions: serviceScoped ? stateFilters : undefined
+			hidden: true,
+			filterOptions: stateFilters
 		},
-		...(serviceScoped ? serviceColumns : [])
+		{ id: 'container', title: m.container(), cell: ContainerCell },
+		...serviceColumns
 	] satisfies ColumnSpec<TaskRow>[]);
 
 	const mobileFields = $derived([
 		...(serviceScoped ? [] : [{ id: 'serviceName', label: m.swarm_service(), defaultVisible: true }]),
 		{ id: 'nodeName', label: m.swarm_node(), defaultVisible: true },
 		{ id: 'currentState', label: m.swarm_current_state(), defaultVisible: true },
-		{ id: 'desiredState', label: m.swarm_desired_state(), defaultVisible: serviceScoped }
+		{ id: 'desiredState', label: m.swarm_desired_state(), defaultVisible: true }
 	]);
 
 	let mobileFieldVisibility = $state<Record<string, boolean>>({});
+	let verifiedContainers = $state<Record<string, boolean>>({});
+	let containerErrors = $state<Record<string, string>>({});
+	function containerKey(item: TaskRow) {
+		return [item.environmentId, item.id, item.nodeId, item.containerId, item.currentState, item.updatedAt].join(':');
+	}
 </script>
 
 {#snippet ContainerCell({ item }: { item: TaskRow })}
-	<SwarmTaskContainer task={item} environmentId={item.environmentId} tablePage={requestOptions.pagination?.page} />
+	<SwarmTaskContainer
+		task={item}
+		environmentId={item.environmentId}
+		tablePage={requestOptions.pagination?.page}
+		verified={verifiedContainers[containerKey(item)] ?? false}
+		onVerified={(verified) => (verifiedContainers[containerKey(item)] = verified)}
+		unavailable={containerErrors[containerKey(item)]}
+		onUnavailable={(error) => (containerErrors[containerKey(item)] = error)}
+	/>
 {/snippet}
 
 {#snippet ServiceCell({ item }: { item: TaskRow })}
@@ -132,7 +152,10 @@
 		<a
 			class="text-primary hover:underline"
 			href={resourceTableHref(
-				environmentHref(resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.serviceId }), item.environmentId),
+				environmentHref(
+					resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.serviceId }) + '?tab=overview',
+					item.environmentId
+				),
 				requestOptions.pagination?.page
 			)}>{item.serviceName}</a
 		>
@@ -142,17 +165,7 @@
 {/snippet}
 
 {#snippet NodeCell({ item }: { item: TaskRow })}
-	{#if item.nodeId && item.nodeName && hasPermission('swarm-nodes:read', item.environmentId)}
-		<a
-			class="text-primary hover:underline"
-			href={resourceTableHref(
-				environmentHref(resolve('/(app)/swarm/nodes/[nodeId]', { nodeId: item.nodeId }), item.environmentId),
-				requestOptions.pagination?.page
-			)}>{item.nodeName}</a
-		>
-	{:else}
-		{item.nodeName}
-	{/if}
+	<span>{item.nodeName || m.common_unknown()}</span>
 {/snippet}
 
 {#snippet MobileService(item: TaskRow)}
@@ -163,8 +176,11 @@
 	{@render NodeCell({ item })}
 {/snippet}
 
-{#snippet StateCell({ value }: { value: unknown })}
-	<Badge variant={getSwarmTaskStateVariant(String(value ?? ''))} minWidth="20">{String(value ?? m.common_unknown())}</Badge>
+{#snippet StateCell({ item }: { item: TaskRow })}
+	<div class="space-y-1">
+		<Badge variant={getSwarmTaskStateVariant(item.currentState)}>{item.currentState || m.common_unknown()}</Badge>
+		<div class="text-xs text-muted-foreground">{m.swarm_desired_state()}: {item.desiredState}</div>
+	</div>
 {/snippet}
 
 {#snippet DesiredStateCell({ value }: { value: unknown })}
@@ -177,11 +193,20 @@
 		{#if !item.name || (serviceScoped && item.name !== item.id)}
 			<div class="font-mono text-xs text-muted-foreground">{item.id.slice(0, 12)}</div>
 		{/if}
+		{@render ErrorCell({ item })}
 	</div>
 {/snippet}
 
+{#snippet ImageCell({ item }: { item: TaskRow })}{@const image = parseImageRef(item.image ?? '')}
+	<div class="max-w-64" title={item.image}>
+		<div class="truncate">{image.repo}</div>
+		<div class="truncate text-xs text-muted-foreground">{item.image?.includes('@') ? item.image.split('@')[1] : image.tag}</div>
+	</div>{/snippet}
+
+{#snippet CreatedCell({ item }: { item: TaskRow })}{formatRelativeTime(item.createdAt) || m.common_na()}{/snippet}
+
 {#snippet UpdatedCell({ item }: { item: TaskRow })}
-	{formatDateTimeShort(item.updatedAt) || m.common_na()}
+	{formatRelativeTime(item.updatedAt) || m.common_na()}
 {/snippet}
 
 {#snippet ErrorCell({ item }: { item: TaskRow })}
@@ -192,24 +217,64 @@
 {/snippet}
 
 {#snippet TaskActions({ item }: { item: TaskRow })}
+	{#snippet VerifiedContainer()}<SwarmTaskContainer
+			task={item}
+			environmentId={item.environmentId}
+			tablePage={requestOptions.pagination?.page}
+			verified={verifiedContainers[containerKey(item)] ?? false}
+			onVerified={(verified) => (verifiedContainers[containerKey(item)] = verified)}
+			unavailable={containerErrors[containerKey(item)]}
+			onUnavailable={(error) => (containerErrors[containerKey(item)] = error)}
+			menu
+		/>{/snippet}
 	{@const canReadService = hasPermission('swarm-services:read', item.environmentId)}
 	{@const canUpdateService = hasPermission('swarm-services:update', item.environmentId)}
-	{#if item.serviceId && ((!serviceScoped && canReadService) || (canReadService && canUpdateService) || (item.desiredState === 'running' && canUpdateService))}
+	{#if item.serviceId && (canReadService || (canReadService && canUpdateService) || (item.desiredState === 'running' && canUpdateService))}
 		{@const href = resourceTableHref(
 			environmentHref(
-				resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.serviceId }) + (serviceScoped ? '?tab=tasks' : ''),
+				resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.serviceId }) + '?tab=overview',
 				item.environmentId
 			),
 			requestOptions.pagination?.page
 		)}
 		<RowActionsMenu name={item.name || item.id}>
+			<DetailLinksMenu
+				{href}
+				related={verifiedContainers[containerKey(item)] ? VerifiedContainer : undefined}
+				tabs={[
+					{
+						value: 'service',
+						label: m.swarm_view_service(),
+						icon: InspectIcon,
+						related: true,
+						visible: canReadService,
+						href: resourceTableHref(
+							environmentHref(
+								resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.serviceId }) + '?tab=overview',
+								item.environmentId
+							),
+							requestOptions.pagination?.page
+						)
+					},
+					{
+						value: 'stack',
+						label: m.swarm_stack(),
+						icon: LayersIcon,
+						related: true,
+						visible: !!item.stackName && hasPermission('swarm-stacks:read', item.environmentId),
+						href: item.stackName
+							? resourceTableHref(
+									environmentHref(
+										resolve('/(app)/swarm/stacks/[name]', { name: item.stackName }) + '?tab=overview',
+										item.environmentId
+									),
+									requestOptions.pagination?.page
+								)
+							: undefined
+					}
+				]}
+			/>
 			{#if canReadService}
-				{#if !serviceScoped}
-					<DropdownMenu.Item onclick={() => goto(href)}>
-						<InspectIcon class="size-4" />
-						{m.swarm_view_service()}
-					</DropdownMenu.Item>
-				{/if}
 				{#if canUpdateService}
 					<DropdownMenu.Item onclick={() => goto(href, { state: { swarmServiceAction: 'edit' } })}>
 						<EditIcon class="size-4" />
@@ -277,13 +342,13 @@
 				getValue: (item: TaskRow) => item.desiredState,
 				icon: ConnectionIcon,
 				iconVariant: 'gray' as const,
-				show: mobileFieldVisibility['desiredState'] ?? serviceScoped
+				show: mobileFieldVisibility['desiredState'] ?? true
 			}
 		]}
 	>
-		<SwarmTaskContainer task={item} environmentId={item.environmentId} tablePage={requestOptions.pagination?.page} />
+		{@render ContainerCell({ item })}
 		{#if item.mixedImageVersions}<p class="mt-1 text-sm text-destructive">{m.mixed_image_versions()}</p>{/if}
-		{#if serviceScoped && item.error}
+		{#if item.error}
 			<p class="mt-1 text-sm wrap-anywhere text-destructive">{item.error}</p>
 		{/if}
 	</UniversalMobileCard>

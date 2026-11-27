@@ -2,7 +2,9 @@
 	import { resolve } from '$app/paths';
 	import { createQuery } from '@tanstack/svelte-query';
 
+	import { ArcaneButton } from '#lib/components/arcane-button/index.js';
 	import RelatedResourceTable from '#lib/components/resource-detail/related-resource-table.svelte';
+	import * as Card from '#lib/components/ui/card/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { containerService } from '#lib/services/container-service.js';
 	import { swarmService } from '#lib/services/swarm-service.js';
@@ -20,7 +22,7 @@
 			queryKey: ['swarm-service-volume-attachment', manager, service],
 			enabled: mounts.some((mount) => mount.type === 'volume' && mount.source) && hasPermission('swarm-nodes:read', manager),
 			queryFn: async ({ signal }) => {
-				const { data: tasks } = await swarmService.getServiceTasks(
+				const { data: tasks, pagination } = await swarmService.getServiceTasks(
 					service,
 					{ pagination: { page: 1, limit: 12 }, filters: { currentState: 'running', desiredState: 'running' } },
 					manager
@@ -43,13 +45,23 @@
 						const container = await containerService.getContainerForEnvironment(target.environmentId, target.containerId, {
 							signal
 						});
-						if (container.id !== target.containerId || container.labels?.['com.docker.swarm.task.id'] !== task.id) return null;
+						if (
+							!container.state?.running ||
+							container.id !== target.containerId ||
+							container.labels?.['com.docker.swarm.task.id'] !== task.id
+						)
+							return null;
 						return { environmentId: target.environmentId, node: node.hostname, mounts: container.mounts };
 					})
 				);
-				return observations.flatMap((observation) =>
-					observation.status === 'fulfilled' && observation.value ? [observation.value] : []
-				);
+				return {
+					observations: observations.flatMap((observation) =>
+						observation.status === 'fulfilled' && observation.value ? [observation.value] : []
+					),
+					incomplete:
+						observations.some((observation) => observation.status === 'rejected') ||
+						(pagination?.totalItems ?? tasks.length) > tasks.length
+				};
 			},
 			retry: false
 		};
@@ -58,7 +70,7 @@
 	function volumeLinks(mount: SwarmServiceMount) {
 		if (mount.type !== 'volume' || !mount.source) return [];
 		const seen = new Set<string>();
-		return (activeAttachments.data ?? []).flatMap((attachment) => {
+		return (activeAttachments.data?.observations ?? []).flatMap((attachment) => {
 			const actual = attachment.mounts.find(
 				(entry) => entry.type === 'volume' && entry.name === mount.source && entry.destination === mount.target
 			);
@@ -112,15 +124,40 @@
 	);
 </script>
 
-<RelatedResourceTable
-	persistKey="arcane-swarm-service-storage-table"
-	columns={[
-		m.common_type(),
-		m.containers_mount_label_container(),
-		m.common_driver(),
-		m.resource_mount_access(),
-		m.dashboard_meter_gpu_device()
-	]}
-	{rows}
-	empty={m.containers_no_mounts_configured()}
-/>
+{#if activeAttachments.isError || activeAttachments.data?.incomplete}<div role="status" class="p-3 text-sm text-warning">
+		{activeAttachments.error?.message ?? m.unavailable()}
+		<ArcaneButton action="refresh" onclick={() => activeAttachments.refetch()} />
+	</div>{/if}
+<Card.Root
+	><Card.Header><Card.Title>{m.resource_volumes_cap()}</Card.Title></Card.Header><Card.Content>
+		<RelatedResourceTable
+			persistKey="arcane-swarm-service-storage-table"
+			columns={[
+				m.common_type(),
+				m.containers_mount_label_container(),
+				m.common_driver(),
+				m.resource_mount_access(),
+				m.dashboard_meter_gpu_device()
+			]}
+			rows={rows.filter((_, index) => mounts[index]?.type === 'volume')}
+			empty={m.containers_no_mounts_configured()}
+		/>
+	</Card.Content></Card.Root
+>
+{#if mounts.some((mount) => mount.type !== 'volume')}
+	<Card.Root
+		><Card.Header><Card.Title>{m.common_mounts()}</Card.Title></Card.Header><Card.Content>
+			<RelatedResourceTable
+				persistKey="arcane-swarm-service-nonvolume-mounts"
+				columns={[
+					m.common_type(),
+					m.containers_mount_label_container(),
+					m.common_driver(),
+					m.resource_mount_access(),
+					m.dashboard_meter_gpu_device()
+				]}
+				rows={rows.filter((_, index) => mounts[index]?.type !== 'volume')}
+			/>
+		</Card.Content></Card.Root
+	>
+{/if}

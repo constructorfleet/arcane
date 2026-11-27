@@ -6,7 +6,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { useUrlTab } from '#lib/hooks/use-url-tab.svelte.js';
-	import { AgentConnectionIcon, ContainersIcon, CpuIcon, LayersIcon, UsersIcon } from '#lib/icons/index.js';
+	import { AgentConnectionIcon, ContainersIcon, CpuIcon, LayersIcon, UsersIcon, JobsIcon } from '#lib/icons/index.js';
 	import TabbedPageLayout from '#lib/layouts/tabbed-page-layout.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
@@ -14,6 +14,7 @@
 	import { environmentName, readableEnvironments } from '#lib/utils/environments.js';
 	import { bytes, capitalizeFirstLetter, formatDateTime } from '#lib/utils/formatting.js';
 
+	import ScopedTasksPanel from '../../tasks/components/scoped-tasks-panel.svelte';
 	import { getSwarmNodeAgentLabel, getSwarmNodeAgentVariant } from '../agent-status';
 	import NodeDockerDetails from '../components/node-docker-details.svelte';
 	import NodeLabels from '../components/node-labels.svelte';
@@ -36,8 +37,9 @@
 	);
 	const tabItems = $derived([
 		{ value: 'overview', label: m.common_overview(), icon: UsersIcon },
+		{ value: 'tasks', label: m.tasks(), icon: JobsIcon },
 		{ value: 'host', label: m.swarm_node_hardware_host(), icon: CpuIcon },
-		{ value: 'docker', label: 'Docker', icon: ContainersIcon },
+		{ value: 'docker', label: m.engine(), icon: ContainersIcon },
 		{ value: 'resources', label: m.swarm_node_local_resources_tab(), icon: LayersIcon },
 		{ value: 'agent', label: m.agent(), icon: AgentConnectionIcon }
 	]);
@@ -72,11 +74,18 @@
 		<Tabs.Content value="overview" layout="panel">
 			<div class={contentClass}>
 				<div class={fieldClass}>
-					<KeyValueCard label={m.common_role()} valueFormat="text">{capitalizeFirstLetter(node.role)}</KeyValueCard>
+					<KeyValueCard label={m.common_role()}
+						><div class="flex gap-1">
+							<Badge variant={node.role === 'manager' ? 'purple' : 'blue'}>{capitalizeFirstLetter(node.role)}</Badge
+							>{#if node.role === 'manager' && node.managerStatus === 'leader'}<Badge variant="green">{m.leader()}</Badge>{/if}
+						</div></KeyValueCard
+					>
 					<KeyValueCard label={m.common_status()}>
 						<Badge variant={node.status.toLowerCase() === 'ready' ? 'green' : 'amber'}>{node.status}</Badge>
 					</KeyValueCard>
-					<KeyValueCard label={m.swarm_availability()} valueFormat="text">{capitalizeFirstLetter(node.availability)}</KeyValueCard
+					<KeyValueCard label={m.scheduling()} valueFormat="text">{capitalizeFirstLetter(node.availability)}</KeyValueCard>
+					<KeyValueCard label={m.common_created()}>{formatDateTime(node.createdAt)}</KeyValueCard><KeyValueCard
+						label={m.common_updated()}>{formatDateTime(node.updatedAt)}</KeyValueCard
 					>
 					<KeyValueCard label={m.swarm_node_identity()}>{node.id}</KeyValueCard>
 					<KeyValueCard label={m.swarm_node_manager_connection()}>{environmentName(data.envId)}</KeyValueCard>
@@ -90,6 +99,13 @@
 				</div>
 			</div>
 		</Tabs.Content>
+		<Tabs.Content value="tasks" layout="table"
+			>{#if selectedTab === 'tasks'}<ScopedTasksPanel
+					environmentId={data.envId}
+					resourceId={node.id}
+					scope="node"
+				/>{/if}</Tabs.Content
+		>
 		<Tabs.Content value="host" layout="panel">
 			<div class={contentClass}>
 				<div class={fieldClass}>
@@ -124,7 +140,6 @@
 				{#if selectedTab === 'resources'}
 					{#key `${data.envId}:${node.id}`}<NodeLocalResources
 							nodeId={node.id}
-							managerId={data.envId}
 							agentId={agent.state === 'connected' && agent.connected !== false ? agentId : undefined}
 						/>{/key}
 				{:else}

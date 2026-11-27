@@ -94,13 +94,25 @@ func NewService(p ServiceParams) *Service {
 	}
 }
 
+func stackTaskCounts(services []swarm.Service) (*uint64, *uint64) {
+	var running, desired uint64
+	for _, service := range services {
+		if service.ServiceStatus == nil {
+			return nil, nil
+		}
+		running += service.ServiceStatus.RunningTasks
+		desired += service.ServiceStatus.DesiredTasks
+	}
+	return new(running), new(desired)
+}
+
 func (s *Service) ListStacksPaginated(ctx context.Context, environmentID string, params pagination.QueryParams) ([]types.SwarmStackSummary, pagination.Response, error) {
 	if err := s.ensureManager(ctx); err != nil {
 		return nil, pagination.Response{}, err
 	}
 
 	servicesResult, err := s.docker.Call(ctx, func(ctx context.Context, dockerClient *client.Client) (client.ServiceListResult, error) {
-		return dockerClient.ServiceList(ctx, client.ServiceListOptions{})
+		return dockerClient.ServiceList(ctx, client.ServiceListOptions{Status: true})
 	})
 	if err != nil {
 		return nil, pagination.Response{}, fmt.Errorf("failed to list swarm services: %w", err)
@@ -115,11 +127,13 @@ func (s *Service) ListStacksPaginated(ctx context.Context, environmentID string,
 	}
 
 	stacks := make(map[string]*types.SwarmStackSummary)
+	membersByStack := make(map[string][]swarm.Service)
 	for _, service := range services {
 		stackName := service.Spec.Labels[types.SwarmStackNamespaceLabel]
 		if stackName == "" {
 			continue
 		}
+		membersByStack[stackName] = append(membersByStack[stackName], service)
 
 		entry, exists := stacks[stackName]
 		if !exists {
@@ -158,6 +172,7 @@ func (s *Service) ListStacksPaginated(ctx context.Context, environmentID string,
 
 	items := make([]types.SwarmStackSummary, 0, len(stacks))
 	for _, stack := range stacks {
+		stack.RunningTasks, stack.DesiredTasks = stackTaskCounts(membersByStack[stack.Name])
 		items = append(items, *stack)
 	}
 
@@ -312,12 +327,15 @@ func (s *Service) GetStack(ctx context.Context, environmentID, stackName string)
 		}
 	}
 
+	running, desired := stackTaskCounts(services)
 	return &types.SwarmStackInspect{
-		Name:      stackName,
-		Namespace: stackName,
-		Services:  len(services),
-		CreatedAt: createdAt,
-		UpdatedAt: updatedAt,
+		Name:         stackName,
+		Namespace:    stackName,
+		Services:     len(services),
+		CreatedAt:    createdAt,
+		UpdatedAt:    updatedAt,
+		RunningTasks: running,
+		DesiredTasks: desired,
 	}, nil
 }
 
@@ -425,30 +443,6 @@ func (s *Service) UpdateStackSource(ctx context.Context, environmentID, stackNam
 
 	if upsertStackSourceErr := s.upsertStackSource(ctx, environmentID, stackName, source.ComposeContent, source.OverrideContent, source.EnvContent, source.Files); upsertStackSourceErr != nil {
 		return nil, upsertStackSourceErr
-	}
-
-	if _, deployStackAfterSourceUpdateErr := deployStackAfterSourceUpdate(s, ctx, environmentID, types.SwarmStackDeployRequest{
-		Name:             stackName,
-		ComposeContent:   source.ComposeContent,
-		OverrideContent:  source.OverrideContent,
-		EnvContent:       source.EnvContent,
-		Files:            source.Files,
-		Prune:            true,
-		ResolveImage:     "changed",
-		WithRegistryAuth: true,
-	}); deployStackAfterSourceUpdateErr != nil {
-		// Roll back the persisted source so reads never return an edit that
-		// was never successfully deployed.
-		var restoreErr error
-		if previous != nil {
-			restoreErr = s.upsertStackSource(ctx, environmentID, stackName, previous.ComposeContent, previous.OverrideContent, previous.EnvContent, previous.Files)
-		} else {
-			restoreErr = s.deleteStackSource(ctx, environmentID, stackName)
-		}
-		if restoreErr != nil {
-			slog.WarnContext(ctx, "failed to restore swarm stack source after deploy failure", "environmentId", cmp.Or(strings.TrimSpace(environmentID), "0"), "stackName", stackName, "error", restoreErr)
-		}
-		return nil, fmt.Errorf("failed to redeploy swarm stack from updated source: %w", deployStackAfterSourceUpdateErr)
 	}
 
 	return &source, nil

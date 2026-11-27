@@ -16,13 +16,12 @@
 	import ComposeFileEditorPanel from '#lib/components/compose-file-editor-panel.svelte';
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import EditorTabStrip from '#lib/components/editor-tab-strip.svelte';
-	import EnvironmentDestinationSelect from '#lib/components/form/environment-destination-select.svelte';
-	import ProjectDirectorySelect from '#lib/components/form/project-directory-select.svelte';
 	import ProjectGitBackupSummary from '#lib/components/gitops/project-git-backup-summary.svelte';
 	import IconImage from '#lib/components/icon-image.svelte';
 	import ProjectTagEditor from '#lib/components/project-tag-editor.svelte';
 	import ProjectUpdateItem from '#lib/components/project-update-item.svelte';
 	import ResizableSplit from '#lib/components/resizable-split.svelte';
+	import { KeyValueCard } from '#lib/components/resource-detail/index.js';
 	import { type TabItem } from '#lib/components/tab-bar/index.js';
 	import * as Alert from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -74,7 +73,6 @@
 		resolveProjectEditorLayout,
 		type ProjectEditorLayoutMode
 	} from '#lib/utils/compose-flow.js';
-	import { createDashboardWidget, pinDashboardAction } from '#lib/utils/dashboard-layout.js';
 	import { getStatusVariant, getThemedIconUrl } from '#lib/utils/docker.js';
 	import { environmentName, listScopes } from '#lib/utils/environments.js';
 	import { capitalizeFirstLetter, withOccurrenceKeys } from '#lib/utils/formatting.js';
@@ -423,8 +421,8 @@
 
 	let autoScrollStackLogs = $state(true);
 
-	type ProjectTab = 'services' | 'compose' | 'backup' | 'logs';
-	let selectedTab = $state<ProjectTab>('compose');
+	type ProjectTab = 'overview' | 'services' | 'compose' | 'backup' | 'logs';
+	let selectedTab = $state<ProjectTab>('overview');
 	let userSelectedTabProjectId: string | null = null;
 	let composeOpen = $state(true);
 	let envOpen = $state(true);
@@ -549,6 +547,7 @@
 	let canSave = $derived(canUpdateProject && !project?.isArchived && hasChanges && !hasAnyErrors && !composeActionsBlocked);
 
 	const tabItems = $derived<TabItem[]>([
+		{ value: 'overview', label: m.common_overview(), icon: ProjectsIcon },
 		{
 			value: 'services',
 			label: m.services(),
@@ -574,7 +573,7 @@
 	let nameInputRef = $state<HTMLInputElement | null>(null);
 
 	type ComposeUIPrefs = {
-		tab: 'services' | 'compose' | 'backup' | 'logs';
+		tab: 'overview' | 'services' | 'compose' | 'backup' | 'logs';
 		composeOpen: boolean;
 		overrideOpen: boolean;
 		envOpen: boolean;
@@ -596,7 +595,7 @@
 	};
 
 	const defaultComposeUIPrefs: ComposeUIPrefs = {
-		tab: 'compose',
+		tab: 'overview',
 		composeOpen: true,
 		overrideOpen: false,
 		envOpen: true,
@@ -610,7 +609,7 @@
 	let lastPrefsProjectId = $state<string | null>(null);
 	const urlTab = useUrlTab<ProjectTab>({
 		validTabs: () => tabItems.map((tab) => tab.value as ProjectTab),
-		defaultTab: () => selectedTab,
+		defaultTab: () => 'overview',
 		ready: () => lastPrefsProjectId === project?.id
 	});
 
@@ -778,12 +777,11 @@
 		let urlTabValue: ProjectTab | null = null;
 		if (tabItems.some((tab) => tab.value === requestedTab)) urlTabValue = requestedTab as ProjectTab;
 		if (!userSelectedTabForProject) {
-			selectedTab = urlTabValue ?? cur.tab ?? defaultComposeUIPrefs.tab;
+			selectedTab = urlTabValue ?? 'overview';
 			// Logs merged into the services tab (#3367): honor legacy ?tab=logs deep
 			// links and stored prefs by landing on services (logs render alongside).
-			if (requestedTab === 'logs' || !tabItems.some((tab) => tab.value === selectedTab)) {
-				selectedTab = 'services';
-			}
+			if (requestedTab === 'logs') selectedTab = 'services';
+			else if (!tabItems.some((tab) => tab.value === selectedTab)) selectedTab = 'overview';
 		}
 		composeOpen = cur.composeOpen ?? defaultComposeUIPrefs.composeOpen;
 		// Expanding the override collapses the compose editor (accordion), so the
@@ -1698,15 +1696,6 @@
 				onclick: handleArchiveToggle
 			});
 		}
-		list.push(
-			pinDashboardAction('pin-dashboard', m.pin_to_dashboard(), () =>
-				createDashboardWidget('resource', {
-					resourceKind: 'projects',
-					environmentIds: [envId],
-					resourceId: projectId
-				})
-			)
-		);
 		return list;
 	});
 </script>
@@ -2432,8 +2421,6 @@
 			class="size-6"
 			containerClass="size-9 shrink-0 bg-transparent ring-0"
 		/>
-		<EnvironmentDestinationSelect value={envId} variant="prefix" readonly />
-		<ProjectDirectorySelect value={project.projectsRoot} environmentId={envId} readonly />
 		<EditableName
 			bind:value={inputs.name.value}
 			displayValue={effectiveName}
@@ -2450,19 +2437,6 @@
 		{#if project.isArchived}
 			<Badge variant="gray" minWidth="20">{m.projects_archived_badge()}</Badge>
 		{/if}
-		<ProjectTagEditor
-			tags={project.tags ?? []}
-			availableTags={availableProjectTags}
-			canEdit={canUpdateProject}
-			onToggle={handleProjectTagToggle}
-		/>
-		<ProjectUpdateItem
-			updateInfo={project.updateInfo}
-			environmentId={envId}
-			onCheck={handleCheckProjectUpdates}
-			checking={checkProjectUpdatesMutation.isPending}
-			disabled={!!project.isArchived || composeActionsBlocked}
-		/>
 	</div>
 {/snippet}
 
@@ -2527,10 +2501,6 @@
 			{@render projectHeader(project)}
 		{/snippet}
 
-		{#snippet subHeader()}
-			{@render projectHeaderLinks(project)}
-		{/snippet}
-
 		{#snippet headerActions()}
 			<ActionButtons
 				id={project.id}
@@ -2566,6 +2536,34 @@
 		{/snippet}
 
 		{#snippet tabContent()}
+			<Tabs.Content value="overview" layout="panel">
+				<div class="space-y-4 rounded-lg border border-border p-4 sm:p-6">
+					<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+						<KeyValueCard label={m.common_name()}>{project.name}</KeyValueCard>
+						<KeyValueCard label={m.common_status()}>{@render projectStatus(project)}</KeyValueCard>
+						<KeyValueCard label={m.swarm_node()}>{environmentName(envId)}</KeyValueCard>
+						<KeyValueCard label={m.common_working_directory()}>{project.path}</KeyValueCard>
+						<KeyValueCard label={m.services()}>{project.serviceCount ?? m.common_unknown()}</KeyValueCard>
+						<KeyValueCard label={m.configuration_source()}>{project.gitRepositoryURL || m.local()}</KeyValueCard>
+					</div>
+					<div class="flex flex-wrap gap-3">
+						<ProjectTagEditor
+							tags={project.tags ?? []}
+							availableTags={availableProjectTags}
+							canEdit={canUpdateProject}
+							onToggle={handleProjectTagToggle}
+						/>
+						<ProjectUpdateItem
+							updateInfo={project.updateInfo}
+							environmentId={envId}
+							onCheck={handleCheckProjectUpdates}
+							checking={checkProjectUpdatesMutation.isPending}
+							disabled={!!project.isArchived || composeActionsBlocked}
+						/>
+					</div>
+					{@render projectHeaderLinks(project)}
+				</div>
+			</Tabs.Content>
 			{@render projectServicesTab(project)}
 
 			{@render projectComposeTab(project)}

@@ -8,8 +8,6 @@
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
 	import UniversalMobileCard from '#lib/components/arcane-table/cards/universal-mobile-card.svelte';
 	import DigestCell from '#lib/components/arcane-table/cells/digest-cell.svelte';
-	import InUseStatus from '#lib/components/arcane-table/cells/in-use-status.svelte';
-	import UnixCreatedCell from '#lib/components/arcane-table/cells/unix-created-cell.svelte';
 	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import type { ColumnSpec, MobileFieldVisibility, BulkAction } from '#lib/components/arcane-table/index.js';
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
@@ -32,7 +30,6 @@
 		ClockIcon,
 		SearchIcon,
 		ShieldCheckIcon,
-		ProjectsIcon,
 		ContainersIcon,
 		TagIcon,
 		AlertIcon,
@@ -56,12 +53,11 @@
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { bulkConfirmAndRun } from '#lib/utils/bulk-actions.js';
-	import { environmentHref, type EnvironmentPage, type EnvironmentRow, hasShownPermission } from '#lib/utils/environments.js';
-	import { bytes, formatDate, formatDateTimeShort } from '#lib/utils/formatting.js';
+	import { type EnvironmentPage, type EnvironmentRow, hasShownPermission } from '#lib/utils/environments.js';
+	import { bytes, formatDate, formatDateTimeShort, formatRelativeTime, truncateString } from '#lib/utils/formatting.js';
 	import { hardenedImageDisplay, hardenedSupportSummary } from '#lib/utils/hardened-images.js';
 	import { inUseImageTargets } from '#lib/utils/image-scan.js';
 	import { blockedUpdateTitle } from '#lib/utils/image-updates.js';
-	import { inUseBadge } from '#lib/utils/mobile-card-badges.js';
 	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 	import { toastVulnerabilityScanStatus } from '#lib/utils/vulnerability.js';
@@ -290,10 +286,11 @@
 
 	const allColumns = $derived([
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
-		{ accessorKey: 'repo', title: m.resource_repository_cap(), sortable: true, cell: RepoCell },
+		{ accessorKey: 'repo', title: m.common_image(), sortable: true, cell: RepoCell },
+		{ accessorKey: 'platform', title: m.platform(), cell: PlatformCell },
 		{
 			accessorKey: 'inUse',
-			title: m.common_status(),
+			title: m.common_usage(),
 			sortable: true,
 			cell: StatusCell
 		},
@@ -312,7 +309,8 @@
 			class: 'min-w-table-update',
 			cell: UpdatesCell
 		},
-		{ accessorKey: 'repoTags', title: m.common_tags(), cell: TagCell },
+		{ id: 'digest', title: m.images_attestations_digest(), hidden: true, cell: ArtifactDigestCell },
+		{ id: 'usedBy', title: m.images_used_by(), hidden: true, cell: UsedByCell },
 		{
 			id: 'vulnerabilities',
 			accessorFn: (row) => {
@@ -342,27 +340,21 @@
 			hidden: true,
 			cell: HardenedCell
 		},
-		{ accessorKey: 'created', title: m.common_created(), hidden: true, sortable: true, cellComponent: UnixCreatedCell },
-		{
-			id: 'usedBy',
-			title: m.images_used_by(),
-			hidden: true,
-			cell: UsedByCell
-		}
+		{ accessorKey: 'created', title: m.common_created(), hidden: true, sortable: true, cell: CreatedCell }
 	] satisfies ColumnSpec<ImageRow>[]);
 
 	const columns = $derived(allColumns.filter((column) => vulnerabilityManagementEnabled || column.id !== 'vulnerabilities'));
 
 	const allMobileFields = [
 		{ id: 'id', label: m.common_id(), defaultVisible: false },
-		{ id: 'repoTags', label: m.common_tags(), defaultVisible: true },
-		{ id: 'inUse', label: m.common_status(), defaultVisible: true },
+		{ id: 'platform', label: m.platform(), defaultVisible: true },
 		{ id: 'usedBy', label: m.images_used_by(), defaultVisible: false },
-		{ id: 'updates', label: m.updates(), defaultVisible: false },
-		{ id: 'vulnerabilities', label: m.vuln_title(), defaultVisible: false },
-		{ id: 'hardened', label: m.docker_hardened_image(), defaultVisible: true },
+		{ id: 'inUse', label: m.common_status(), defaultVisible: true },
+		{ id: 'updates', label: m.updates(), defaultVisible: true },
+		{ id: 'vulnerabilities', label: m.vuln_title(), defaultVisible: true },
+		{ id: 'hardened', label: m.docker_hardened_image(), defaultVisible: false },
 		{ id: 'size', label: m.common_size(), defaultVisible: true },
-		{ id: 'created', label: m.common_created(), defaultVisible: true }
+		{ id: 'created', label: m.common_created(), defaultVisible: false }
 	];
 
 	const mobileFields = $derived(
@@ -385,15 +377,18 @@
 </script>
 
 {#snippet RepoCell({ item }: { item: ImageRow })}
-	<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+	<div class="flex max-w-56 min-w-0 flex-col items-start gap-1">
 		{#if item.repo && item.repo !== '<none>'}
-			<a class="min-w-0 font-medium wrap-anywhere hover:underline" href={imageHref(item)}>{item.repo}</a>
+			<a class="max-w-full min-w-0 font-medium wrap-anywhere whitespace-normal hover:underline" href={imageHref(item)}
+				>{item.repo}</a
+			>
 		{:else}
 			<span class="text-muted-foreground italic">{m.images_untagged()}</span>
 		{/if}
 		{#if item.hardened}
 			<HardenedImageBadge info={item.hardened} />
 		{/if}
+		<div class="flex min-w-0 flex-wrap items-center gap-1">{@render TagCell({ item })}</div>
 	</div>
 {/snippet}
 
@@ -409,6 +404,7 @@
 {/snippet}
 
 {#snippet TagCell({ item }: { item: ImageRow })}
+	{@const artifactDigest = item.repositoryGroup?.digests?.[0] ?? item.repoDigests?.[0]?.split('@').pop() ?? item.id}
 	{#if item.repositoryGroup}
 		<div class="flex min-w-0 flex-wrap items-center gap-1.5">
 			{#if item.tag !== '<none>'}
@@ -417,20 +413,19 @@
 			{#if (item.repoTags?.length ?? 0) > 1}
 				<Badge variant="gray" title={item.repoTags.join(', ')}>+{item.repoTags.length - 1}</Badge>
 			{/if}
-			<DigestCell value={item.repositoryGroup.digests?.[0] ?? item.id} />
-			{#if item.platform}<Badge variant="gray" mono>{item.platform}</Badge>{/if}
 		</div>
 	{:else if item.repoTags && item.repoTags.length > 0 && item.repoTags[0] !== '<none>:<none>'}
 		<div class="flex flex-wrap gap-1.5">
-			{#each item.repoTags as repoTag, tagIndex (`${repoTag}-${tagIndex}`)}
+			{#each item.repoTags.slice(0, 2) as repoTag, tagIndex (`${repoTag}-${tagIndex}`)}
 				<Badge variant="outline" mono class="max-w-full wrap-anywhere whitespace-normal"
 					>{repoTag.split(':').pop() || repoTag}</Badge
 				>
 			{/each}
+			{#if item.repoTags.length > 2}<Badge variant="gray">+{item.repoTags.length - 2}</Badge>{/if}
 		</div>
 	{:else if item.pinnedReferences && item.pinnedReferences.length > 0 && item.pinnedReferences[0]}
 		<div class="flex flex-wrap items-center gap-1.5">
-			{#each item.pinnedReferences as pin, pinIndex (`${pin}-${pinIndex}`)}
+			{#each item.pinnedReferences.slice(0, 2) as pin, pinIndex (`${pin}-${pinIndex}`)}
 				{@const digestAt = pin.indexOf('@')}
 				{@const pinName = digestAt === -1 ? pin : pin.slice(0, digestAt)}
 				{@const tagAt = pinName.lastIndexOf(':')}
@@ -438,93 +433,47 @@
 					{#if tagAt > pinName.lastIndexOf('/')}
 						<Badge variant="outline" mono class="max-w-full wrap-anywhere whitespace-normal">{pinName.slice(tagAt + 1)}</Badge>
 					{/if}
-					<DigestCell value={digestAt === -1 ? pin : pin.slice(digestAt + 1)} />
+					{#if tagAt <= pinName.lastIndexOf('/')}<span class="text-xs text-muted-foreground">{m.images_untagged()}</span>{/if}
 				</div>
 			{/each}
+			{#if item.pinnedReferences.length > 2}<Badge variant="gray">+{item.pinnedReferences.length - 2}</Badge>{/if}
 		</div>
 	{:else if item.tag && item.tag !== '<none>'}
 		<Badge variant="outline" mono class="max-w-full wrap-anywhere whitespace-normal">{item.tag}</Badge>
 	{:else}
 		<span class="text-muted-foreground italic">{m.images_untagged()}</span>
 	{/if}
+	<Badge variant="outline" mono title={artifactDigest} class="max-w-full">{truncateString(artifactDigest, 22)}</Badge>
 {/snippet}
 
+{#snippet PlatformCell({ item }: { item: ImageRow })}<span class="font-mono text-xs">{item.platform ?? m.common_unknown()}</span
+	>{/snippet}
+{#snippet ArtifactDigestCell({ item }: { item: ImageRow })}<DigestCell
+		value={item.repositoryGroup?.digests?.[0] ?? item.repoDigests?.[0] ?? item.id}
+	/>{/snippet}
+{#snippet CreatedCell({ item }: { item: ImageRow })}<span
+		title={formatDateTimeShort(Temporal.Instant.fromEpochMilliseconds(item.created * 1000))}
+		>{formatRelativeTime(Temporal.Instant.fromEpochMilliseconds(item.created * 1000))}</span
+	>{/snippet}
 {#snippet SizeCell({ item }: { item: ImageRow })}
 	{bytes.format(Number(item.size ?? 0), { unitSeparator: ' ' })}
 {/snippet}
 
 {#snippet StatusCell({ item }: { item: ImageRow })}
-	<InUseStatus inUse={item.inUse} />
-{/snippet}
-
-{#snippet UsageBadgeList(usages: NonNullable<ImageSummary['usedBy']>, environmentId: string)}
-	{#each usages as usage, usageIndex (`${usage.type}-${usage.id ?? usage.name}-${usageIndex}`)}
-		{#if usage.type === 'project'}
-			{#if usage.id}
-				<Badge
-					variant="outline"
-					maxWidth="resource-name"
-					title={usage.name}
-					href={environmentHref(`/projects/${encodeURIComponent(usage.id)}`, environmentId)}
-				>
-					<ProjectsIcon class="size-3 shrink-0" />
-					<span class="min-w-0 truncate">{usage.name}</span>
-				</Badge>
-			{:else}
-				<Badge variant="outline" maxWidth="resource-name" title={usage.name}>
-					<ProjectsIcon class="size-3 shrink-0" />
-					<span class="min-w-0 truncate">{usage.name}</span>
-				</Badge>
-			{/if}
-		{:else if usage.id}
-			<Badge
-				variant="outline"
-				maxWidth="resource-name"
-				title={usage.name}
-				href={environmentHref(`/containers/${encodeURIComponent(usage.id)}`, environmentId)}
-			>
-				<ContainersIcon class="size-3 shrink-0" />
-				<span class="min-w-0 truncate">{usage.name}</span>
-			</Badge>
-		{:else}
-			<Badge variant="outline" maxWidth="resource-name" title={usage.name}>
-				<ContainersIcon class="size-3 shrink-0" />
-				<span class="min-w-0 truncate">{usage.name}</span>
-			</Badge>
-		{/if}
-	{/each}
+	<span class="tabular-nums">{item.runningContainers ?? m.common_unknown()}</span>
 {/snippet}
 
 {#snippet UsedByCell({ item }: { item: ImageRow })}
-	{#if item.usedBy && item.usedBy.length > 0}
-		{@const maxVisible = 3}
-		{@const hasOverflow = item.usedBy.length > maxVisible}
-		{@const visibleUsage = hasOverflow ? item.usedBy.slice(0, maxVisible) : item.usedBy}
-		{@const overflowUsage = hasOverflow ? item.usedBy.slice(maxVisible) : []}
-		<div class="flex flex-wrap gap-1.5">
-			{@render UsageBadgeList(visibleUsage, item.environmentId)}
-			{#if hasOverflow}
-				<Tooltip.Provider>
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							<Badge variant="outline">
-								+{overflowUsage.length}
-							</Badge>
-						</Tooltip.Trigger>
-						<Tooltip.Content class="pointer-events-auto">
-							<div class="flex max-w-xs flex-wrap gap-1.5">
-								{@render UsageBadgeList(overflowUsage, item.environmentId)}
-							</div>
-						</Tooltip.Content>
-					</Tooltip.Root>
-				</Tooltip.Provider>
-			{/if}
-		</div>
-	{:else}
-		<span class="text-muted-foreground">—</span>
-	{/if}
+	{#if typeof item.runningContainers !== 'number'}<span class="text-muted-foreground">{m.common_unavailable()}</span>{:else}<div
+			class="flex max-w-56 flex-col gap-1"
+		>
+			{#each (item.usedBy ?? []).slice(0, 2) as usage, index (index)}<span class="truncate text-sm" title={usage.name}
+					>{usage.name}</span
+				>{/each}{#if (item.usedBy?.length ?? 0) > 2}<span class="text-xs text-muted-foreground"
+					>+{(item.usedBy?.length ?? 0) - 2}</span
+				>{/if}{#if !item.usedBy?.length}—{/if}
+		</div>{/if}
 {/snippet}
-
 {#snippet UpdatesCell({ item }: { item: ImageRow })}
 	{@const errorHref = updateErrorHref(item)}
 	<div class="flex min-w-0 items-center">
@@ -635,14 +584,17 @@
 		}}
 		subtitle={(item) => ((mobileFieldVisibility['id'] ?? false) ? item.id : null)}
 		badges={[
-			inUseBadge(mobileFieldVisibility['inUse'] ?? true),
+			(item: ImageRow) =>
+				mobileFieldVisibility['inUse'] === false
+					? null
+					: { variant: 'gray' as const, text: `${m.common_usage()}: ${item.runningContainers ?? m.common_unknown()}` },
 			(item: ImageRow) => {
-				if (!(mobileFieldVisibility['hardened'] ?? true) || !item.hardened) return null;
+				if (!(mobileFieldVisibility['hardened'] ?? false) || !item.hardened) return null;
 				const display = hardenedImageDisplay(item.hardened);
 				return { variant: display.variant, text: display.label };
 			},
 			(item: ImageRow) => {
-				if (!(mobileFieldVisibility['updates'] ?? false)) return null;
+				if (!(mobileFieldVisibility['updates'] ?? true)) return null;
 				if (!item.repoDigests || item.repoDigests.length === 0) {
 					return { variant: 'gray' as const, text: m.image_update_local_title() };
 				}
@@ -655,6 +607,22 @@
 			}
 		]}
 		fields={[
+			{
+				label: m.images_used_by(),
+				getValue: (item: ImageRow) =>
+					typeof item.runningContainers !== 'number'
+						? m.common_unavailable()
+						: (item.usedBy ?? [])
+								.slice(0, 2)
+								.map((usage) => usage.name)
+								.join(', ') + ((item.usedBy?.length ?? 0) > 2 ? ` +${(item.usedBy?.length ?? 0) - 2}` : ''),
+				show: mobileFieldVisibility['usedBy'] ?? false
+			},
+			{
+				label: m.platform(),
+				getValue: (item: ImageRow) => item.platform ?? m.common_unknown(),
+				show: mobileFieldVisibility['platform'] ?? true
+			},
 			{
 				label: m.common_size(),
 				getValue: (item: ImageRow) => bytes.format(Number(item.size ?? 0), { unitSeparator: ' ' }),
@@ -684,16 +652,9 @@
 				type: 'component',
 				component: MobileVulnerabilitiesValue,
 				show: repositoryLibrary && vulnerabilityManagementEnabled
-			},
-			{
-				label: m.images_used_by(),
-				getValue: (item: ImageRow) => item.usedBy?.map((usage) => usage.name).join(', ') || '—',
-				icon: ImagesIcon,
-				iconVariant: 'purple' as const,
-				show: mobileFieldVisibility['usedBy'] ?? false
 			}
 		]}
-		footer={(mobileFieldVisibility['created'] ?? true)
+		footer={(mobileFieldVisibility['created'] ?? false)
 			? {
 					label: m.common_created(),
 					getValue: (item) => formatDateTimeShort(Temporal.Instant.fromEpochMilliseconds(Number(item.created || 0) * 1000)),
@@ -718,6 +679,14 @@
 		details={releaseTag && hasPermission('image-updates:read', envId) ? releaseNotes : undefined}
 		tabs={[
 			{ value: 'overview', label: m.common_overview(), visible: hasPermission('images:read', envId) },
+			{
+				value: 'containers',
+				label: m.containers(),
+				icon: ContainersIcon,
+				related: true,
+				visible: hasPermission('images:read', envId)
+			},
+			{ value: 'services', label: m.services(), icon: LayersIcon, related: true, visible: hasPermission('images:read', envId) },
 			{ value: 'history', label: m.images_history_title(), icon: LayersIcon, visible: hasPermission('images:read', envId) },
 			{
 				value: 'attestations',

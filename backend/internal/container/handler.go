@@ -59,6 +59,8 @@ type (
 		Standalone      string `query:"standalone" doc:"Filter standalone containers only (true/false)"`
 		Label           string `query:"label" doc:"Filter by label key or key=value"`
 		Status          string `query:"status" doc:"Filter by state (running, exited, paused, restarting, created, dead, stopped, unhealthy)"`
+		ImageID         string `query:"imageId" doc:"Filter by exact local image ID"`
+		VolumeName      string `query:"volumeName" doc:"Filter by exact named volume attachment"`
 		Start           int    `query:"start" default:"0" doc:"Start index"`
 		Limit           int    `query:"limit" default:"20" doc:"Limit"`
 		IncludeInternal bool   `query:"includeInternal" default:"false" doc:"Include internal containers"`
@@ -152,6 +154,12 @@ func (h *ContainerHandler) ListContainers(ctx context.Context, input *ListContai
 	}
 	if input.Status != "" {
 		params.Filters["status"] = input.Status
+	}
+	if input.ImageID != "" {
+		params.Filters["imageId"] = input.ImageID
+	}
+	if input.VolumeName != "" {
+		params.Filters["volumeName"] = input.VolumeName
 	}
 
 	if _, ok := httpx.EnvironmentScopeFromContext(ctx); ok {

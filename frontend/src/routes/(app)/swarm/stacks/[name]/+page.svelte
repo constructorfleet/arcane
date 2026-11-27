@@ -9,8 +9,9 @@
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import EditorTabStrip from '#lib/components/editor-tab-strip.svelte';
 	import ResizableSplit from '#lib/components/resizable-split.svelte';
+	import { KeyValueCard } from '#lib/components/resource-detail/index.js';
+	import SwarmKvScopedPanel from '#lib/components/swarm/swarm-kv-scoped-panel.svelte';
 	import { type TabItem } from '#lib/components/tab-bar/index.js';
-	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import * as CodeBlock from '#lib/components/ui/code-block/index.js';
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
@@ -25,7 +26,10 @@
 		EditIcon,
 		FileTextIcon,
 		StopIcon,
-		PlayIcon
+		PlayIcon,
+		NetworksIcon,
+		VolumesIcon,
+		InspectIcon
 	} from '#lib/icons/index.js';
 	import type { ActionButton } from '#lib/layouts/index.js';
 	import TabbedPageLayout from '#lib/layouts/tabbed-page-layout.svelte';
@@ -36,10 +40,14 @@
 	import type { SwarmStackSource } from '#lib/types/swarm.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
+	import { formatRelativeTime } from '#lib/utils/formatting.js';
+	import { resourceDetailHref } from '#lib/utils/resource-navigation.js';
+	import { declaredExternalResources } from '#lib/utils/swarm-resource-relations.js';
 	import { tryCatch } from '#lib/utils/try-catch.js';
 
 	import SwarmServicesTable from '../../services/components/services-table.svelte';
 	import SwarmTasksTable from '../../tasks/components/tasks-table.svelte';
+	import StackRelatedResources from '../components/stack-related-resources.svelte';
 	import { bringDownStack, bringUpStack } from '../stack-actions.js';
 
 	let { data } = $props();
@@ -53,17 +61,7 @@
 		...swarmStackQuery(data.envId, data.stackName),
 		placeholderData: (previous, query) => (query?.queryKey[1] === data.envId ? previous : undefined)
 	}));
-	const servicesQuery = createQuery(() => ({
-		...swarmStackServiceListQuery(data.environment, data.stackName, servicesRequestOptions),
-		placeholderData: (previous, query) => (query?.queryKey[1] === data.envId ? previous : undefined)
-	}));
-	const tasksQuery = createQuery(() => ({
-		...swarmStackTaskListQuery(data.environment, data.stackName, tasksRequestOptions),
-		placeholderData: (previous, query) => (query?.queryKey[1] === data.envId ? previous : undefined)
-	}));
 	const stack = $derived(stackQuery.data ?? data.stack);
-	const services = $derived(servicesQuery.data ?? data.services);
-	const tasks = $derived(tasksQuery.data ?? data.tasks);
 
 	let selectedSourceFile = $state('compose');
 	let openSourceTabs = $state<string[]>(['compose']);
@@ -105,7 +103,7 @@
 			selectedSourceFile = remaining[Math.min(Math.max(index - 1, 0), remaining.length - 1)] ?? 'compose';
 		}
 	}
-	type StackTab = 'services' | 'tasks' | 'source';
+	type StackTab = 'overview' | 'services' | 'tasks' | 'source' | 'networks' | 'volumes' | 'secrets' | 'configs';
 	const isLoading = $state({ refresh: false, remove: false, down: false, up: false });
 	const isMutating = $derived(isLoading.remove || isLoading.down || isLoading.up);
 
@@ -115,27 +113,44 @@
 	const canReadStackSource = $derived(hasPermission('swarm-stacks:read', envId));
 	const canViewSource = $derived(canReadStackSource && sourceState !== 'forbidden');
 	const tabItems = $derived<TabItem[]>([
-		...(hasLiveStack ? [{ value: 'services', label: m.services(), icon: ContainersIcon }] : []),
-		...(hasLiveStack ? [{ value: 'tasks', label: m.tasks(), icon: JobsIcon }] : []),
-		...(canViewSource ? [{ value: 'source', label: 'Source', icon: FileTextIcon }] : [])
+		{ value: 'overview', label: m.common_overview(), icon: InspectIcon },
+		{ value: 'services', label: m.services(), icon: ContainersIcon },
+		{ value: 'tasks', label: m.tasks(), icon: JobsIcon },
+		...(hasPermission('networks:list', envId)
+			? [{ value: 'networks', label: m.resource_networks_cap(), icon: NetworksIcon }]
+			: []),
+		...(hasPermission('volumes:list', envId) ? [{ value: 'volumes', label: m.resource_volumes_cap(), icon: VolumesIcon }] : []),
+		...(hasPermission('swarm-secrets:list', envId)
+			? [{ value: 'secrets', label: m.swarm_secrets_title(), icon: FileTextIcon }]
+			: []),
+		...(hasPermission('swarm-configs:list', envId)
+			? [{ value: 'configs', label: m.swarm_configs_title(), icon: FileTextIcon }]
+			: []),
+		...(canViewSource ? [{ value: 'source', label: m.source(), icon: FileTextIcon }] : [])
 	]);
 	const urlTab = useUrlTab<StackTab>({
 		history: true,
 		validTabs: () => tabItems.map((tab) => tab.value as StackTab),
-		defaultTab: () => {
-			if (hasLiveStack) return 'services';
-			if (canViewSource) return 'source';
-			return 'services';
-		}
+		defaultTab: () => 'overview'
 	});
 	const selectedTab = $derived(urlTab.value);
-	const totalServices = $derived(services?.pagination?.totalItems ?? services?.data?.length ?? 0);
-	const totalTasks = $derived(tasks?.pagination?.totalItems ?? tasks?.data?.length ?? 0);
-	const stackSubtitle = $derived(
-		hasLiveStack
-			? m.swarm_stack_namespace({ namespace: stack?.namespace ?? stackName })
-			: m.swarm_stack_saved_source({ stackName })
-	);
+	const servicesQuery = createQuery(() => ({
+		...swarmStackServiceListQuery(data.environment, data.stackName, servicesRequestOptions),
+		enabled: selectedTab === 'services',
+		placeholderData: (previous, query) => (query?.queryKey[1] === data.envId ? previous : undefined)
+	}));
+	const tasksQuery = createQuery(() => ({
+		...swarmStackTaskListQuery(data.environment, data.stackName, tasksRequestOptions),
+		enabled: selectedTab === 'tasks',
+		placeholderData: (previous, query) => (query?.queryKey[1] === data.envId ? previous : undefined)
+	}));
+	const services = $derived(servicesQuery.data ?? data.services);
+	const tasks = $derived(tasksQuery.data ?? data.tasks);
+	const relationServices = createQuery(() => ({
+		queryKey: ['swarm', data.envId, 'stack-service-references', data.stackName],
+		enabled: ['networks', 'volumes', 'secrets', 'configs'].includes(selectedTab),
+		queryFn: () => swarmService.getStackServices(data.stackName, { pagination: { page: 1, limit: -1 } }, data.envId)
+	}));
 
 	async function refreshSource(showErrorToast = false) {
 		if (!canReadStackSource) {
@@ -245,12 +260,12 @@
 					}
 				]
 			: []),
-		...(!hasLiveStack && hasPermission('swarm-stacks:update', envId)
+		...(sourceState === 'available' && hasPermission('swarm-stacks:update', envId)
 			? [
 					{
 						id: 'up',
 						action: 'start' as const,
-						label: m.common_up(),
+						label: m.deploy_saved_source(),
 						icon: PlayIcon,
 						onclick: () =>
 							bringUpStack({
@@ -316,9 +331,6 @@
 		<div class="flex min-h-9 min-w-0 items-center gap-2">
 			<LayersIcon class="size-5 shrink-0 text-primary" />
 			<h1 class="min-w-0 truncate font-semibold" title={stackName}>{stackName}</h1>
-			<Badge variant="secondary">{stackSubtitle}</Badge>
-			<Badge variant="secondary">{m.resource_header_count({ resource: m.services(), count: totalServices })}</Badge>
-			<Badge variant="secondary">{m.resource_header_count({ resource: m.tasks(), count: totalTasks })}</Badge>
 		</div>
 	{/snippet}
 	{#snippet headerActions()}
@@ -335,23 +347,96 @@
 			{/if}
 
 			<Tabs.Content value="services" layout="table">
-				<SwarmServicesTable
-					{services}
-					invalidateKey={queryKeys.swarm.stack(envId, data.stackName)}
-					bind:requestOptions={servicesRequestOptions}
-					onRetry={() => servicesQuery.refetch()}
-					persistKey={`arcane-swarm-stack-services-table-${stackName}`}
-					showEnvironment={false}
-				/>
+				{#if services}
+					<SwarmServicesTable
+						{services}
+						invalidateKey={queryKeys.swarm.stack(envId, data.stackName)}
+						bind:requestOptions={servicesRequestOptions}
+						onRetry={() => servicesQuery.refetch()}
+						persistKey={`arcane-swarm-stack-services-table-${stackName}`}
+						showEnvironment={false}
+						showStack={false}
+					/>
+				{:else}<p role="status">{servicesQuery.error?.message ?? m.common_loading()}</p>{/if}
 			</Tabs.Content>
+			<Tabs.Content value="overview">
+				<Card.Root
+					><Card.Header><Card.Title>{m.details()}</Card.Title></Card.Header><Card.Content
+						><div class="grid gap-4 sm:grid-cols-2">
+							<KeyValueCard label={m.common_name()}>{stackName}</KeyValueCard>
+							<KeyValueCard label={m.namespace()}>{stack?.namespace ?? stackName}</KeyValueCard>
+							<KeyValueCard label={m.services()} valueFormat="custom"
+								><a
+									class="text-primary-text hover:underline"
+									href={resourceDetailHref(
+										resolve(`/(app)/swarm/stacks/[name]?env=${encodeURIComponent(envId)}&tab=services`, { name: stackName })
+									)}>{stack?.services ?? m.unavailable()}</a
+								></KeyValueCard
+							>
+							<KeyValueCard label={m.tasks()} valueFormat="custom"
+								><a
+									class="text-primary-text hover:underline"
+									href={resourceDetailHref(
+										resolve(`/(app)/swarm/stacks/[name]?env=${encodeURIComponent(envId)}&tab=tasks`, { name: stackName })
+									)}>{stack?.runningTasks ?? m.unavailable()} / {stack?.desiredTasks ?? m.unavailable()}</a
+								></KeyValueCard
+							>
+							<KeyValueCard label={m.source()}
+								>{sourceState === 'available'
+									? m.saved_compose()
+									: sourceState === 'missing'
+										? m.not_imported()
+										: m.unavailable()}</KeyValueCard
+							>
+							<KeyValueCard label={m.common_created()}
+								>{formatRelativeTime(stack?.createdAt ?? '') || m.unavailable()}</KeyValueCard
+							>
+							<KeyValueCard label={m.common_updated()}
+								>{formatRelativeTime(stack?.updatedAt ?? '') || m.unavailable()}</KeyValueCard
+							>
+						</div></Card.Content
+					></Card.Root
+				>
+			</Tabs.Content>
+			{#each ['networks', 'volumes', 'secrets', 'configs'] as kind (kind)}
+				{@const externalNames =
+					sourceState === 'available' &&
+					source &&
+					(kind === 'networks' || kind === 'volumes' || kind === 'secrets' || kind === 'configs')
+						? declaredExternalResources({ composeContent: source.composeContent, overrideContent: source.overrideContent, kind })
+						: new Set<string>()}
+				<Tabs.Content value={kind} layout="table"
+					>{#if selectedTab === kind}
+						{#if relationServices.data}
+							{#if kind === 'secrets' || kind === 'configs'}<SwarmKvScopedPanel
+									{kind}
+									environmentId={envId}
+									{stackName}
+									{externalNames}
+									references={relationServices.data.data.flatMap((service) => service[kind] ?? [])}
+									incomplete={relationServices.data.data.some((service) => service[kind] === undefined)}
+								/>
+							{:else if kind === 'networks' || kind === 'volumes'}<StackRelatedResources
+									{kind}
+									environmentId={envId}
+									{stackName}
+									{externalNames}
+									services={relationServices.data.data}
+								/>{/if}
+						{:else}<p role="status">{relationServices.error?.message ?? m.common_loading()}</p>{/if}
+					{/if}</Tabs.Content
+				>
+			{/each}
 			<Tabs.Content value="tasks" layout="table">
-				<SwarmTasksTable
-					{tasks}
-					bind:requestOptions={tasksRequestOptions}
-					onRetry={() => tasksQuery.refetch()}
-					persistKey={`arcane-swarm-stack-tasks-table-${stackName}`}
-					showEnvironment={false}
-				/>
+				{#if tasks}
+					<SwarmTasksTable
+						{tasks}
+						bind:requestOptions={tasksRequestOptions}
+						onRetry={() => tasksQuery.refetch()}
+						persistKey={`arcane-swarm-stack-tasks-table-${stackName}`}
+						showEnvironment={false}
+					/>
+				{:else}<p role="status">{tasksQuery.error?.message ?? m.common_loading()}</p>{/if}
 			</Tabs.Content>
 			<Tabs.Content value="source" class="flex min-h-96 flex-1 flex-col">
 				{#if sourceState === 'available' && source}

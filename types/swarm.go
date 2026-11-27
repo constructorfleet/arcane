@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"encoding/json/jsontext"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/moby/moby/api/types/swarm"
@@ -202,6 +203,7 @@ type (
 		Role           string          `json:"role" required:"false" doc:"manager or worker"`
 		Availability   string          `json:"availability" required:"false" doc:"Scheduling availability: active, pause or drain"`
 		Status         string          `json:"status" readOnly:"true"`
+		RunningTasks   *int            `json:"runningTasks,omitempty" readOnly:"true"`
 		Address        string          `json:"address,omitempty" readOnly:"true"`
 		ManagerStatus  string          `json:"managerStatus,omitempty" readOnly:"true"`
 		ManagerAddress string          `json:"managerAddress,omitempty" readOnly:"true"`
@@ -231,24 +233,33 @@ type (
 	}
 
 	SwarmServiceSummary struct {
-		CreatedAt time.Time         `json:"createdAt"`
-		UpdatedAt time.Time         `json:"updatedAt"`
-		Labels    map[string]string `json:"labels"`
-
+		CreatedAt         time.Time         `json:"createdAt"`
+		UpdatedAt         time.Time         `json:"updatedAt"`
+		Labels            map[string]string `json:"labels"`
+		CompletedReplicas *uint64           `json:"completedReplicas"`
 		EnvironmentTag
-		ID        string              `json:"id"`
-		Name      string              `json:"name"`
-		Image     string              `json:"image"`
-		Mode      string              `json:"mode"`
-		StackName string              `json:"stackName,omitempty"`
-		Ports     []SwarmServicePort  `json:"ports"`
-		Nodes     []string            `json:"nodes"`
-		Networks  []string            `json:"networks"`
-		Mounts    []SwarmServiceMount `json:"mounts"`
+		ID                   string                   `json:"id"`
+		Name                 string                   `json:"name"`
+		Image                string                   `json:"image"`
+		Mode                 string                   `json:"mode"`
+		StackName            string                   `json:"stackName,omitempty"`
+		Ports                []SwarmServicePort       `json:"ports"`
+		Nodes                []string                 `json:"nodes"`
+		Networks             []string                 `json:"networks"`
+		NetworkIDs           []string                 `json:"networkIds"`
+		Mounts               []SwarmServiceMount      `json:"mounts"`
+		Secrets              []SwarmResourceReference `json:"secrets"`
+		Configs              []SwarmResourceReference `json:"configs"`
+		RunningImageVersions []string                 `json:"runningImageVersions,omitempty"`
+		Replicas             uint64                   `json:"replicas"`
+		RunningReplicas      uint64                   `json:"runningReplicas"`
+		StatusObserved       bool                     `json:"statusObserved"`
+	}
 
-		RunningImageVersions []string `json:"runningImageVersions,omitempty"`
-		Replicas             uint64   `json:"replicas"`
-		RunningReplicas      uint64   `json:"runningReplicas"`
+	SwarmResourceReference struct {
+		ID     string `json:"id"`
+		Name   string `json:"name"`
+		Target string `json:"target,omitempty"`
 	}
 
 	SwarmServiceInspect struct {
@@ -335,8 +346,10 @@ type (
 	}
 
 	SwarmStackSummary struct {
-		CreatedAt time.Time `json:"createdAt"`
-		UpdatedAt time.Time `json:"updatedAt"`
+		RunningTasks *uint64   `json:"runningTasks"`
+		DesiredTasks *uint64   `json:"desiredTasks"`
+		CreatedAt    time.Time `json:"createdAt"`
+		UpdatedAt    time.Time `json:"updatedAt"`
 
 		EnvironmentTag
 		ID        string `json:"id"`
@@ -350,11 +363,13 @@ type (
 	}
 
 	SwarmStackInspect struct {
-		CreatedAt time.Time `json:"createdAt"`
-		UpdatedAt time.Time `json:"updatedAt"`
-		Name      string    `json:"name"`
-		Namespace string    `json:"namespace"`
-		Services  int       `json:"services"`
+		RunningTasks *uint64   `json:"runningTasks"`
+		DesiredTasks *uint64   `json:"desiredTasks"`
+		CreatedAt    time.Time `json:"createdAt"`
+		UpdatedAt    time.Time `json:"updatedAt"`
+		Name         string    `json:"name"`
+		Namespace    string    `json:"namespace"`
+		Services     int       `json:"services"`
 	}
 
 	SwarmStackRenderConfigRequest struct {
@@ -378,7 +393,7 @@ type (
 
 	SwarmStackSource struct {
 		Name            string          `json:"name" readOnly:"true"`
-		ComposeContent  string          `json:"composeContent" required:"false" doc:"Saved compose file; saving a source redeploys the stack"`
+		ComposeContent  string          `json:"composeContent" required:"false" doc:"Saved compose file; saving never deploys the stack"`
 		OverrideContent string          `json:"overrideContent,omitempty" doc:"Compose override merged over composeContent"`
 		EnvContent      string          `json:"envContent,omitempty" doc:"Content of the stack's .env file"`
 		Files           []SwarmSyncFile `json:"files,omitempty" doc:"Extra stack files, such as env files, configs and secrets"`
@@ -416,6 +431,7 @@ type (
 		Name               string `json:"name"`
 		ServiceID          string `json:"serviceId"`
 		ServiceName        string `json:"serviceName"`
+		StackName          string `json:"stackName,omitempty"`
 		NodeID             string `json:"nodeId"`
 		NodeName           string `json:"nodeName"`
 		DesiredState       string `json:"desiredState"`
@@ -609,21 +625,63 @@ func NewSwarmServiceSummary(service swarm.Service, nodeNames []string, networkNa
 		}
 	}
 
+	var secrets []SwarmResourceReference
+	var completedReplicas *uint64
+	if service.ServiceStatus != nil {
+		completedReplicas = new(service.ServiceStatus.CompletedTasks)
+	}
+	var configs []SwarmResourceReference
+	var networkIDs []string
+	for _, ref := range spec.TaskTemplate.Networks {
+		networkIDs = append(networkIDs, ref.Target)
+	}
+	for _, vip := range service.Endpoint.VirtualIPs {
+		if !slices.Contains(networkIDs, vip.NetworkID) {
+			networkIDs = append(networkIDs, vip.NetworkID)
+		}
+	}
+	if spec.TaskTemplate.ContainerSpec != nil {
+		for _, ref := range spec.TaskTemplate.ContainerSpec.Secrets {
+			if ref == nil {
+				continue
+			}
+			target := ""
+			if ref.File != nil {
+				target = ref.File.Name
+			}
+			secrets = append(secrets, SwarmResourceReference{ID: ref.SecretID, Name: ref.SecretName, Target: target})
+		}
+		for _, ref := range spec.TaskTemplate.ContainerSpec.Configs {
+			if ref == nil {
+				continue
+			}
+			target := ""
+			if ref.File != nil {
+				target = ref.File.Name
+			}
+			configs = append(configs, SwarmResourceReference{ID: ref.ConfigID, Name: ref.ConfigName, Target: target})
+		}
+	}
 	return SwarmServiceSummary{
-		ID:              service.ID,
-		Name:            spec.Name,
-		Image:           image,
-		Mode:            mode,
-		Replicas:        replicas,
-		RunningReplicas: runningReplicas,
-		Ports:           ports,
-		CreatedAt:       service.CreatedAt,
-		UpdatedAt:       service.UpdatedAt,
-		Labels:          spec.Labels,
-		StackName:       stackName,
-		Nodes:           nodeNames,
-		Networks:        networks,
-		Mounts:          mounts,
+		ID:                service.ID,
+		Name:              spec.Name,
+		Image:             image,
+		Mode:              mode,
+		Replicas:          replicas,
+		RunningReplicas:   runningReplicas,
+		CompletedReplicas: completedReplicas,
+		StatusObserved:    service.ServiceStatus != nil,
+		Ports:             ports,
+		CreatedAt:         service.CreatedAt,
+		UpdatedAt:         service.UpdatedAt,
+		Labels:            spec.Labels,
+		StackName:         stackName,
+		Nodes:             nodeNames,
+		Networks:          networks,
+		NetworkIDs:        networkIDs,
+		Mounts:            mounts,
+		Secrets:           secrets,
+		Configs:           configs,
 	}
 }
 

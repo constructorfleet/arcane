@@ -32,6 +32,9 @@ type (
 		Search        string `query:"search" doc:"Search query"`
 		Sort          string `query:"sort" doc:"Column to sort by"`
 		Order         string `query:"order" default:"asc" doc:"Sort direction (asc or desc)"`
+		CurrentState  string `query:"currentState" doc:"Current task state"`
+		DesiredState  string `query:"desiredState" doc:"Desired task state"`
+		History       string `query:"history" enum:"active,all" doc:"Include completed shutdown history when all"`
 		NetworkID     string `query:"networkId" doc:"Filter tasks by Swarm network ID"`
 		NodeName      string `query:"nodeName" doc:"Node hostnames (comma-separated)"`
 		Start         int    `query:"start" default:"0" doc:"Start index for pagination"`
@@ -76,7 +79,12 @@ func NewHandler(swarmService *SwarmService, eventService *event.EventService) *S
 
 func (h *SwarmHandler) ListTasks(ctx context.Context, input *ListSwarmTasksInput) (*handlerutil.Page[types.SwarmTaskSummary], error) {
 	params := handlerutil.PaginationParams(input.Start, input.Limit, input.Sort, input.Order, input.Search)
-	params.Filters = map[string]string{}
+	params.Filters = map[string]string{"history": input.History, "currentState": input.CurrentState, "desiredState": input.DesiredState}
+	for key, value := range params.Filters {
+		if value == "" {
+			delete(params.Filters, key)
+		}
+	}
 	if input.NetworkID != "" {
 		params.Filters["networkId"] = input.NetworkID
 	}

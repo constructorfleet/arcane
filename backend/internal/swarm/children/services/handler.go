@@ -25,6 +25,10 @@ type (
 		Sort               string `query:"sort" doc:"Column to sort by"`
 		Order              string `query:"order" default:"asc" doc:"Sort direction (asc or desc)"`
 		NetworkID          string `query:"networkId" doc:"Filter services by Swarm network ID"`
+		SecretID           string `query:"secretId" doc:"Filter services by exact secret ID"`
+		ConfigID           string `query:"configId" doc:"Filter services by exact config ID"`
+		VolumeName         string `query:"volumeName" doc:"Filter volume mounts by exact source in this cluster"`
+		ServiceIDs         string `query:"serviceIds" doc:"Exact service IDs, comma-separated"`
 		Start              int    `query:"start" default:"0" doc:"Start index for pagination"`
 		Limit              int    `query:"limit" default:"20" doc:"Number of items per page"`
 	}
@@ -92,6 +96,18 @@ func (h *Handler) ListServices(ctx context.Context, input *ListSwarmServicesInpu
 	}
 	if input.NetworkID != "" {
 		params.Filters["networkId"] = input.NetworkID
+	}
+	if input.SecretID != "" {
+		params.Filters["secretId"] = input.SecretID
+	}
+	if input.ConfigID != "" {
+		params.Filters["configId"] = input.ConfigID
+	}
+	if input.VolumeName != "" {
+		params.Filters["volumeName"] = input.VolumeName
+	}
+	if input.ServiceIDs != "" {
+		params.Filters["serviceIds"] = input.ServiceIDs
 	}
 	if _, ok := httpx.EnvironmentScopeFromContext(ctx); ok {
 		body, err := h.service.Aggregate(ctx, params)

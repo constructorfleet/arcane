@@ -21,12 +21,15 @@ type (
 	}
 
 	ListTemplatesInput struct {
-		Search string `query:"search" doc:"Search query"`
-		Sort   string `query:"sort" doc:"Column to sort by"`
-		Order  string `query:"order" default:"asc" doc:"Sort direction"`
-		Type   string `query:"type" doc:"Filter by template type (comma-separated: false,true)"`
-		Start  int    `query:"start" default:"0" doc:"Start index"`
-		Limit  int    `query:"limit" default:"20" doc:"Items per page"`
+		Search   string `query:"search" doc:"Search query"`
+		Sort     string `query:"sort" doc:"Column to sort by"`
+		Order    string `query:"order" default:"asc" doc:"Sort direction"`
+		Registry string `query:"registry" doc:"Filter by exact template registry ID"`
+		Tags     string `query:"tags" doc:"Filter by template tag"`
+		Author   string `query:"author" doc:"Filter by declared author"`
+		Type     string `query:"type" doc:"Filter by template type (comma-separated: false,true)"`
+		Start    int    `query:"start" default:"0" doc:"Start index"`
+		Limit    int    `query:"limit" default:"20" doc:"Items per page"`
 	}
 
 	GetAllTemplatesInput struct{}
@@ -86,8 +89,11 @@ type (
 func (h *TemplateHandler) ListTemplates(ctx context.Context, input *ListTemplatesInput) (*handlerutil.Page[types.Template], error) {
 	params := handlerutil.PaginationParams(input.Start, input.Limit, input.Sort, input.Order, input.Search)
 	params.Limit = cmp.Or(params.Limit, 20)
-	if input.Type != "" {
-		params.Filters["type"] = input.Type
+	params.Filters = map[string]string{"type": input.Type, "registry": input.Registry, "tags": input.Tags, "author": input.Author}
+	for key, value := range params.Filters {
+		if value == "" {
+			delete(params.Filters, key)
+		}
 	}
 
 	templates, paginationResp, err := h.templateService.GetAllTemplatesPaginated(ctx, params)

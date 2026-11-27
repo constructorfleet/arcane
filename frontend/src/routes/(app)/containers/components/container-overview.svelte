@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import type { Snippet } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { HardenedImageBadge } from '#lib/components/badges/index.js';
@@ -9,6 +10,7 @@
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { containerService } from '#lib/services/container-service.js';
+	import { environmentStore } from '#lib/stores/environment.store.svelte.js';
 	import type { ContainerDetails } from '#lib/types/container.js';
 	import { extractApiErrorMessage } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
@@ -21,6 +23,7 @@
 	interface Props {
 		container: ContainerDetails;
 		environmentId: string;
+		linkedResources?: Snippet;
 		primaryIpAddress: string;
 		autoUpdateEnabled?: boolean;
 		autoUpdateLabelControlled?: boolean;
@@ -34,6 +37,7 @@
 	let {
 		container,
 		environmentId,
+		linkedResources,
 		primaryIpAddress,
 		autoUpdateEnabled = true,
 		autoUpdateLabelControlled = false,
@@ -116,6 +120,9 @@
 	<DetailSection title={m.runtime()} class="border-t-0 pt-0">
 		<KeyValueGrid>
 			<KeyValueCard label={m.common_id()} valueTitle={m.common_click_to_select()}>{container.id}</KeyValueCard>
+			<KeyValueCard label={m.swarm_node()} valueFormat="text"
+				>{environmentStore.available.find((agent) => agent.id === environmentId)?.name ?? environmentId}</KeyValueCard
+			>
 
 			<KeyValueCard label={m.common_image()}>{container.image || m.common_na()}</KeyValueCard>
 			<KeyValueCard label={m.containers_ip_address()}>{primaryIpAddress}</KeyValueCard>
@@ -244,6 +251,7 @@
 		</KeyValueGrid>
 	</DetailSection>
 
+	{@render linkedResources?.()}
 	{#if hasExecutionDetails}
 		<DetailSection title={m.execution()}>
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

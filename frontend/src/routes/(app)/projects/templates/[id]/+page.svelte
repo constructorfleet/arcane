@@ -22,16 +22,15 @@
 	import {
 		EllipsisIcon,
 		CodeIcon,
-		GlobeIcon,
 		ContainersIcon,
 		FileTextIcon,
-		RegistryIcon,
 		ExternalLinkIcon,
 		MoveToFolderIcon,
 		TemplateIcon,
 		TrashIcon
 	} from '#lib/icons/index.js';
 	import { ResourceDetailLayout } from '#lib/layouts/index.js';
+	import TabbedPageLayout from '#lib/layouts/tabbed-page-layout.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { templateService } from '#lib/services/template-service.js';
@@ -301,10 +300,10 @@
 		tabs: () => [
 			{ value: 'overview', label: m.common_overview(), icon: TemplateIcon },
 			{ value: 'compose', label: 'compose.yaml', icon: CodeIcon },
-			{ value: 'env', label: '.env', icon: FileTextIcon, visible: !!data.templateData.envContent }
+			{ value: 'env', label: '.env', icon: FileTextIcon, visible: template.isRemote && !!data.templateData.envContent }
 		],
 		defaultTab: () => 'overview',
-		ready: () => template.isRemote
+		ready: () => true
 	});
 
 	const metaItems = $derived(
@@ -319,87 +318,102 @@
 	);
 </script>
 
+{#snippet localTemplateActions()}
+	<ArcaneButton action="cancel" customLabel={m.common_reset()} onclick={handleReset} disabled={!hasChanges || status.saving} />
+	<ArcaneButton action="save" onclick={handleSave} disabled={!canSave} loading={status.saving} loadingLabel={m.common_saving()} />
+	<DropdownMenu.Root>
+		<DropdownMenu.Trigger>
+			{#snippet child({ props })}
+				<ArcaneButton {...props} action="base" tone="ghost" size="icon" class="size-9">
+					<span class="sr-only">{m.common_open_menu()}</span>
+					<EllipsisIcon class="size-4" />
+				</ArcaneButton>
+			{/snippet}
+		</DropdownMenu.Trigger>
+		<DropdownMenu.Content align="end">
+			<IfPermitted perm="projects:create">
+				<DropdownMenu.Item onclick={() => goto(resolve(`/(app)/projects/new?templateId=${encodeURIComponent(template.id)}`))}>
+					<MoveToFolderIcon class="size-4" />
+					{m.compose_create_project()}
+				</DropdownMenu.Item>
+				<DropdownMenu.Separator />
+			</IfPermitted>
+			<DropdownMenu.Item variant="destructive" onclick={handleDelete} disabled={status.isDeleting}>
+				{#if status.isDeleting}
+					<Spinner class="size-4" />
+				{:else}
+					<TrashIcon class="size-4" />
+				{/if}
+				{m.templates_delete_template()}
+			</DropdownMenu.Item>
+		</DropdownMenu.Content>
+	</DropdownMenu.Root>
+{/snippet}
+
 {#if !template.isRemote}
-	<TemplateEditorWorkspace
-		bind:inputs={form.inputs}
-		bind:validation
-		{originalName}
-		{originalCompose}
-		{originalEnv}
-		fileIdPrefix="templates:custom:{template.id}"
-		{globalVariableMap}
-		saving={status.saving}
-		lockNameAndDescription={data.templateData.isFolderTemplate}
-		onSubmit={handleSave}
+	<TabbedPageLayout
+		backUrl={resolve('/(app)/projects/templates')}
+		backLabel={m.templates_title()}
+		tabItems={urlTab.items}
+		selectedTab={urlTab.value}
+		onTabChange={urlTab.select}
 	>
-		{#snippet toolbarActions()}
-			<ArcaneButton action="cancel" onclick={handleReset} disabled={!hasChanges || status.saving}>
-				{m.common_reset()}
-			</ArcaneButton>
-			<ArcaneButton
-				action="save"
-				onclick={handleSave}
-				disabled={!canSave}
-				loading={status.saving}
-				loadingLabel={m.common_saving()}
-			/>
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger>
-					{#snippet child({ props })}
-						<ArcaneButton {...props} action="base" tone="ghost" size="icon" class="size-9">
-							<span class="sr-only">{m.common_open_menu()}</span>
-							<EllipsisIcon class="size-4" />
-						</ArcaneButton>
-					{/snippet}
-				</DropdownMenu.Trigger>
-				<DropdownMenu.Content align="end">
-					<IfPermitted perm="projects:create">
-						<DropdownMenu.Item onclick={() => goto(resolve(`/(app)/projects/new?templateId=${encodeURIComponent(template.id)}`))}>
-							<MoveToFolderIcon class="size-4" />
-							{m.compose_create_project()}
-						</DropdownMenu.Item>
-						<DropdownMenu.Separator />
-					</IfPermitted>
-					<DropdownMenu.Item variant="destructive" onclick={handleDelete} disabled={status.isDeleting}>
-						{#if status.isDeleting}
-							<Spinner class="size-4" />
-						{:else}
-							<TrashIcon class="size-4" />
-						{/if}
-						{m.templates_delete_template()}
-					</DropdownMenu.Item>
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
+		{#snippet headerInfo()}<h1 class="font-semibold">{template.name}</h1>{/snippet}
+		{#snippet headerActions()}{@render localTemplateActions()}{/snippet}
+		{#snippet tabContent()}
+			<Tabs.Content value="overview" layout="panel"
+				><div class="space-y-4 rounded-lg border border-border p-4 sm:p-6">
+					<KeyValueGrid>
+						<KeyValueCard label={m.common_description()}>{template.description || m.common_na()}</KeyValueCard>
+						<KeyValueCard label={m.source()}>{m.local()}</KeyValueCard>
+						<KeyValueCard label={m.common_id()}>{template.id}</KeyValueCard>
+						{#each metaItems as item (item.label)}<KeyValueCard label={item.label}>{item.value}</KeyValueCard>{/each}
+						{#if template.metadata?.tags?.length}<KeyValueCard label={m.common_tags()} valueFormat="custom"
+								><div class="flex flex-wrap gap-1.5">
+									{#each template.metadata.tags as tag, index (`${index}:${tag}`)}<Badge variant="outline">{tag}</Badge>{/each}
+								</div></KeyValueCard
+							>{/if}
+					</KeyValueGrid>
+				</div></Tabs.Content
+			>
+			<Tabs.Content value="compose" class="h-full min-h-0">
+				<TemplateEditorWorkspace
+					embedded
+					toolbarActions={localTemplateActions}
+					bind:inputs={form.inputs}
+					bind:validation
+					{originalName}
+					{originalCompose}
+					{originalEnv}
+					fileIdPrefix="templates:custom:{template.id}"
+					{globalVariableMap}
+					saving={status.saving}
+					lockNameAndDescription={data.templateData.isFolderTemplate}
+					onSubmit={handleSave}
+				></TemplateEditorWorkspace>
+			</Tabs.Content>
 		{/snippet}
-	</TemplateEditorWorkspace>
+	</TabbedPageLayout>
 {:else}
 	<ResourceDetailLayout
 		icon={TemplateIcon}
 		backUrl="/projects/templates"
 		backLabel={m.templates_title()}
 		title={template.name}
-		subtitle={template.description}
 		actions={remoteActions}
 	>
-		{#snippet badges()}
-			<Badge variant="secondary">
-				<GlobeIcon class="size-3" />
-				{m.templates_remote()}
-			</Badge>
-			{#if template.registry?.name}
-				<Badge variant="outline">
-					<RegistryIcon class="size-3" />
-					{template.registry.name}
-				</Badge>
-			{/if}
-		{/snippet}
-
 		<Tabs.Root value={urlTab.value}>
 			<div class="space-y-6">
 				<TabBar items={urlTab.items} onValueChange={(value) => urlTab.select(value)} />
 
 				<Tabs.Content value="overview" layout="panel">
 					<div class="space-y-6">
+						<KeyValueGrid
+							><KeyValueCard label={m.common_description()}>{template.description || m.common_na()}</KeyValueCard><KeyValueCard
+								label={m.source()}>{m.templates_remote()}</KeyValueCard
+							><KeyValueCard label={m.common_registry()}>{template.registry?.name || m.common_unknown()}</KeyValueCard
+							><KeyValueCard label={m.common_id()}>{template.id}</KeyValueCard></KeyValueGrid
+						>
 						{#if metaItems.length > 0 || template.metadata?.documentationUrl || template.metadata?.tags?.length}
 							<KeyValueGrid>
 								{#each metaItems as item (item.label)}

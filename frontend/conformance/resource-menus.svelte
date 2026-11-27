@@ -8,7 +8,7 @@
 	const scenario = new URLSearchParams(location.search).get('scenario') ?? 'service';
 	let releaseNotesOpen = $state(false);
 	const disabled = scenario === 'unavailable';
-	const tabs: (TabItem & { visible?: boolean; related?: boolean })[] =
+	const tabs: (TabItem & { visible?: boolean; related?: boolean; href?: string })[] =
 		scenario === 'overview-only'
 			? [
 					{ value: 'overview', label: 'Overview' },
@@ -27,6 +27,16 @@
 		tabs.push(
 			{ value: 'config', label: 'Duplicate configuration', related: true },
 			{ value: 'overview', label: 'Duplicate overview' }
+		);
+	if (scenario === 'owners')
+		tabs.push(
+			{ value: 'stack', label: 'Owning stack', related: true, href: '/swarm/stacks/observability?env=manager&tab=overview' },
+			{
+				value: 'duplicate-stack',
+				label: 'Duplicate stack',
+				related: true,
+				href: '/swarm/stacks/observability?tab=overview&env=manager'
+			}
 		);
 </script>
 

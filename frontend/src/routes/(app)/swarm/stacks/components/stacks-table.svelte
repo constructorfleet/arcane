@@ -5,6 +5,7 @@
 	import { toast } from 'svelte-sonner';
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
+	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
 	import type { ColumnSpec, MobileFieldVisibility } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
@@ -12,7 +13,18 @@
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import IfPermitted from '#lib/components/if-permitted.svelte';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
-	import { LayersIcon, EditIcon, ContainersIcon, InspectIcon, TrashIcon, StopIcon, PlayIcon } from '#lib/icons/index.js';
+	import {
+		LayersIcon,
+		EditIcon,
+		ContainersIcon,
+		TrashIcon,
+		StopIcon,
+		PlayIcon,
+		FileTextIcon,
+		NetworksIcon,
+		VolumesIcon,
+		JobsIcon
+	} from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { swarmService } from '#lib/services/swarm-service.js';
@@ -20,6 +32,7 @@
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import type { SwarmStacksPaginatedResponse } from '#lib/types/ui/swarm.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
+	import { hasPermission } from '#lib/utils/auth.js';
 	import { environmentHref, type EnvironmentPage, type EnvironmentRow } from '#lib/utils/environments.js';
 	import { formatRelativeTime } from '#lib/utils/formatting.js';
 	import { resourceTableHref } from '#lib/utils/resource-navigation.js';
@@ -46,7 +59,7 @@
 
 	let isLoading = $state(false);
 
-	function stackHref(stack: StackRow, tab?: 'services' | 'source' | 'tasks') {
+	function stackHref(stack: StackRow, tab?: string) {
 		const path = resolve('/(app)/swarm/stacks/[name]', { name: encodeURIComponent(stack.name) });
 		return resourceTableHref(
 			environmentHref(path + (tab ? `?tab=${tab}` : ''), stack.environmentId),
@@ -90,8 +103,11 @@
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
 		...environmentColumns<StackRow>(),
 		{ accessorKey: 'name', title: m.common_name(), sortable: true, cell: NameCell },
-		{ accessorKey: 'services', title: m.services(), sortable: true },
-		{ accessorKey: 'createdAt', title: m.common_created(), sortable: true, cell: CreatedCell },
+		{ accessorKey: 'services', title: m.services(), sortable: true, cell: ServicesCell },
+		{ id: 'tasks', title: m.tasks(), cell: TasksCell },
+		{ id: 'source', title: m.source(), cell: SourceCell },
+		{ id: 'deploymentOwner', title: m.deployment_owner(), cell: DeploymentOwnerCell },
+		{ accessorKey: 'createdAt', title: m.common_created(), sortable: true, cell: CreatedCell, hidden: true },
 		{ accessorKey: 'updatedAt', title: m.common_updated(), sortable: true, cell: UpdatedCell }
 	] satisfies ColumnSpec<StackRow>[];
 
@@ -109,6 +125,20 @@
 		{item.name}
 	</a>
 {/snippet}
+
+{#snippet ServicesCell({ item }: { item: StackRow })}<a
+		href={stackHref(item, 'services')}
+		class="text-primary-text hover:underline">{item.services}</a
+	>{/snippet}
+{#snippet TasksCell({ item }: { item: StackRow })}<a
+		href={stackHref(item, 'tasks')}
+		class="font-mono hover:underline"
+		class:text-success={!!item.desiredTasks && item.runningTasks != null && item.runningTasks >= item.desiredTasks}
+		class:text-destructive={!!item.desiredTasks && item.runningTasks != null && item.runningTasks < item.desiredTasks}
+		>{item.runningTasks ?? m.unavailable()} / {item.desiredTasks ?? m.unavailable()}</a
+	>{/snippet}
+{#snippet SourceCell({ item }: { item: StackRow })}{item.hasSource ? m.saved_compose() : m.not_imported()}{/snippet}
+{#snippet DeploymentOwnerCell()}{m.common_unknown()}{/snippet}
 
 {#snippet CreatedCell({ value }: { value: unknown })}
 	<span class="text-sm">{formatRelativeTime(String(value ?? '')) || m.common_unknown()}</span>
@@ -156,15 +186,48 @@
 
 {#snippet RowActions({ item }: { item: StackRow })}
 	<RowActionsMenu name={item.name}>
-		{#if item.services > 0}<DropdownMenu.Item onclick={() => goto(stackHref(item, 'tasks'))}>{m.view_tasks()}</DropdownMenu.Item
-			>{/if}
-		<DropdownMenu.Item onclick={() => goto(stackHref(item))}>
-			<InspectIcon class="size-4" />
-			{m.common_inspect()}
-		</DropdownMenu.Item>
-		<DropdownMenu.Item onclick={() => goto(stackHref(item, 'services'))}>
-			<ContainersIcon />{m.resource_view_services()}
-		</DropdownMenu.Item>
+		<DetailLinksMenu
+			href={stackHref(item)}
+			tabs={[
+				{ value: 'overview', label: m.common_overview() },
+				{
+					value: 'source',
+					label: m.source(),
+					icon: FileTextIcon,
+					visible: hasPermission('swarm-stacks:read', item.environmentId)
+				},
+				{ value: 'services', label: m.services(), icon: ContainersIcon, related: true, visible: item.services > 0 },
+				{ value: 'tasks', label: m.tasks(), icon: JobsIcon, related: true, visible: item.services > 0 },
+				{
+					value: 'networks',
+					label: m.resource_networks_cap(),
+					icon: NetworksIcon,
+					related: true,
+					visible: hasPermission('networks:list', item.environmentId)
+				},
+				{
+					value: 'volumes',
+					label: m.resource_volumes_cap(),
+					icon: VolumesIcon,
+					related: true,
+					visible: hasPermission('volumes:list', item.environmentId)
+				},
+				{
+					value: 'secrets',
+					label: m.swarm_secrets_title(),
+					icon: FileTextIcon,
+					related: true,
+					visible: hasPermission('swarm-secrets:list', item.environmentId)
+				},
+				{
+					value: 'configs',
+					label: m.swarm_configs_title(),
+					icon: FileTextIcon,
+					related: true,
+					visible: hasPermission('swarm-configs:list', item.environmentId)
+				}
+			]}
+		/>
 		<IfPermitted perm="swarm-stacks:update" envId={item.environmentId}>
 			<DropdownMenu.Separator />
 			{#if item.hasSource}

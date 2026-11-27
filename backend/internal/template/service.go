@@ -242,6 +242,16 @@ func (s *TemplateService) GetAllTemplatesPaginated(ctx context.Context, params p
 			},
 		},
 		SortBindings: []pagination.SortBinding[types.Template]{
+			{Key: "version", Fn: func(a, b types.Template) int {
+				left, right := "", ""
+				if a.Metadata != nil {
+					left = kit.FromPtr(a.Metadata.Version)
+				}
+				if b.Metadata != nil {
+					right = kit.FromPtr(b.Metadata.Version)
+				}
+				return strings.Compare(left, right)
+			}},
 			{
 				Key: "name",
 				Fn: func(a, b types.Template) int {
@@ -265,6 +275,13 @@ func (s *TemplateService) GetAllTemplatesPaginated(ctx context.Context, params p
 			},
 		},
 		FilterAccessors: []pagination.FilterAccessor[types.Template]{
+			{Key: "registry", Fn: func(item types.Template, value string) bool { return kit.FromPtr(item.RegistryID) == value }},
+			{Key: "tags", Fn: func(item types.Template, value string) bool {
+				return item.Metadata != nil && slices.Contains(item.Metadata.Tags, value)
+			}},
+			{Key: "author", Fn: func(item types.Template, value string) bool {
+				return item.Metadata != nil && kit.FromPtr(item.Metadata.Author) == value
+			}},
 			{
 				Key: "type",
 				Fn: func(item types.Template, filterValue string) bool {
