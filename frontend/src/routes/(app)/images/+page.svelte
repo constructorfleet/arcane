@@ -28,7 +28,6 @@
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
 	import { extractApiErrorMessage } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
-	import { pinViewAction } from '#lib/utils/dashboard-layout.js';
 	import {
 		acrossEnvironmentsNote,
 		actionEnvironments,
@@ -313,7 +312,7 @@
 				href: resolve('/(app)/images')
 			});
 		}
-		buttons.push(pinViewAction('images', pageState.requestOptions, readableEnvironments('images:list', data.linkedAgent)));
+
 		buttons.push({
 			id: 'refresh',
 			action: 'refresh',

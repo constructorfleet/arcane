@@ -20,7 +20,6 @@
 	import type { ProjectStatusCounts } from '#lib/types/project.js';
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
-	import { pinViewAction } from '#lib/utils/dashboard-layout.js';
 	import {
 		acrossEnvironmentsNote,
 		actionEnvironments,
@@ -245,7 +244,7 @@
 				disabled: !resourcesReady || checkUpdatesMutation.isPending
 			});
 		}
-		buttons.push(pinViewAction('projects', projectRequestOptions, readableEnvironments('projects:list')));
+
 		buttons.push({
 			id: 'refresh',
 			action: 'refresh',

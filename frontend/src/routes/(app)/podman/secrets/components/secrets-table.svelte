@@ -7,7 +7,6 @@
 	import type { ColumnSpec, MobileFieldVisibility } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
-	import { LabelBadges } from '#lib/components/badges/index.js';
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { CalendarIcon, EditIcon, LockIcon, TrashIcon } from '#lib/icons/index.js';
@@ -73,7 +72,7 @@
 		{ accessorKey: 'id', title: m.common_id(), hidden: true },
 		{ id: 'name', accessorFn: (item) => item.spec.name, title: m.common_name(), sortable: true, cell: NameCell },
 		{ id: 'driver', accessorFn: (item) => item.spec.driver.name, title: m.common_driver(), sortable: true },
-		{ id: 'labels', accessorFn: (item) => item.spec.labels, title: m.common_labels(), cell: LabelsCell },
+
 		{ accessorKey: 'createdAt', title: m.common_created(), sortable: true, cell: TimeCell },
 		{ accessorKey: 'updatedAt', title: m.common_updated(), sortable: true, cell: TimeCell }
 	] satisfies ColumnSpec<SecretRow>[]);
@@ -87,10 +86,6 @@
 
 {#snippet NameCell({ item }: { item: SecretRow })}
 	<button type="button" class="font-medium hover:underline" onclick={() => onEdit(item)}>{item.spec.name}</button>
-{/snippet}
-
-{#snippet LabelsCell({ item }: { item: SecretRow })}
-	<LabelBadges labels={item.spec.labels} />
 {/snippet}
 
 {#snippet TimeCell({ value }: { value: unknown })}

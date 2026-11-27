@@ -36,7 +36,6 @@
 	import type { VersionInfo } from '#lib/types/version.js';
 	import { handleApiResultWithCallbacks } from '#lib/utils/api.js';
 	import { hasPermission } from '#lib/utils/auth.js';
-	import { createDashboardWidget, pinDashboardWidget } from '#lib/utils/dashboard-layout.js';
 	import { getEnvironmentStatusVariant, isEnvironmentOnline, resolveEnvironmentStatus } from '#lib/utils/docker.js';
 	import { getEnvironmentTypeLabel, resolveEnvironmentTransport } from '#lib/utils/environments.js';
 	import { capitalizeFirstLetter } from '#lib/utils/formatting.js';
@@ -343,9 +342,7 @@
 				onclick={() => goto(resolve(`/(app)/settings/docker?env=${encodeURIComponent(item.id)}`))}
 				>{m.settings()}</DropdownMenu.Item
 			>{/if}
-		<DropdownMenu.Item onclick={() => pinDashboardWidget(createDashboardWidget('environment', { environmentIds: [item.id] }))}
-			>{m.pin_to_dashboard()}</DropdownMenu.Item
-		>
+
 		{#if item.id !== '0' && hasPermission('environments:sync', item.id)}
 			<DropdownMenu.Item disabled={syncingIds.includes(item.id)} onclick={() => handleSync(item.id)}
 				>{m.resource_sync_cap()}</DropdownMenu.Item

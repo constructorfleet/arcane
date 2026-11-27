@@ -17,7 +17,6 @@
 	import type { VolumeUsageCounts } from '#lib/types/volume.js';
 	import { activityToastOptions, extractActivityId } from '#lib/utils/activity-toast.js';
 	import { extractApiErrorMessage } from '#lib/utils/api.js';
-	import { pinViewAction } from '#lib/utils/dashboard-layout.js';
 	import { environmentName, hasShownPermission, readableEnvironments } from '#lib/utils/environments.js';
 	import { ResourceListPageState } from '#lib/utils/resource-list-page.svelte.js';
 
@@ -115,7 +114,7 @@
 				href: resolve('/(app)/volumes')
 			});
 		}
-		buttons.push(pinViewAction('volumes', pageState.requestOptions, readableEnvironments('volumes:list', data.linkedAgent)));
+
 		buttons.push({
 			id: 'refresh',
 			action: 'refresh',

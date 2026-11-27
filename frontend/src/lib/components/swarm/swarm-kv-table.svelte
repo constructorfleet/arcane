@@ -7,7 +7,6 @@
 	import type { ColumnSpec, MobileFieldVisibility } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
-	import { LabelBadges } from '#lib/components/badges/index.js';
 	import { openConfirmDialog } from '#lib/components/confirm-dialog/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { CalendarIcon, EditIcon, TrashIcon } from '#lib/icons/index.js';
@@ -86,15 +85,12 @@
 					}
 				]
 			: []),
-		{ id: 'labels', accessorFn: (item) => item.spec.Labels, title: m.common_labels(), cell: LabelsCell },
+
 		{ accessorKey: 'createdAt', title: m.common_created(), sortable: true, cell: TimeCell },
 		{ accessorKey: 'updatedAt', title: m.common_updated(), sortable: true, cell: TimeCell }
 	] satisfies ColumnSpec<KvRow>[]);
 
-	const mobileFields = [
-		{ id: 'labels', label: m.common_labels(), defaultVisible: true },
-		{ id: 'createdAt', label: m.common_created(), defaultVisible: true }
-	];
+	const mobileFields = [{ id: 'createdAt', label: m.common_created(), defaultVisible: true }];
 </script>
 
 {#snippet NameCell({ item }: { item: KvRow })}
@@ -103,10 +99,6 @@
 
 {#snippet DriverCell({ item }: { item: KvRow })}
 	<span class="text-sm text-muted-foreground">{item.spec.Driver?.Name || '-'}</span>
-{/snippet}
-
-{#snippet LabelsCell({ item }: { item: KvRow })}
-	<LabelBadges labels={item.spec.Labels} />
 {/snippet}
 
 {#snippet TimeCell({ value }: { value: unknown })}
@@ -118,8 +110,6 @@
 		{item}
 		icon={{ component: resource.icon, variant: 'purple' }}
 		title={(item: KvRow) => item.spec.Name}
-		subtitle={(item: KvRow) =>
-			(mobileFieldVisibility['labels'] ?? true) ? Object.keys(item.spec.Labels ?? {}).join(', ') || null : null}
 		footer={(mobileFieldVisibility['createdAt'] ?? true)
 			? {
 					label: m.common_created(),

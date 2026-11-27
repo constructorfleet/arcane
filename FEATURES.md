@@ -338,6 +338,17 @@ and current mitigation status are recorded in
 [infrastructure issue #76](https://gitea.home.prettybaked.com/constructorfleet/arcane/issues/76).
 These observations do not establish the initiating allocation of the global OOM.
 
+## Resource design contract
+
+Acceptance and implementation status are maintained in [RESOURCE_DESIGN.md](./RESOURCE_DESIGN.md) and [RESOURCE_IMPLEMENTATION.md](./RESOURCE_IMPLEMENTATION.md), with an [interactive wireframe](./output/resource-navigation-contract.html).
+
+- [x] UX-01 — Approve and version resource columns, navigation, ownership/reference mappings and shared presentation contracts.
+- [ ] UX-02 — Apply shared list/action/header/Overview rules across resources, including node terminology and removing labels from all tables.
+- [ ] UX-03 — Implement missing scoped relationship tabs and verified destinations without name-based guesses or per-row fleet fan-out.
+- [ ] UX-04 — Apply task history and verified running-container navigation rules across list/mobile/menu surfaces.
+- [ ] UX-05 — Complete global/replicated desired-image correctness and canonical fleet security reporting/collection; preserve cf.106–108 behavior.
+- [ ] UX-06 — Import editable Swarm Compose and manually sync to a separate repository; save/import never deploys.
+
 ## Decisions still open
 
 - [ ] DEC-01 — Confirm the exact custom tags/authoring conveniences worth keeping.

@@ -50,7 +50,6 @@
 	import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 	import { hasPermission } from '#lib/utils/auth.js';
 	import { hasAnyLoadingState } from '#lib/utils/bulk-actions.js';
-	import { createDashboardWidget, pinDashboardWidget } from '#lib/utils/dashboard-layout.js';
 	import { getStatusVariant, getThemedIconUrl } from '#lib/utils/docker.js';
 	import {
 		getProjectUpdateStatus,
@@ -226,8 +225,7 @@
 					cell: UpdatesCell
 				},
 				{ accessorKey: 'createdAt', title: m.common_created(), sortable: true, cell: CreatedCell },
-				{ accessorKey: 'serviceCount', title: m.services(), sortable: true },
-				{ id: 'label', accessorFn: () => '', title: m.common_labels(), hidden: true }
+				{ accessorKey: 'serviceCount', title: m.services(), sortable: true }
 			] satisfies ColumnSpec<ProjectRow>[]
 	);
 
@@ -519,12 +517,6 @@
 	{@const lifecycleDisabled = item.isArchived || isBulkActionRunning || !!status || configurationBlocked}
 	{@const archivedTitle = getRowArchivedTitle(item, configurationBlocked)}
 	<RowActionsMenu name={item.name}>
-		<DropdownMenu.Item
-			onclick={() =>
-				pinDashboardWidget(
-					createDashboardWidget('resource', { resourceKind: 'projects', environmentIds: [envId], resourceId: item.id })
-				)}>{m.pin_to_dashboard()}</DropdownMenu.Item
-		>
 		<DetailLinksMenu
 			href={resolve(`/(app)/projects/[projectId]?env=${encodeURIComponent(envId)}`, { projectId: item.id })}
 			tabs={[

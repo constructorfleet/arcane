@@ -5,12 +5,10 @@ import { toast } from 'svelte-sonner';
 import type { ActionButton } from '#lib/components/action-button-group/types.js';
 import { PinOnIcon } from '#lib/icons/index.js';
 import { m } from '#lib/paraglide/messages.js';
-import { environmentStore, type EnvironmentRef } from '#lib/stores/environment.store.svelte.js';
+import { environmentStore } from '#lib/stores/environment.store.svelte.js';
 import userStore from '#lib/stores/user-store.svelte.js';
-import type { SearchPaginationSortRequest } from '#lib/types/ui/pagination.js';
 import type { DashboardWidgetType } from '#lib/types/ui/user.js';
-import type { DashboardResourceKind, DashboardWidgetConfig, DashboardWidgetLayout } from '#lib/types/user.js';
-import { ENVIRONMENT_FILTER, environmentFilterIds } from '#lib/utils/environments.js';
+import type { DashboardWidgetConfig, DashboardWidgetLayout } from '#lib/types/user.js';
 import { saveUserPreferences } from '#lib/utils/user-preferences.js';
 
 export const GRID_COLUMNS = 12;
@@ -208,32 +206,5 @@ export function pinDashboardAction(id: string, label: string, widget: () => Dash
 		icon: PinOnIcon,
 		group: 'manage',
 		onclick: () => pinDashboardWidget(widget())
-	};
-}
-
-export function pinViewAction(
-	resourceKind: DashboardResourceKind,
-	request: SearchPaginationSortRequest,
-	environments: EnvironmentRef[]
-): ActionButton {
-	return {
-		...pinDashboardAction('pin-view', m.pin_this_view(), () => {
-			const { [ENVIRONMENT_FILTER]: environmentFilter, ...filters } = request.filters ?? {};
-			const picked = environmentFilterIds(environmentFilter, environments);
-			const entries = Object.entries(filters).map(([key, value]): [string, string] => [
-				key,
-				Array.isArray(value) ? value.join(',') : String(value)
-			]);
-			return createDashboardWidget('resourceQuery', {
-				resourceKind,
-				environmentIds: picked.length > 0 ? picked : environments.map((environment) => environment.id),
-				search: request.search || undefined,
-				filters: entries.length > 0 ? Object.fromEntries(entries) : undefined,
-				display: 'list',
-				limit: 10
-			});
-		}),
-		placement: 'secondary',
-		iconOnly: true
 	};
 }

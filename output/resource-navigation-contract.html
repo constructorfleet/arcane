@@ -1,0 +1,3821 @@
+<style>
+	#resource-design {
+		color-scheme: light dark;
+		font: 14px/1.5 system-ui;
+		color: light-dark(#22242a, #e7e8ec);
+	}
+	#resource-design * {
+		box-sizing: border-box;
+	}
+	#resource-design {
+		--paper: light-dark(#fff, #17181c);
+		--line: light-dark(#dedfe4, #353740);
+		--muted: light-dark(#646773, #b3b6c1);
+		--soft: light-dark(#f5f6f8, #22242b);
+		--link: light-dark(#275baf, #98baff);
+	}
+	#resource-design button,
+	#resource-design select,
+	#resource-design input {
+		font: inherit;
+		color: inherit;
+		background: var(--paper);
+		border: 1px solid var(--line);
+		border-radius: 6px;
+		padding: 7px 10px;
+		max-width: 100%;
+	}
+	#resource-design button,
+	#resource-design summary {
+		cursor: pointer;
+	}
+	#resource-design button:disabled {
+		cursor: default;
+		color: var(--muted);
+	}
+	#resource-design .controls {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px 18px;
+		margin-bottom: 16px;
+		align-items: end;
+	}
+	#resource-design label {
+		display: grid;
+		gap: 5px;
+	}
+	#resource-design .preview-note {
+		color: var(--muted);
+		font-size: 12px;
+		margin: 10px 0;
+	}
+	#resource-design .paper {
+		background: var(--paper);
+		border: 1px solid var(--line);
+		border-radius: 9px;
+		padding: 22px;
+		min-height: 530px;
+	}
+	#resource-design .header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 12px;
+		flex-wrap: wrap;
+		margin-bottom: 18px;
+	}
+	#resource-design h1 {
+		font-size: 20px;
+		font-weight: 600;
+		margin: 0;
+	}
+	#resource-design h2 {
+		font-size: 16px;
+		font-weight: 600;
+		margin: 0 0 12px;
+	}
+	#resource-design h3 {
+		font-size: 14px;
+		font-weight: 600;
+		margin: 0 0 8px;
+	}
+	#resource-design p {
+		margin: 8px 0;
+	}
+	#resource-design .heading,
+	#resource-design .buttons {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 9px;
+	}
+	#resource-design .status {
+		border-radius: 4px;
+		padding: 3px 7px;
+		background: var(--soft);
+		font-size: 12px;
+	}
+	#resource-design .primary {
+		background: light-dark(#272930, #e0e2e8);
+		color: light-dark(#fff, #23242b);
+	}
+	#resource-design .toolbar {
+		display: flex;
+		gap: 8px;
+		flex-wrap: wrap;
+		margin-bottom: 14px;
+	}
+	#resource-design .crumbs {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 5px;
+		color: var(--muted);
+		font-size: 12px;
+		margin-bottom: 14px;
+	}
+	#resource-design .text-link {
+		border: 0;
+		background: transparent;
+		padding: 0;
+		color: var(--link);
+		text-align: left;
+		border-radius: 0;
+	}
+	#resource-design table {
+		border-collapse: collapse;
+		width: 100%;
+		font-size: 13px;
+	}
+	#resource-design td,
+	#resource-design th {
+		text-align: left;
+		padding: 11px 9px;
+		border-bottom: 1px solid var(--line);
+		vertical-align: top;
+		overflow-wrap: anywhere;
+	}
+	#resource-design th {
+		color: var(--muted);
+		font-weight: 500;
+	}
+	#resource-design .table-wrap {
+		overflow: auto;
+	}
+	#resource-design .table-wrap table {
+		min-width: 490px;
+	}
+	#resource-design .menu-area {
+		display: flex;
+		justify-content: flex-end;
+		margin-top: 8px;
+	}
+	#resource-design .menu {
+		width: 290px;
+		max-width: 100%;
+		border: 1px solid var(--line);
+		border-radius: 7px;
+		background: var(--paper);
+		padding: 5px;
+		box-shadow: 0 4px 12px #00000012;
+	}
+	#resource-design .menu button,
+	#resource-design summary {
+		display: flex;
+		gap: 9px;
+		align-items: center;
+		width: 100%;
+		padding: 7px 9px;
+		border: 0;
+		background: transparent;
+		text-align: left;
+	}
+	#resource-design .menu button:hover,
+	#resource-design summary:hover {
+		background: var(--soft);
+	}
+	#resource-design summary {
+		list-style: none;
+	}
+	#resource-design summary::-webkit-details-marker {
+		display: none;
+	}
+	#resource-design .related {
+		border-top: 1px solid var(--line);
+		border-bottom: 1px solid var(--line);
+		margin: 4px 0;
+		padding: 4px 0;
+	}
+	#resource-design .related nav {
+		padding: 0 3px 3px 18px;
+	}
+	#resource-design .related small {
+		display: block;
+		color: var(--muted);
+		font-size: 12px;
+	}
+	#resource-design .item-copy {
+		display: block;
+	}
+	#resource-design .symbol {
+		width: 17px;
+		flex-shrink: 0;
+		text-align: center;
+		display: inline-block;
+	}
+	#resource-design .danger {
+		color: light-dark(#b32e37, #ff9aa2);
+	}
+	#resource-design hr {
+		border: 0;
+		border-top: 1px solid var(--line);
+		margin: 6px 0;
+	}
+	#resource-design .tabs {
+		display: flex;
+		gap: 4px;
+		flex-wrap: wrap;
+		border-bottom: 1px solid var(--line);
+		margin-bottom: 20px;
+		padding-bottom: 7px;
+	}
+	#resource-design .tabs button {
+		border: 0;
+		background: transparent;
+		border-radius: 4px;
+	}
+	#resource-design .tabs button[aria-selected='true'] {
+		background: var(--soft);
+		font-weight: 600;
+	}
+	#resource-design .section {
+		margin-top: 24px;
+		padding-top: 18px;
+		border-top: 1px solid var(--line);
+	}
+	#resource-design .section:first-child {
+		margin-top: 0;
+		padding-top: 0;
+		border-top: 0;
+	}
+	#resource-design .kv {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+		gap: 18px;
+		margin: 0;
+	}
+	#resource-design dt {
+		color: var(--muted);
+		font-size: 12px;
+		margin-bottom: 4px;
+	}
+	#resource-design dd {
+		margin: 0;
+		overflow-wrap: anywhere;
+	}
+	#resource-design .linked {
+		display: grid;
+		gap: 0;
+	}
+	#resource-design .linked-row {
+		display: grid;
+		grid-template-columns: 135px 1fr;
+		gap: 16px;
+		padding: 10px 0;
+		border-bottom: 1px solid var(--line);
+	}
+	#resource-design .linked-row > span {
+		color: var(--muted);
+	}
+	#resource-design .linked-row .links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px 18px;
+	}
+	#resource-design .callout {
+		border-left: 3px solid var(--line);
+		padding: 8px 12px;
+		background: var(--soft);
+		margin: 12px 0;
+	}
+	#resource-design .contract {
+		display: grid;
+		gap: 18px;
+	}
+	#resource-design .contract table {
+		font-size: 13px;
+	}
+	#resource-design .compact .paper {
+		max-width: 405px;
+		margin: auto;
+		padding: 14px;
+	}
+	#resource-design .compact .linked-row {
+		grid-template-columns: 1fr;
+		gap: 5px;
+	}
+	#resource-design .compact .kv {
+		grid-template-columns: 1fr;
+	}
+	#resource-design .compact .menu {
+		width: 100%;
+	}
+	#resource-design .blank {
+		padding: 24px 0;
+		color: var(--muted);
+	}
+	#resource-design .mono {
+		font-family: ui-monospace, monospace;
+	}
+	#resource-design #feedback {
+		min-height: 22px;
+		color: var(--muted);
+		font-size: 12px;
+		margin-top: 10px;
+	}
+	#resource-design i svg {
+		width: 16px;
+		height: 16px;
+	}
+	#resource-design table {
+		color: light-dark(#22242a, #e7e8ec);
+	}
+	#resource-design th {
+		color: light-dark(#1f2937, #f3f4f6);
+		background: light-dark(#eef2f6, #2d3440);
+		font-weight: 600;
+	}
+	#resource-design td {
+		color: light-dark(#22242a, #e7e8ec);
+	}
+	#resource-design .stacked {
+		display: grid;
+		gap: 3px;
+		min-width: 100px;
+	}
+	#resource-design .secondary {
+		display: block;
+		color: var(--muted);
+		font-size: 12px;
+		overflow-wrap: anywhere;
+	}
+	#resource-design .tag {
+		display: inline-block;
+		padding: 2px 7px;
+		border-radius: 4px;
+		font-size: 12px;
+		white-space: nowrap;
+		background: var(--soft);
+		color: inherit;
+	}
+	#resource-design .tag.manager {
+		background: light-dark(#eee7fa, #39294e);
+		color: light-dark(#542c85, #dfc5ff);
+	}
+	#resource-design .tag.worker {
+		background: light-dark(#e4edf9, #26394f);
+		color: light-dark(#234e84, #b7d6ff);
+	}
+	#resource-design .tag.leader {
+		background: light-dark(#fff0c4, #493d1d);
+		color: light-dark(#715200, #ffdf83);
+	}
+	#resource-design .good {
+		color: light-dark(#16613d, #8cdeb4);
+	}
+	#resource-design .bad {
+		color: light-dark(#a52b36, #ff9da6);
+	}
+	#resource-design .neutral {
+		color: var(--muted);
+	}
+	#resource-design .replicas {
+		font-variant-numeric: tabular-nums;
+		font-weight: 600;
+		white-space: nowrap;
+	}
+	#resource-design .field-picker {
+		padding: 14px;
+		background: var(--soft);
+		margin-bottom: 14px;
+		display: flex;
+		gap: 10px 18px;
+		flex-wrap: wrap;
+	}
+	#resource-design .field-picker label {
+		display: flex;
+		gap: 7px;
+		align-items: center;
+	}
+	#resource-design .column-card {
+		padding: 15px 0;
+		border-bottom: 1px solid var(--line);
+	}
+	#resource-design .column-card .kv {
+		margin-top: 14px;
+		grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+	}
+	#resource-design .column-card h3 {
+		margin: 0;
+	}
+	#resource-design .column-count {
+		color: var(--muted);
+		font-size: 12px;
+		margin: 8px 0;
+	}
+	#resource-design .change-notes {
+		margin: 14px 0;
+		display: grid;
+		gap: 5px;
+	}
+	#resource-design .audit-table table {
+		min-width: 850px;
+	}
+	#resource-design .audit-table td:first-child {
+		white-space: nowrap;
+	}
+	#resource-design .scope-chip {
+		font-size: 12px;
+		color: var(--muted);
+	}
+	#resource-design .paper,
+	#resource-design .audit-table,
+	#resource-design .table-wrap {
+		min-width: 0;
+		max-width: 100%;
+	}
+	#resource-design .contract {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	@media (max-width: 500px) {
+		#resource-design .paper {
+			padding: 12px;
+		}
+		#resource-design .linked-row {
+			grid-template-columns: 1fr;
+			gap: 5px;
+		}
+		#resource-design .menu {
+			width: 100%;
+		}
+		#resource-design .controls label {
+			width: 100%;
+		}
+		#resource-design .controls select {
+			width: 100%;
+		}
+	}
+</style>
+<div id="resource-design">
+	<div class="controls">
+		<label
+			>Resource<select id="design-resource">
+				<option value="stacks">Stacks</option>
+				<option value="services">Services</option>
+				<option value="tasks">Tasks</option>
+				<option value="containers">Containers</option>
+				<option value="networks">Networks</option>
+				<option value="volumes">Volumes</option>
+				<option value="nodes">Nodes</option>
+				<option value="secrets">Secrets</option>
+				<option value="configs">Configs</option>
+				<option value="images">Images</option>
+				<option value="projects">Projects</option>
+				<option value="templates">Templates</option>
+			</select></label
+		>
+		<label
+			>Preview<select id="design-screen">
+				<option value="list">List and actions</option>
+				<option value="detail">Detail pages</option>
+				<option value="columns">Columns and cleanup</option>
+				<option value="contract">Design contract</option>
+				<option value="mapping">Resource mappings</option>
+				<option value="source-contract">Stack source contract</option>
+				<option value="image-contract">Images and security contract</option>
+			</select></label
+		>
+		<label
+			>Relationship state<select id="design-state">
+				<option value="resolved">Resolved</option>
+				<option value="external">External network / volume</option>
+				<option value="unavailable">Unable to resolve</option>
+			</select></label
+		>
+		<label
+			>Layout<select id="design-layout">
+				<option value="desktop">Desktop</option>
+				<option value="compact">Mobile</option>
+			</select></label
+		>
+		<label
+			>Column set<select id="design-columns">
+				<option value="default">Proposed defaults</option>
+				<option value="all">All proposed columns</option>
+			</select></label
+		>
+	</div>
+	<p class="preview-note">
+		Design proposal · sample data · complete proposed column inventory for all 12 resources shown
+		here. Choose Proposed defaults or All proposed columns. Columns and cleanup documents every
+		field, including optional and contextual fields. Other application lists are outside this column
+		audit.
+	</p>
+	<div id="design-stage"></div>
+	<div id="feedback" role="status" aria-live="polite"></div>
+	<dialog
+		id="image-notes"
+		aria-labelledby="image-notes-title"
+		style="
+			background: var(--paper);
+			color: inherit;
+			border: 1px solid var(--line);
+			border-radius: 8px;
+			padding: 24px;
+			max-width: 440px;
+		"
+	>
+		<h2 id="image-notes-title">Image release notes</h2>
+		<p>Existing release-notes dialog for the selected image reference. Preview only.</p>
+		<form method="dialog"><button type="submit">Close</button></form>
+	</dialog>
+</div>
+<script>
+	(() => {
+		const root = document.getElementById('resource-design');
+		const q = (id) => root.querySelector('#' + id);
+		const state = {
+			resource: 'stacks',
+			screen: 'list',
+			tab: 'Overview',
+			relationship: 'resolved',
+			layout: 'desktop',
+			record: 'stack-store',
+			columnSet: 'default',
+			columnPicker: false,
+			customColumns: {}
+		};
+		const escape = (value) =>
+			String(value).replace(
+				/[&<>"']/g,
+				(c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+			);
+		const glyphs = {
+			eye: '↗',
+			link: '↗',
+			layers: '▤',
+			server: '▣',
+			network: '⌘',
+			volume: '▱',
+			key: '⚿',
+			file: '▤',
+			list: '☷',
+			edit: '✎',
+			refresh: '↻',
+			stop: '■',
+			restart: '↻',
+			delete: '×',
+			plus: '+',
+			play: '▷',
+			pause: 'Ⅱ',
+			shell: '›_',
+			logs: '≡'
+		};
+		const lucideNames = {
+			eye: 'eye',
+			link: 'link',
+			layers: 'layers',
+			server: 'server',
+			network: 'network',
+			volume: 'database',
+			key: 'key-round',
+			file: 'file-text',
+			list: 'list',
+			edit: 'pencil',
+			refresh: 'refresh-cw',
+			stop: 'square',
+			restart: 'rotate-cw',
+			delete: 'trash-2',
+			plus: 'plus',
+			play: 'play',
+			pause: 'pause',
+			shell: 'terminal',
+			logs: 'file-text'
+		};
+		function icon(kind) {
+			return `<i class="symbol" data-lucide="${lucideNames[kind] || 'circle'}" aria-hidden="true">${glyphs[kind] || '•'}</i>`;
+		}
+		const resources = {
+			stacks: {
+				title: 'Stacks',
+				name: 'store',
+				status: 'Deployed',
+				create: 'Create stack',
+				tabs: [
+					'Overview',
+					'Services',
+					'Tasks',
+					'Networks',
+					'Volumes',
+					'Secrets',
+					'Configs',
+					'Source'
+				],
+				default: 'Overview',
+				ops: ['Edit source', 'Down'],
+				danger: 'Delete'
+			},
+			services: {
+				title: 'Services',
+				name: 'store_api',
+				status: '5 / 5 running',
+				create: 'Create service',
+				tabs: [
+					'Overview',
+					'Logs',
+					'Tasks',
+					'Configuration',
+					'Networks',
+					'Volumes',
+					'Secrets',
+					'Configs'
+				],
+				default: 'Overview',
+				ops: ['Edit', 'Scale', 'Force update', 'Rollback'],
+				danger: 'Delete'
+			},
+			tasks: {
+				title: 'Tasks',
+				name: 'store_api.1',
+				status: 'Running',
+				tabs: [],
+				default: 'Tasks',
+				ops: ['Edit service', 'Force update service']
+			},
+			containers: {
+				title: 'Containers',
+				name: 'store_api.1.k7m2',
+				status: 'Running',
+				create: 'Create container',
+				tabs: [
+					'Overview',
+					'Metrics',
+					'Processes',
+					'Logs',
+					'Shell',
+					'Health',
+					'Configuration',
+					'Networks',
+					'Storage',
+					'Inspect'
+				],
+				default: 'Overview',
+				ops: ['Stop', 'Restart', 'Pause'],
+				danger: 'Delete'
+			},
+			networks: {
+				title: 'Networks',
+				name: 'store_backend',
+				status: 'In use',
+				create: 'Create network',
+				tabs: ['Overview', 'Services', 'Tasks'],
+				default: 'Overview',
+				ops: [],
+				danger: 'Delete'
+			},
+			volumes: {
+				title: 'Volumes',
+				name: 'store_db',
+				status: 'In use',
+				create: 'Create volume',
+				tabs: ['Overview', 'Workspace', 'Backups', 'Services', 'Containers'],
+				default: 'Overview',
+				ops: ['Rename'],
+				danger: 'Delete'
+			},
+			nodes: {
+				title: 'Nodes',
+				name: 'swarm03',
+				status: 'Ready',
+				tabs: ['Overview', 'Host', 'Docker', 'Resources', 'Agent', 'Tasks'],
+				default: 'Overview',
+				ops: ['Promote', 'Drain', 'Pause scheduling'],
+				danger: 'Delete'
+			},
+			secrets: {
+				title: 'Secrets',
+				name: 'store_db_password',
+				status: 'Referenced',
+				create: 'Create secret',
+				tabs: ['Overview', 'Services'],
+				default: 'Overview',
+				ops: ['Edit metadata'],
+				danger: 'Delete'
+			},
+			configs: {
+				title: 'Configs',
+				name: 'store_nginx_conf',
+				status: 'Referenced',
+				create: 'Create config',
+				tabs: ['Overview', 'Services'],
+				default: 'Overview',
+				ops: ['Edit metadata'],
+				danger: 'Delete'
+			},
+			images: {
+				title: 'Images',
+				name: 'nginx:stable',
+				status: 'In use',
+				create: 'Pull image',
+				tabs: ['Overview', 'History', 'Attestations', 'Vulnerabilities', 'Containers', 'Services'],
+				default: 'Overview',
+				ops: ['Tag', 'Pull', 'Push', 'Export', 'Scan', 'Patch'],
+				danger: 'Delete'
+			},
+			projects: {
+				title: 'Projects',
+				name: 'monitoring',
+				status: 'Running',
+				create: 'Create project',
+				tabs: ['Overview', 'Services', 'Configuration', 'Git sync'],
+				default: 'Overview',
+				ops: ['Edit', 'Down', 'Restart', 'Pull and redeploy', 'Archive'],
+				danger: 'Destroy'
+			},
+			templates: {
+				title: 'Templates',
+				name: 'Web application',
+				status: 'Local',
+				create: 'Create template',
+				tabs: ['Overview', 'Compose', 'Environment'],
+				default: 'Overview',
+				ops: ['Create project'],
+				danger: 'Delete'
+			}
+		};
+		const defaultRecords = {
+			stacks: 'stack-store',
+			services: 'service-api',
+			tasks: 'task-api-1',
+			containers: 'container-api-1',
+			networks: 'network-backend',
+			volumes: 'volume-db',
+			nodes: 'node-swarm03',
+			secrets: 'secret-db-password',
+			configs: 'config-nginx',
+			images: 'image-nginx',
+			projects: 'project-monitoring',
+			templates: 'template-web'
+		};
+		const records = {
+			'network-backend': { name: 'store_backend', id: 'network-backend-123', owner: 'stack-store' },
+			'network-edge': { name: 'shared_edge', id: 'network-edge-456', owner: null },
+			'volume-db': {
+				name: 'store_db',
+				id: 'volume-db-123',
+				owner: 'stack-store',
+				node: 'node-swarm03'
+			},
+			'volume-media': {
+				name: 'shared_media',
+				id: 'volume-media-456',
+				owner: null,
+				node: 'node-swarm03'
+			},
+			'image-nginx': {
+				name: 'nginx:stable · linux/amd64 · sha256:9af…',
+				digest: 'sha256:9af…',
+				platform: 'linux/amd64',
+				id: 'artifact-nginx-amd64'
+			},
+			'image-nginx-new': {
+				name: 'nginx:stable · linux/amd64 · sha256:27b…',
+				digest: 'sha256:27b…',
+				platform: 'linux/amd64',
+				id: 'artifact-nginx-new-amd64'
+			},
+			'service-api': { name: 'store_api', id: 'service-api-123', owner: 'stack-store' },
+			'service-db': {
+				name: 'store_database',
+				id: 'service-database-456',
+				owner: 'stack-store',
+				status: '1 / 1 running'
+			}
+		};
+		const current = () => ({ ...resources[state.resource], ...(records[state.record] || {}) });
+		const externalRecord = () =>
+			state.relationship === 'external' || records[state.record]?.owner === null;
+		const to = (resource, tab, record) => ({
+			resource,
+			screen: 'detail',
+			tab: tab || resources[resource].default || 'Overview',
+			record: record || (state.resource === resource ? state.record : defaultRecords[resource])
+		});
+		function route(resource, tab, record) {
+			return escape(JSON.stringify(to(resource, tab, record)));
+		}
+		function link(label, resource, tab, extra = '', record) {
+			return `<button type="button" class="text-link" data-go="${route(resource, tab, record)}">${escape(label)}${extra}</button>`;
+		}
+		function button(label, kind = 'eye', action = 'preview', cls = '') {
+			return `<button type="button" class="${cls}" data-action="${action}">${icon(kind)}${escape(label)}</button>`;
+		}
+		function item(label, resource, tab, subtitle, kind = 'link') {
+			return { label, resource, tab, subtitle, kind };
+		}
+		function related(resource) {
+			const own = !externalRecord(),
+				broken = state.relationship === 'unavailable';
+			const map = {
+				tasks: [
+					item('Owning service', 'services', 'Overview', 'store_api', 'layers'),
+					item('Owning stack', 'stacks', 'Overview', 'store', 'layers'),
+					item(
+						'Open container',
+						'containers',
+						'Overview',
+						'Verified running task container on swarm03; omit when unavailable',
+						'server'
+					)
+				],
+				services: [
+					item('Owning stack', 'stacks', 'Overview', 'store', 'layers'),
+					item('Tasks', 'services', 'Tasks', 'Tasks belonging to this service', 'list'),
+					item(
+						'Volumes',
+						'services',
+						'Volumes',
+						'Declared mounts and verified attachments',
+						'volume'
+					),
+					item(
+						'Networks',
+						'services',
+						'Networks',
+						'Networks referenced by this service',
+						'network'
+					),
+					item('Secrets', 'services', 'Secrets', 'Secrets referenced by this service', 'key'),
+					item('Configs', 'services', 'Configs', 'Configs referenced by this service', 'file')
+				],
+				stacks: ['Services', 'Tasks', 'Networks', 'Volumes', 'Secrets', 'Configs'].map((label) =>
+					item(
+						label,
+						'stacks',
+						label,
+						`${label} owned or referenced by store`,
+						label === 'Networks'
+							? 'network'
+							: label === 'Volumes'
+								? 'volume'
+								: label === 'Secrets'
+									? 'key'
+									: 'layers'
+					)
+				),
+				containers: [
+					item('Owning service', 'services', 'Overview', 'store_api', 'layers'),
+					item('Owning stack', 'stacks', 'Overview', 'store', 'layers'),
+					item('Networks', 'containers', 'Networks', 'Actual container attachments', 'network'),
+					item('Volumes', 'containers', 'Storage', 'Actual named-volume mounts', 'volume')
+				],
+				networks: [
+					...(own ? [item('Owning stack', 'stacks', 'Overview', 'store', 'layers')] : []),
+					item(
+						'Services',
+						'networks',
+						'Services',
+						'Services referencing this exact network',
+						'layers'
+					),
+					item('Tasks', 'networks', 'Tasks', 'Tasks using this exact network', 'list')
+				],
+				volumes: [
+					...(own ? [item('Owning stack', 'stacks', 'Overview', 'store', 'layers')] : []),
+					item(
+						'Using services',
+						'volumes',
+						'Services',
+						'Services with verified references',
+						'layers'
+					),
+					item('Containers', 'volumes', 'Containers', 'Containers using this node record', 'server')
+				],
+				nodes: [
+					item('Tasks', 'nodes', 'Tasks', 'Tasks assigned to swarm03', 'list'),
+					item(
+						'Node-local resources',
+						'nodes',
+						'Resources',
+						'Containers, images, networks and volumes on this verified node',
+						'server'
+					)
+				],
+				secrets: [
+					...(own ? [item('Owning stack', 'stacks', 'Overview', 'store', 'layers')] : []),
+					item(
+						'Using services',
+						'secrets',
+						'Services',
+						'Services referencing the secret ID',
+						'layers'
+					)
+				],
+				configs: [
+					...(own ? [item('Owning stack', 'stacks', 'Overview', 'store', 'layers')] : []),
+					item(
+						'Using services',
+						'configs',
+						'Services',
+						'Services referencing the config ID',
+						'layers'
+					)
+				],
+				images: [
+					item(
+						'Containers',
+						'images',
+						'Containers',
+						'Running consumers of this exact artifact and platform in the authorized scope',
+						'server'
+					),
+					item(
+						'Services',
+						'images',
+						'Services',
+						'Services with verified running tasks using this artifact',
+						'layers'
+					)
+				],
+				projects: [
+					item(
+						'Containers',
+						'projects',
+						'Services',
+						'Containers belonging to this Compose project',
+						'server'
+					)
+				],
+				templates: []
+			};
+			return { items: map[resource] || [], broken };
+		}
+		function relatedMenu(resource) {
+			const { items, broken } = related(resource);
+			if (!items.length) return '';
+			return `<details class="related" open><summary>${icon('link')}Related resources <span style="margin-left:auto">⌄</span></summary><nav aria-label="Related resources">${broken ? '<p class="preview-note">Unable to resolve related resources.</p><button type="button" data-action="retry">↻ Retry</button>' : items.map((x) => `<button type="button" data-go="${route(x.resource, x.tab)}">${icon(x.kind)}<span class="item-copy">${escape(x.label)}<small>${escape(x.subtitle)}</small></span></button>`).join('')}</nav></details>`;
+		}
+		function detailsMenu(resource) {
+			const views = {
+				stacks: ['Overview', 'Source'],
+				services: ['Overview', 'Logs', 'Configuration'],
+				containers: [
+					'Overview',
+					'Metrics',
+					'Processes',
+					'Logs',
+					'Shell',
+					'Health',
+					'Configuration',
+					'Inspect'
+				],
+				networks: ['Overview'],
+				volumes: ['Overview', 'Workspace', 'Backups'],
+				nodes: ['Overview', 'Host', 'Docker', 'Agent'],
+				secrets: ['Overview'],
+				configs: ['Overview'],
+				images: ['Overview', 'History', 'Attestations', 'Vulnerabilities'],
+				projects: ['Overview', 'Configuration', 'Git sync'],
+				templates: ['Overview', 'Compose', 'Environment']
+			};
+			const tabs = (views[resource] || []).filter((tab) => tab !== 'Overview');
+			if (!tabs.length) return '';
+			return `<details class="related" open><summary>${icon('eye')}Details <span style="margin-left:auto">⌄</span></summary><nav aria-label="Resource details">${tabs.map((tab) => `<button type="button" data-go="${route(resource, tab)}">${icon(tab === 'Logs' ? 'logs' : tab === 'Shell' ? 'shell' : tab === 'Configuration' ? 'edit' : tab === 'History' ? 'refresh' : 'file')}${escape(tab)}</button>`).join('')}${resource === 'images' ? button('Release notes', 'file', 'release-notes') : ''}</nav></details>`;
+		}
+		function rowMenu(resource) {
+			const r = current();
+			const overview = r.tabs.includes('Overview')
+				? `<button type="button" data-go="${route(resource, 'Overview')}">${icon('eye')}View details</button>`
+				: '';
+			return `<div class="menu-area"><div class="menu" aria-label="Actions for ${escape(r.name)}">${overview}${detailsMenu(resource)}${relatedMenu(resource)}${r.ops.map((x) => button(x, x.includes('Edit') ? 'edit' : x === 'Down' || x === 'Stop' ? 'stop' : x.includes('Restart') ? 'restart' : 'refresh')).join('')}${r.danger ? `<hr>${button(r.danger, 'delete', 'preview', 'danger')}` : ''}</div></div>`;
+		}
+		function table(headers, rows) {
+			return `<div class="table-wrap"><table><thead><tr>${headers.map((h) => `<th>${escape(h)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+		}
+		// key, heading, visibility, presentation, authority, sort/filter, proposed change.
+		const columnSpecs = {
+			stacks: [
+				[
+					'name',
+					'Stack',
+					'default',
+					'Linked name; compact deployment state below',
+					'Stack identity in cluster',
+					'Sort name; filter name',
+					'Keep name; fold separate deployment status into it.'
+				],
+				[
+					'services',
+					'Services',
+					'default',
+					'Service count links to scoped Services tab',
+					'Complete namespace-matched service aggregate',
+					'Sort numeric',
+					'Keep.'
+				],
+				[
+					'tasks',
+					'Tasks',
+					'default',
+					'Running / desired; meaningful shortage color',
+					'Stack services and current task aggregate',
+					'Sort readiness; filter shortage',
+					'Add; never count only the visible task page.'
+				],
+				[
+					'source',
+					'Source',
+					'default',
+					'Saved Compose / reconstructed / not imported; draft status below',
+					'Persisted source and saved/deployed revision comparison',
+					'Filter source and draft state',
+					'Add; distinguishes editable source from live-only discovery.'
+				],
+				[
+					'deployment',
+					'Deployment owner',
+					'default',
+					'Manual or named GitOps owner',
+					'Explicit deployment ownership',
+					'Filter owner',
+					'Add; never infer ownership from discovery.'
+				],
+				[
+					'updated',
+					'Updated',
+					'default',
+					'Compact relative time',
+					'Latest observed stack service update',
+					'Sort original timestamp',
+					'Keep; retain complete date in details.'
+				],
+				[
+					'created',
+					'Created',
+					'optional',
+					'Compact relative time',
+					'Earliest observed service creation, with documented stack semantics',
+					'Sort original timestamp',
+					'Move out of default view.'
+				],
+				[
+					'cluster',
+					'Cluster',
+					'context',
+					'Cluster name, not query-manager name',
+					'Verified cluster ID',
+					'Filter cluster',
+					'Default only when multiple clusters are in view.'
+				],
+				[
+					'id',
+					'ID',
+					'optional',
+					'Exact stack identity',
+					'Stack namespace and cluster',
+					'Filter exact identity',
+					'Keep optional.'
+				]
+			],
+			services: [
+				[
+					'name',
+					'Service',
+					'default',
+					'Linked service name',
+					'Service ID',
+					'Sort name; filter name',
+					'Keep.'
+				],
+				[
+					'stack',
+					'Stack',
+					'default',
+					'Linked owning stack or Standalone',
+					'Inspected namespace label in cluster',
+					'Filter stack',
+					'Keep; omit when already scoped to that stack.'
+				],
+				[
+					'mode',
+					'Mode',
+					'default',
+					'Compact mode label',
+					'Desired service mode',
+					'Sort/filter mode',
+					'Keep separate; do not confuse mode with replica health.'
+				],
+				[
+					'replicas',
+					'Replicas',
+					'default',
+					'Running / desired plus text state',
+					'Service mode-aware desired/current counts',
+					'Sort readiness; filter shortage',
+					'Green at positive target; red below target; zero-target and unknown neutral. Job modes show completion semantics.'
+				],
+				[
+					'image',
+					'Image',
+					'default',
+					'Repository above tag/digest; mixed versions visibly identified',
+					'Desired image reference plus observed running versions',
+					'Sort repository; filter image / mixed versions',
+					'Stack image text to reduce width; retain full reference.'
+				],
+				[
+					'updated',
+					'Updated',
+					'default',
+					'Relative time',
+					'Service updatedAt',
+					'Sort timestamp',
+					'Keep; shorten display only.'
+				],
+				[
+					'ports',
+					'Published ports',
+					'optional',
+					'Compact port mappings',
+					'Service endpoint publication spec',
+					'Filter port',
+					'Available existing data; avoid widening defaults.'
+				],
+				[
+					'nodes',
+					'Placed nodes',
+					'optional',
+					'Bounded observed placement count; no hostname list',
+					'Verified task placement',
+					'Filter node',
+					'Optional existing-placement summary, not the manager connection; full membership is in Tasks.'
+				],
+				[
+					'networks',
+					'Networks',
+					'optional',
+					'Referenced-network count',
+					'Service attachment IDs',
+					'Filter exact network ID',
+					'Optional summary; navigation stays in Related resources.'
+				],
+				[
+					'mounts',
+					'Mounts',
+					'optional',
+					'Volume / bind / tmpfs counts',
+					'Desired mounts',
+					'Filter mount type',
+					'Do not call every mount a volume.'
+				],
+				[
+					'created',
+					'Created',
+					'optional',
+					'Relative time',
+					'Service createdAt',
+					'Sort timestamp',
+					'Optional.'
+				],
+				[
+					'cluster',
+					'Cluster',
+					'context',
+					'Verified cluster',
+					'Cluster ID',
+					'Filter cluster',
+					'Only needed across clusters.'
+				],
+				[
+					'id',
+					'ID',
+					'optional',
+					'Exact service ID',
+					'Docker service identity',
+					'Exact filter',
+					'Keep optional.'
+				]
+			],
+			tasks: [
+				[
+					'name',
+					'Task',
+					'default',
+					'Task identity with slot; errors beneath when present',
+					'Task ID, service identity and slot',
+					'Sort/filter name',
+					'Keep errors visible without a separate wide column.'
+				],
+				[
+					'service',
+					'Service',
+					'default',
+					'Owning service link',
+					'Task.ServiceID',
+					'Sort/filter service',
+					'Keep; omit in service-scoped task tables.'
+				],
+				[
+					'node',
+					'Node',
+					'default',
+					'Plain hostname; unassigned shown explicitly',
+					'Task.NodeID resolved in cluster',
+					'Sort/filter node',
+					'Remove the node link; keep useful placement text.'
+				],
+				[
+					'state',
+					'State',
+					'default',
+					'Current state above Desired: …',
+					'Task current and desired states',
+					'Sort/filter both underlying states',
+					'Combine display, preserve both meanings and mismatch visibility.'
+				],
+				[
+					'container',
+					'Container',
+					'default',
+					'Open container only when verified running and authorized; otherwise plain state',
+					'Task/container identity + verified node binding + current container observation + permission',
+					'No cross-node name lookup',
+					'Never offer navigation using a historical ID or task state alone.'
+				],
+				[
+					'updated',
+					'Updated',
+					'optional',
+					'Relative task update',
+					'Task updatedAt',
+					'Sort timestamp',
+					'Add as optional troubleshooting field.'
+				],
+				[
+					'image',
+					'Image',
+					'optional',
+					'Repository above tag/digest',
+					'Task specification image',
+					'Filter image',
+					'Optional; useful during rolling updates.'
+				],
+				[
+					'created',
+					'Created',
+					'optional',
+					'Relative age',
+					'Task createdAt',
+					'Sort timestamp',
+					'Optional.'
+				],
+				[
+					'error',
+					'Error',
+					'optional',
+					'Full error text',
+					'Task status error',
+					'Filter error',
+					'Normally beneath Task; standalone column available for investigation.'
+				],
+				[
+					'cluster',
+					'Cluster',
+					'context',
+					'Verified cluster',
+					'Task cluster',
+					'Filter cluster',
+					'Context only; never label manager connection as task node.'
+				],
+				['id', 'ID', 'optional', 'Full task ID', 'Task identity', 'Exact filter', 'Keep optional.']
+			],
+			nodes: [
+				[
+					'name',
+					'Node',
+					'default',
+					'Linked hostname',
+					'Node ID',
+					'Sort/filter hostname',
+					'Keep address optional rather than widening every row.'
+				],
+				[
+					'role',
+					'Role',
+					'default',
+					'Worker or Manager colored tag; separate Leader tag when elected',
+					'Node role and ManagerStatus.Leader',
+					'Filter Worker / Manager / Leader',
+					'Leader is a manager status, not a third Docker role.'
+				],
+				[
+					'state',
+					'State',
+					'default',
+					'Ready/down/etc. with semantic color',
+					'Docker node readiness',
+					'Sort/filter state',
+					'Keep separate from scheduling availability.'
+				],
+				[
+					'scheduling',
+					'Scheduling',
+					'default',
+					'Active / Drain / Pause',
+					'Node availability',
+					'Sort/filter scheduling',
+					'Rename Availability for clarity.'
+				],
+				[
+					'tasks',
+					'Running tasks',
+					'optional',
+					'Count assigned to this node',
+					'Complete current-task aggregate by NodeID',
+					'Sort numeric',
+					'Proposed optional enrichment; do not query every node to decorate a list.'
+				],
+				[
+					'connection',
+					'Connection',
+					'optional',
+					'Connected / missing / mismatched',
+					'Verified node-agent binding',
+					'Filter connection state',
+					'Keep technical diagnostics selectable.'
+				],
+				[
+					'engine',
+					'Engine',
+					'optional',
+					'Docker version',
+					'Node description',
+					'Sort/filter version',
+					'Move engine version out of default list.'
+				],
+				[
+					'platform',
+					'Platform',
+					'optional',
+					'OS / architecture',
+					'Node description',
+					'Filter platform',
+					'Useful optional field.'
+				],
+				[
+					'address',
+					'Address',
+					'optional',
+					'Reported node address',
+					'Docker node status',
+					'Sort address',
+					'Optional.'
+				],
+				[
+					'reachability',
+					'Manager reachability',
+					'optional',
+					'Reachable / unreachable / not a manager',
+					'Manager status',
+					'Filter reachability',
+					'Optional diagnostic, distinct from node readiness.'
+				],
+				[
+					'created',
+					'Created',
+					'optional',
+					'Relative time',
+					'Node createdAt',
+					'Sort timestamp',
+					'Optional.'
+				],
+				[
+					'updated',
+					'Updated',
+					'optional',
+					'Relative time',
+					'Node updatedAt',
+					'Sort timestamp',
+					'Optional.'
+				],
+				[
+					'cluster',
+					'Cluster',
+					'context',
+					'Verified cluster',
+					'Cluster ID',
+					'Filter cluster',
+					'Only when needed across clusters.'
+				],
+				[
+					'connectionId',
+					'Connection ID',
+					'optional',
+					'Exact registration UUID',
+					'Verified binding',
+					'Exact filter',
+					'Technical agent ID; not a node ID.'
+				],
+				[
+					'id',
+					'ID',
+					'optional',
+					'Exact node ID',
+					'Docker node identity',
+					'Exact filter',
+					'Keep optional.'
+				]
+			],
+			containers: [
+				[
+					'name',
+					'Container',
+					'default',
+					'Linked name; image reference below',
+					'Container and node identity',
+					'Sort/filter name and image',
+					'Keep existing compact name/image presentation.'
+				],
+				[
+					'state',
+					'State',
+					'default',
+					'Running / stopped; health and uptime/exit detail below',
+					'Container state, health, status',
+					'Sort/filter state and health',
+					'Combine State and Status display without losing exit/health information.'
+				],
+				[
+					'updates',
+					'Updates',
+					'default',
+					'Update state with explanatory text',
+					'Image update result',
+					'Filter update state',
+					'Keep separate from runtime health.'
+				],
+				[
+					'cpu',
+					'CPU',
+					'default',
+					'Current usage percentage',
+					'Verified node resource sample',
+					'Sort numeric when supported',
+					'Keep; unavailable is not 0%.'
+				],
+				[
+					'memory',
+					'Memory',
+					'default',
+					'Used memory above percentage / limit',
+					'Verified node resource sample',
+					'Sort usage when supported',
+					'Keep compact numeric display.'
+				],
+				[
+					'ports',
+					'Ports',
+					'default',
+					'Published ports; extra mappings revealed',
+					'Container port mappings',
+					'Sort/filter ports',
+					'Keep; preserve complete mappings in details.'
+				],
+				[
+					'node',
+					'Node',
+					'default',
+					'Observed node name',
+					'Verified container host',
+					'Filter node',
+					'Default in aggregate lists; omit for a fixed node.'
+				],
+				[
+					'owner',
+					'Owner',
+					'optional',
+					'Stack/service or Compose project',
+					'Verified ownership relationship',
+					'Filter owner',
+					'Optional shortcut; do not parse ownership from names.'
+				],
+				[
+					'ip',
+					'IP address',
+					'optional',
+					'Observed container addresses',
+					'Container network attachments',
+					'Filter address',
+					'Keep optional.'
+				],
+				[
+					'created',
+					'Created',
+					'optional',
+					'Relative time',
+					'Container created timestamp',
+					'Sort timestamp',
+					'Keep optional.'
+				],
+				[
+					'id',
+					'ID',
+					'optional',
+					'Full container ID',
+					'Container and node identity',
+					'Exact filter',
+					'Keep optional.'
+				]
+			],
+			images: [
+				[
+					'name',
+					'Image',
+					'default',
+					'Repository above bounded tag aliases and immutable digest',
+					'Normalized repository + running digest + platform; local content fallback',
+					'Filter exact artifact / repository / reference',
+					'One row per running artifact; different running versions stay separate.'
+				],
+				[
+					'platform',
+					'Platform',
+					'default',
+					'OS / architecture / variant',
+					'Resolved immutable platform metadata',
+					'Filter platform',
+					'Disambiguates platform rows without a version or node picker.'
+				],
+				[
+					'usage',
+					'Usage',
+					'default',
+					'Running consumer count; partial observation explicit',
+					'Verified running containers and tasks in authorized scope',
+					'Sort count; filter service / stack',
+					'No unused-cache or stopped-history rows, including in node-scoped lists.'
+				],
+				[
+					'size',
+					'Size',
+					'default',
+					'One active copy reported size; no range or sum',
+					'Representative active observation; storage accounting varies',
+					'Sort bytes with stated semantics',
+					'Not compressed registry size or total fleet storage.'
+				],
+				[
+					'updates',
+					'Updates',
+					'default',
+					'Available / up to date / error / not checked',
+					'Update comparison for selected artifact',
+					'Filter update state',
+					'Update availability is separate from deployed image correctness and vulnerabilities.'
+				],
+				[
+					'vulnerabilities',
+					'Vulnerabilities',
+					'default',
+					'Severity counts and report state; source and completed time below',
+					'Stored report matching this exact artifact/platform',
+					'Sort severity; filter provider / report state',
+					'One summary and one report; unavailable or unscanned never equals zero findings.'
+				],
+				[
+					'usedBy',
+					'Used by',
+					'optional',
+					'Bounded service / standalone consumer summary',
+					'Verified runtime joins; complete scoped consumer views',
+					'Filter exact consumer',
+					'No hostname arrays or per-row fleet fan-out.'
+				],
+				[
+					'created',
+					'Created',
+					'optional',
+					'Relative image creation time',
+					'Selected artifact metadata',
+					'Sort original timestamp',
+					'Not scan or inventory observation time.'
+				],
+				[
+					'digest',
+					'Digest',
+					'optional',
+					'Full digest with copy access',
+					'Immutable manifest identity; explicit local-content identity if unresolved',
+					'Exact filter',
+					'Never substitute an engine-specific Docker ID for a registry digest.'
+				],
+				[
+					'support',
+					'Support / EOL',
+					'optional',
+					'Applicable support/EOL state',
+					'Artifact support metadata',
+					'Filter support state',
+					'Unknown stays unknown.'
+				]
+			],
+			networks: [
+				[
+					'name',
+					'Network',
+					'default',
+					'Linked network name',
+					'Network ID and cluster or node scope',
+					'Sort/filter name',
+					'Keep.'
+				],
+				[
+					'source',
+					'Source',
+					'default',
+					'Verified owner stack link, Docker, System or Unknown',
+					'Ownership labels / identified built-in network / verified provenance',
+					'Filter source',
+					'External means referenced as external by a stack; it is a relationship, not provenance.'
+				],
+				[
+					'usage',
+					'Usage',
+					'default',
+					'In use / unused / partial observation',
+					'Observed consumers in verified scope',
+					'Sort/filter usage',
+					'Do not imply a cluster-wide consumer check from one node.'
+				],
+				[
+					'network',
+					'Driver / scope',
+					'default',
+					'Driver above Local / Swarm',
+					'Network inspect',
+					'Sort/filter driver and scope independently',
+					'Stack two related technical fields into one column.'
+				],
+				[
+					'addressing',
+					'Addressing',
+					'default',
+					'Subnet above gateway; reveal additional IPAM entries',
+					'Network IPAM configs',
+					'Sort/filter subnet and gateway independently',
+					'Combine Subnet and Gateway presentation; retain every address.'
+				],
+				[
+					'created',
+					'Created',
+					'optional',
+					'Relative time',
+					'Network created timestamp',
+					'Sort timestamp',
+					'Optional.'
+				],
+				[
+					'queryConnection',
+					'Query connection',
+					'optional',
+					'Connection used to obtain the observation',
+					'Request routing metadata',
+					'Filter connection',
+					'Technical field only; do not call this the owning Node.'
+				],
+				[
+					'id',
+					'ID',
+					'optional',
+					'Exact network ID',
+					'Network inspect',
+					'Exact filter',
+					'Keep optional.'
+				]
+			],
+			volumes: [
+				[
+					'name',
+					'Volume',
+					'default',
+					'Linked volume name',
+					'Volume record and verified node identity',
+					'Sort/filter name',
+					'Keep.'
+				],
+				[
+					'usage',
+					'Usage',
+					'default',
+					'In use / unused; active consumer count when verified',
+					'Volume consumers and attachments',
+					'Sort/filter usage',
+					'Make usage scope explicit; no Global badge.'
+				],
+				[
+					'driver',
+					'Driver',
+					'default',
+					'Reported driver name',
+					'Volume driver metadata',
+					'Sort/filter driver',
+					'Useful in the list; no driver badge in title bar.'
+				],
+				[
+					'node',
+					'Node / attachment',
+					'default',
+					'Observed node, with active attachment noted',
+					'Verified volume node records',
+					'Filter node / attachment state',
+					'Keep node identity without asserting shared storage.'
+				],
+				[
+					'filesystem',
+					'Filesystem usage',
+					'default',
+					'Used / total capacity where measured',
+					'Backing filesystem probe',
+					'No invented sort from unavailable values',
+					'Keep distinct from data size.'
+				],
+				[
+					'size',
+					'Data size',
+					'optional',
+					'Measured volume data bytes',
+					'Volume size scan',
+					'Sort measured bytes',
+					'Rename Size to Data size; move out of default to avoid confusing it with filesystem capacity.'
+				],
+				[
+					'source',
+					'Source / owner',
+					'optional',
+					'Verified owning stack or Unknown',
+					'Ownership metadata and verified references',
+					'Filter owner',
+					'New optional relationship. External usage does not prove ownership.'
+				],
+				[
+					'created',
+					'Created',
+					'optional',
+					'Relative time',
+					'Volume createdAt',
+					'Sort timestamp',
+					'Move out of default.'
+				],
+				[
+					'mountpoint',
+					'Mountpoint',
+					'optional',
+					'Reported path on this node',
+					'Volume inspect',
+					'Filter path',
+					'Technical metadata; never interpreted as a manager-local path.'
+				],
+				[
+					'rawScope',
+					'Docker scope',
+					'optional',
+					'Raw reported scope with technical meaning',
+					'Docker driver report',
+					'Filter raw scope',
+					'Technical only; never imply physical shared storage.'
+				],
+				[
+					'id',
+					'ID',
+					'optional',
+					'Exact observed/logical record identity',
+					'Existing volume identity',
+					'Exact filter',
+					'Keep optional.'
+				]
+			],
+			projects: [
+				[
+					'name',
+					'Project',
+					'default',
+					'Linked name; optional short description',
+					'Project identity',
+					'Sort/filter name',
+					'Keep.'
+				],
+				[
+					'state',
+					'State',
+					'default',
+					'Running/stopped/configuration error',
+					'Project state and operation-blocking errors',
+					'Sort/filter state',
+					'Keep errors visible.'
+				],
+				[
+					'services',
+					'Services',
+					'default',
+					'Compose service count',
+					'Project Compose / container membership',
+					'Sort numeric',
+					'Keep.'
+				],
+				[
+					'updates',
+					'Updates',
+					'default',
+					'Image update summary',
+					'Project update result',
+					'Filter update state',
+					'Keep distinct from running state.'
+				],
+				[
+					'node',
+					'Node',
+					'default',
+					'Project host',
+					'Project environment identity',
+					'Filter node',
+					'Default in aggregate lists.'
+				],
+				[
+					'provider',
+					'Configuration source',
+					'default',
+					'Local / repository; sync state below if configured',
+					'Project Git linkage and sync mode',
+					'Filter provider',
+					'Keep provider but clarify its meaning.'
+				],
+				[
+					'tags',
+					'Tags',
+					'optional',
+					'User tags',
+					'Project tags',
+					'Filter tags',
+					'Move out of default.'
+				],
+				[
+					'directory',
+					'Working directory',
+					'optional',
+					'Full project path',
+					'Saved project path',
+					'Sort/filter path',
+					'Move out of default.'
+				],
+				[
+					'created',
+					'Created',
+					'optional',
+					'Relative time',
+					'Project createdAt',
+					'Sort timestamp',
+					'Move out of default.'
+				],
+				['id', 'ID', 'optional', 'Project ID', 'Project identity', 'Exact filter', 'Keep optional.']
+			],
+			templates: [
+				[
+					'name',
+					'Template',
+					'default',
+					'Linked name above short description',
+					'Template identity and description',
+					'Sort/filter name and description',
+					'Merge Description into identity cell.'
+				],
+				[
+					'source',
+					'Source',
+					'default',
+					'Local / remote above registry name',
+					'Template remote flag and registry identity',
+					'Filter type and registry independently',
+					'Merge Type and Registry presentation.'
+				],
+				[
+					'tags',
+					'Tags',
+					'default',
+					'Compact user-facing categories',
+					'Template metadata tags',
+					'Filter tags',
+					'Keep; useful discovery information.'
+				],
+				[
+					'version',
+					'Version',
+					'optional',
+					'Declared version',
+					'Template metadata',
+					'Sort/filter version',
+					'Keep optional.'
+				],
+				[
+					'author',
+					'Author',
+					'optional',
+					'Declared author',
+					'Template metadata',
+					'Filter author',
+					'Keep optional.'
+				]
+			]
+		};
+		const kvColumns = [
+			[
+				'name',
+				'Name',
+				'default',
+				'Linked metadata detail view',
+				'Secret/config ID in cluster',
+				'Sort/filter name',
+				'Keep.'
+			],
+			[
+				'source',
+				'Source / owner',
+				'default',
+				'Verified owning stack, external reference in context or Unknown',
+				'Object ownership metadata',
+				'Filter source',
+				'Add explicit ownership; no name-prefix inference.'
+			],
+			[
+				'usedBy',
+				'Used by',
+				'default',
+				'Referencing services count',
+				'Complete service-spec references by exact SecretID / ConfigID',
+				'Sort numeric; filter used/unused',
+				'Proposed aggregate; missing permission or incomplete scan is Unavailable, not zero.'
+			],
+			[
+				'updated',
+				'Updated',
+				'default',
+				'Compact relative time',
+				'Object updatedAt',
+				'Sort timestamp',
+				'Keep Updated; move Created out of default.'
+			],
+			[
+				'created',
+				'Created',
+				'optional',
+				'Relative time',
+				'Object createdAt',
+				'Sort timestamp',
+				'Move out of default.'
+			],
+			[
+				'cluster',
+				'Cluster',
+				'context',
+				'Verified cluster',
+				'Cluster identity',
+				'Filter cluster',
+				'Only across clusters.'
+			],
+			[
+				'id',
+				'ID',
+				'optional',
+				'Exact Docker object ID',
+				'Secret/config identity',
+				'Exact filter',
+				'Keep optional.'
+			]
+		];
+		columnSpecs.secrets = [
+			...kvColumns,
+			[
+				'driver',
+				'Driver',
+				'optional',
+				'Secret driver if configured',
+				'Secret Driver.Name',
+				'Filter driver',
+				'Hide by default; secret-only field.'
+			]
+		];
+		columnSpecs.configs = [...kvColumns];
+		const scopedColumnSpecs = {
+			networks: [
+				[
+					'relationship',
+					'Relationship',
+					'default',
+					'Owned / referenced externally',
+					'Verified ownership compared with the current stack',
+					'Filter relationship',
+					'Only in stack-scoped lists; not a replacement for Source.',
+					'stacks'
+				],
+				[
+					'aliases',
+					'Aliases',
+					'default',
+					'Service attachment aliases',
+					'Service network attachment',
+					'Filter alias',
+					'Only in service context.',
+					'services'
+				],
+				[
+					'vip',
+					'Virtual IP',
+					'default',
+					'Service VIP on this exact network',
+					'Service endpoint network ID',
+					'Filter address',
+					'Only in service context.',
+					'services'
+				],
+				[
+					'configuration',
+					'Configuration',
+					'optional',
+					'Network flags, config-only parent and related IPAM configuration',
+					'Inspected network configuration',
+					'Filter network flags',
+					'Keep complete technical configuration selectable.',
+					'services'
+				]
+			],
+			volumes: [
+				[
+					'relationship',
+					'Relationship',
+					'default',
+					'Owned / referenced externally',
+					'Verified resource ownership and current stack',
+					'Filter relationship',
+					'Separate ownership from use.',
+					'stacks'
+				],
+				[
+					'target',
+					'Mount target',
+					'default',
+					'Container mount destination',
+					'Desired service mount',
+					'Filter destination',
+					'Required in service context.',
+					'services'
+				],
+				[
+					'access',
+					'Access',
+					'default',
+					'Read-only / read-write',
+					'Desired mount ReadOnly',
+					'Filter access',
+					'Required in service context.',
+					'services'
+				],
+				[
+					'device',
+					'Device / options',
+					'optional',
+					'Configured device or driver options',
+					'Mount driver configuration',
+					'Filter configured value',
+					'Preserve the existing storage table field.',
+					'services'
+				]
+			],
+			secrets: [
+				[
+					'target',
+					'Targets',
+					'default',
+					'Referenced filenames / paths',
+					'Service SecretID references and target mapping',
+					'Filter target',
+					'No secret contents.',
+					'services,stacks'
+				],
+				[
+					'relationship',
+					'Relationship',
+					'default',
+					'Owned / referenced externally',
+					'Object ownership compared with current stack',
+					'Filter relationship',
+					'Stack context.',
+					'stacks'
+				],
+				[
+					'permissions',
+					'UID / GID / mode',
+					'optional',
+					'File-target ownership and mode',
+					'Service secret file target',
+					'Filter target permissions',
+					'Reference metadata only.',
+					'services,stacks'
+				]
+			],
+			configs: [
+				[
+					'target',
+					'Targets',
+					'default',
+					'Referenced filenames / paths',
+					'Service ConfigID references and target mapping',
+					'Filter target',
+					'Target may differ across consumers.',
+					'services,stacks'
+				],
+				[
+					'relationship',
+					'Relationship',
+					'default',
+					'Owned / referenced externally',
+					'Object ownership compared with current stack',
+					'Filter relationship',
+					'Stack context.',
+					'stacks'
+				],
+				[
+					'permissions',
+					'UID / GID / mode',
+					'optional',
+					'File-target ownership and mode',
+					'Service config file target',
+					'Filter target permissions',
+					'Reference metadata only.',
+					'services,stacks'
+				]
+			]
+		};
+		const cleanupNotes = {
+			nodes:
+				'Colored Manager / Worker tags; Leader is an additional manager tag and a filter option. Keep readiness separate from scheduling. Running tasks is optional proposed enrichment, not a default fan-out query. Engine, addresses and connection diagnostics become optional.',
+			services:
+				'Keep Stack. Stack repository and tag/digest in Image. Replicas carry health color and text. 5/5 is healthy; 4/5 through 0/5 are degraded. 0/0 is scaled to zero, not healthy. Job modes need completion-aware status.',
+			tasks:
+				'Hide Desired: Shutdown / Current: Shutdown history in the main list; keep it in Service Tasks. Retiring running and failed/rejected tasks remain visible. Node is plain text. Combine Current and Desired in State. Open container requires a verified running, authorized target; otherwise show plain availability text. Keep original errors visible.',
+			secrets:
+				'Prefer Source / owner and Used by. Labels belong in details and supported filters only; never offer a Labels column. Created, ID and secret Driver remain selectable.',
+			configs:
+				'Same contract as Secrets, without a Driver field. Source and Used by need complete identity-based lookups, not label guesses or visible-page counts.',
+			containers:
+				'Keep the rich operational view. Combine State, health, uptime and exit details. Name retains its image line; CPU, memory, update state and ports remain distinct.',
+			images:
+				'Running artifacts only: repository + digest + platform. Separate active versions get separate rows and detail pages; no unused cache, stopped history, copy counts or host selectors. Size is one active observation, never a range. Update availability, service image consistency and vulnerability state remain separate.',
+			networks:
+				'Keep Source. Stack Driver/Scope and Subnet/Gateway into two columns. No Nodes column. Node filtering remains separate. Show at most one IPAM pair plus a remainder count; full observation membership and IPAM configuration belong in details.',
+			volumes:
+				'Keep driver and node/attachment context in the list, without title-bar tags. Default to filesystem usage; offer measured Data size separately so the two are not confused.',
+			stacks:
+				'Add task readiness, source availability/draft state and deployment owner. Move Created to optional. Live-only discovery is not equivalent to saved deployable source.',
+			projects:
+				'Keep project state, service count, updates and host. Clarify Configuration source. Tags, working directory and Created become optional.',
+			templates:
+				'Stack description under the name and registry under Local / Remote. Keep discovery tags. Author and version remain optional.'
+		};
+		function stacked(primary, secondary) {
+			return `<span class="stacked">${primary}<span class="secondary">${secondary}</span></span>`;
+		}
+		function tag(label, tone = '') {
+			return `<span class="tag ${tone}">${escape(label)}</span>`;
+		}
+		function relativeTime(label, iso) {
+			return `<span data-tooltip="${escape(iso)}" aria-label="${escape(label + ' · ' + iso)}"><time datetime="${escape(iso)}">${escape(label)}</time></span>`;
+		}
+		function replicaCell(running, desired) {
+			if (running === null || desired === null)
+				return stacked('<span class="neutral">Unavailable</span>', 'Counts not reported');
+			if (desired === 0)
+				return stacked(
+					`<span class="replicas neutral">${running} / 0</span>`,
+					running === 0 ? 'Scaled to zero' : 'Converging to zero'
+				);
+			const ok = running === desired;
+			return stacked(
+				`<span class="replicas ${ok ? 'good' : 'bad'}">${running} / ${desired}</span>`,
+				ok ? 'Healthy' : running < desired ? 'Below target' : 'Above target / updating'
+			);
+		}
+		const observedUpdated = () => relativeTime('2h ago', '2026-11-27T08:00:00-07:00');
+		const observedCreated = () => relativeTime('3d ago', '2026-11-24T10:00:00-07:00');
+		function sampleRows(resource) {
+			const names = resources[resource];
+			const stack = link('store', 'stacks', 'Overview');
+			const node = 'swarm03';
+			const base = {
+				updated: observedUpdated(),
+				created: observedCreated(),
+				cluster: 'Primary Swarm',
+				id: escape(defaultRecords[resource]),
+				name: names.tabs.length ? link(names.name, resource) : escape(names.name)
+			};
+			const row = (key, fields) => ({ key, fields: { ...base, id: escape(key), ...fields } });
+			switch (resource) {
+				case 'stacks':
+					return [
+						row('stack-store', {
+							name: stacked(link('store', 'stacks'), tag('Deployed')),
+							services: link('3', 'stacks', 'Services'),
+							tasks: replicaCell(8, 10),
+							source: stacked('Saved Compose', 'Saved · not deployed'),
+							deployment: 'Manual'
+						})
+					];
+				case 'services':
+					return [
+						row('service-api', {
+							name: link('store_api', 'services', 'Overview', '', 'service-api'),
+							stack,
+							mode: tag('Replicated'),
+							replicas: replicaCell(5, 5),
+							image: stacked('nginx', 'stable · sha256:9af…'),
+							ports: '443 → 8080/tcp',
+							nodes: '2 observed',
+							networks: '2',
+							mounts: '1 volume · 1 bind'
+						}),
+						row('service-worker', {
+							name: 'store_worker',
+							stack,
+							mode: tag('Replicated'),
+							replicas: replicaCell(3, 5),
+							image: stacked(
+								'registry.example/store/worker',
+								'<span class="bad">Mixed versions · rollout active</span>'
+							),
+							ports: '—',
+							nodes: '2 observed',
+							networks: '1',
+							mounts: '1 volume'
+						}),
+						row('service-global', {
+							name: 'store_agent',
+							stack,
+							mode: tag('Global'),
+							replicas: replicaCell(5, 5),
+							image: stacked(
+								'registry.example/store/agent',
+								'<span class="bad">Off target · 1 of 5 tasks</span>'
+							),
+							ports: '—',
+							nodes: '5 observed',
+							networks: '1',
+							mounts: '1 bind'
+						}),
+						row('service-paused', {
+							name: 'store_optional',
+							stack,
+							mode: tag('Replicated'),
+							replicas: replicaCell(0, 0),
+							image: stacked('registry.example/store/optional', 'v1.4.2'),
+							ports: '—',
+							nodes: '0 assigned',
+							networks: '1',
+							mounts: 'None'
+						})
+					];
+				case 'tasks':
+					return [
+						row('task-api-1', {
+							name: link('store_api.1', 'services', 'Tasks'),
+							service: link('store_api', 'services', 'Overview'),
+							node,
+							state: stacked(tag('Running'), 'Desired: running'),
+							container: link('k7m2…', 'containers'),
+							image: stacked('nginx', 'stable'),
+							error: 'None'
+						}),
+						row('task-retiring', {
+							name: 'store_api.3',
+							service: link('store_api', 'services', 'Overview'),
+							node: 'swarm05',
+							state: stacked(tag('Running'), 'Desired: shutdown · retiring'),
+							container: link('old1…', 'containers'),
+							image: stacked('nginx', 'previous running digest'),
+							error: 'None'
+						}),
+						row('task-failed', {
+							name: stacked('store_api.2', 'Container exited with code 1'),
+							service: link('store_api', 'services'),
+							node: 'swarm04',
+							state: stacked('<span class="bad">Failed</span>', 'Desired: running'),
+							container: 'Unavailable',
+							image: stacked('nginx', 'stable'),
+							error: 'Container exited with code 1'
+						})
+					];
+				case 'nodes':
+					return [
+						row('node-leader', {
+							name: 'swarm01',
+							role: tag('Manager', 'manager') + ' ' + tag('Leader', 'leader'),
+							state: tag('Ready'),
+							scheduling: 'Active',
+							tasks: '2',
+							connection: 'Connected',
+							engine: '29.0.1',
+							platform: 'linux / amd64',
+							address: '10.0.0.11',
+							reachability: 'Reachable',
+							connectionId: 'connection-01'
+						}),
+						row('node-manager', {
+							name: 'swarm02',
+							role: tag('Manager', 'manager'),
+							state: tag('Ready'),
+							scheduling: 'Drain',
+							tasks: '0',
+							connection: 'Connected',
+							engine: '29.0.1',
+							platform: 'linux / arm64',
+							address: '10.0.0.12',
+							reachability: 'Reachable',
+							connectionId: 'connection-02'
+						}),
+						row('node-swarm03', {
+							name: link('swarm03', 'nodes'),
+							role: tag('Worker', 'worker'),
+							state: tag('Ready'),
+							scheduling: 'Active',
+							tasks: '5',
+							connection: 'Connected',
+							engine: '29.0.1',
+							platform: 'linux / amd64',
+							address: '10.0.0.13',
+							reachability: 'Not a manager',
+							connectionId: 'connection-03'
+						})
+					];
+				case 'containers':
+					return [
+						row('container-api-1', {
+							name: stacked(link('store_api.1.k7m2', 'containers'), 'nginx:stable'),
+							state: stacked(tag('Running'), 'Healthy · up 2h'),
+							updates: 'Up to date',
+							cpu: '1.8%',
+							memory: stacked('128 MiB', '12.5% of 1 GiB'),
+							ports: '443 → 8080/tcp',
+							node,
+							owner: stacked(stack, 'Service: store_api'),
+							ip: '10.20.0.14'
+						})
+					];
+				case 'images':
+					return [
+						row('image-nginx', {
+							name: stacked(
+								link('nginx', 'images', 'Overview', '', 'image-nginx'),
+								'stable · sha256:9af…'
+							),
+							usage: stacked('3 running consumers', 'Including 1 retiring task'),
+							size: '192 MiB',
+							updates: 'Update available',
+							vulnerabilities: stacked(
+								'<span class="bad">1 critical · 3 high</span>',
+								'Harbor · completed 2h ago'
+							),
+							usedBy: '2 services',
+							platform: 'linux / amd64',
+							digest: 'sha256:9af…',
+							support: 'Not applicable'
+						}),
+						row('image-nginx-new', {
+							name: stacked(
+								link('nginx', 'images', 'Overview', '', 'image-nginx-new'),
+								'stable · sha256:27b…'
+							),
+							usage: '2 running consumers',
+							size: '196 MiB',
+							updates: 'Up to date',
+							vulnerabilities: stacked('Not scanned', 'Harbor report pending'),
+							usedBy: '1 service',
+							platform: 'linux / amd64',
+							digest: 'sha256:27b…',
+							support: 'Not applicable'
+						})
+					];
+				case 'networks':
+					return [
+						row('network-backend', {
+							name: link('store_backend', 'networks', 'Overview', '', 'network-backend'),
+							source: state.relationship === 'external' ? 'Unknown' : stack,
+							usage: stacked('In use', 'Observed scope only'),
+							network: stacked('overlay', 'Swarm'),
+							addressing: stacked('10.20.0.0/24', 'Gateway 10.20.0.1'),
+							nodes: 'swarm02, swarm03',
+							queryConnection: 'swarm01 (manager)'
+						}),
+						row('network-ingress', {
+							name: 'ingress',
+							source: 'System',
+							usage: 'System-managed',
+							network: stacked('overlay', 'Swarm'),
+							addressing: stacked('10.0.0.0/24', 'Gateway 10.0.0.1'),
+							nodes: 'Observed on 3 nodes',
+							queryConnection: 'swarm01 (manager)'
+						}),
+						row('network-bridge', {
+							name: 'bridge',
+							source: 'Docker',
+							usage: 'Unused',
+							network: stacked('bridge', 'Local'),
+							addressing: stacked('172.17.0.0/16', 'Gateway 172.17.0.1'),
+							nodes: node,
+							queryConnection: node
+						})
+					];
+				case 'volumes':
+					return [
+						row('volume-db', {
+							name: link('store_db', 'volumes'),
+							usage: stacked('In use', '1 active consumer'),
+							driver: 'rbd',
+							node: stacked(node, 'Active attachment'),
+							filesystem: '18 GiB / 50 GiB',
+							size: '16.2 GiB',
+							source: stack,
+							mountpoint: '/reported/node/path',
+							rawScope: 'global (driver-reported metadata)'
+						})
+					];
+				case 'projects':
+					return [
+						row('project-monitoring', {
+							name: link('monitoring', 'projects'),
+							state: tag('Running'),
+							services: '4',
+							updates: 'Up to date',
+							node,
+							provider: stacked('Repository', 'Sync up to date'),
+							tags: 'observability',
+							directory: '/projects/monitoring'
+						})
+					];
+				case 'templates':
+					return [
+						row('template-web', {
+							name: stacked(
+								link('Web application', 'templates'),
+								'Web service with persistent storage'
+							),
+							source: stacked('Remote', 'Community registry'),
+							tags: 'web · database',
+							version: '1.4.2',
+							author: 'Example author'
+						})
+					];
+				case 'secrets':
+				case 'configs':
+					return [
+						row(defaultRecords[resource], {
+							source: stack,
+							usedBy: '2 services',
+							driver: resource === 'secrets' ? 'Default' : '—'
+						})
+					];
+				default:
+					return [row(defaultRecords[resource], {})];
+			}
+		}
+		function visibleColumns(resource, context = {}) {
+			const all = columnSpecs[resource];
+			const selected = state.customColumns[resource];
+			return all.filter(
+				(c) =>
+					(selected ? selected.includes(c[0]) : state.columnSet === 'all' || c[2] === 'default') &&
+					!(
+						(context.stack && c[0] === 'stack') ||
+						(context.service && c[0] === 'service') ||
+						(context.node && ['node', 'nodes'].includes(c[0])) ||
+						(context.cluster && c[0] === 'cluster')
+					)
+			);
+		}
+		function fieldPicker(resource) {
+			if (!state.columnPicker) return '';
+			const selected = visibleColumns(resource).map((c) => c[0]);
+			return `<fieldset class="field-picker"><legend>Visible columns · ${escape(resources[resource].title)}</legend>${columnSpecs[resource].map((c) => `<label><input type="checkbox" data-column="${escape(c[0])}" ${selected.includes(c[0]) ? 'checked' : ''} ${c[0] === 'name' ? 'disabled' : ''}>${escape(c[1])}${c[2] === 'default' ? '' : ' · ' + c[2]}</label>`).join('')}</fieldset>`;
+		}
+		function listRows(resource, context = {}) {
+			if (resource === 'tasks' && context.parent === 'services') {
+				context = {
+					...context,
+					rows: [
+						...(context.rows || sampleRows('tasks')),
+						{
+							key: 'task-history',
+							fields: {
+								name: 'store_api.1 · previous task',
+								service: link('store_api', 'services'),
+								node: 'swarm03',
+								state: stacked('Shutdown', 'Desired: shutdown'),
+								container: 'Removed',
+								updated: observedUpdated(),
+								image: 'nginx:previous',
+								error: 'None'
+							}
+						}
+					]
+				};
+			}
+			const extras = (scopedColumnSpecs[resource] || []).filter(
+				(c) =>
+					context.parent &&
+					c[7].split(',').includes(context.parent) &&
+					(state.columnSet === 'all' || c[2] === 'default')
+			);
+			const cols = [...visibleColumns(resource, context), ...extras];
+			let rows = context.rows || sampleRows(resource);
+			if (resource === 'nodes' && state.roleFilter && state.roleFilter !== 'all')
+				rows = rows.filter((r) =>
+					state.roleFilter === 'leader'
+						? r.key === 'node-leader'
+						: r.fields.role.includes(state.roleFilter === 'manager' ? 'Manager' : 'Worker')
+				);
+			const missing = '<span class="neutral">—</span>';
+			const act =
+				'<button type="button" data-action="menu" aria-label="Open row actions" aria-expanded="true">⋯</button>';
+			if (state.layout === 'compact')
+				return rows
+					.map(
+						(r) =>
+							`<section class="column-card"><h3>${r.fields.name}</h3><dl class="kv">${cols
+								.filter((c) => c[0] !== 'name')
+								.map(
+									(c) => `<div><dt>${escape(c[1])}</dt><dd>${r.fields[c[0]] ?? missing}</dd></div>`
+								)
+								.join('')}</dl>${act}</section>`
+					)
+					.join('');
+			return (
+				`<p class="column-count">${cols.length} visible data columns · ${columnSpecs[resource].length} core fields plus ${extras.length} visible contextual fields · ${state.columnSet === 'all' ? 'all fields' : 'defaults or custom selection'}${Object.keys(context).length ? ' · fixed parent context omitted' : ''}</p>` +
+				table(
+					[...cols.map((c) => c[1]), 'Actions'],
+					rows.map((r) => [...cols.map((c) => r.fields[c[0]] ?? missing), act])
+				)
+			);
+		}
+		function columnContractView() {
+			const resource = state.resource;
+			const contextual = scopedColumnSpecs[resource] || [];
+			return `<div class="paper contract"><h1>${escape(resources[resource].title)} · full proposed columns</h1><p>${escape(cleanupNotes[resource])}</p><div class="audit-table">${table(
+				[
+					'Column',
+					'Visibility',
+					'Presentation / link',
+					'Data authority',
+					'Sorting / filtering',
+					'Change'
+				],
+				columnSpecs[resource].map((c) => [
+					escape(c[1]),
+					escape(c[2]),
+					escape(c[3]),
+					escape(c[4]),
+					escape(c[5]),
+					escape(c[6])
+				])
+			)}</div>${
+				contextual.length
+					? `<h2>Additional fields in scoped ${escape(resources[resource].title.toLowerCase())} tables</h2><div class="audit-table">${table(
+							[
+								'Column',
+								'Visibility',
+								'Presentation',
+								'Authority',
+								'Sort / filter',
+								'Reason',
+								'Parent context'
+							],
+							contextual.map((c) => [
+								escape(c[1]),
+								escape(c[2]),
+								escape(c[3]),
+								escape(c[4]),
+								escape(c[5]),
+								escape(c[6]),
+								escape(c[7])
+							])
+						)}</div>`
+					: ''
+			}<h2>Shared density contract</h2><p>Use at most two identity / metadata lines per cell. Keep primary information readable. Combine related facts without losing the underlying sort/filter fields. Use compact relative timestamps; preserve exact timestamps and full identifiers in details and accessible text. No duplicate status columns. Operational state, update state and security state stay distinct. Labels never appear as table columns, optional fields or stacked cell metadata. Keep full labels in resource details; supported label filters remain independent of column visibility. Unknown and incomplete results never become healthy zeroes. Fixed parent context is omitted from scoped lists.</p></div>`;
+		}
+		function section(title, body) {
+			return `<section class="section"><h2>${escape(title)}</h2>${body}</section>`;
+		}
+		function kv(items) {
+			return `<dl class="kv">${items.map(([label, value]) => `<div><dt>${escape(label)}</dt><dd>${value}</dd></div>`).join('')}</dl>`;
+		}
+		function linkedRows(rows) {
+			return `<div class="linked">${rows.map(([label, content]) => `<div class="linked-row"><span>${escape(label)}</span><div class="links">${content}</div></div>`).join('')}</div>`;
+		}
+		function ownership(resource) {
+			if (state.relationship === 'unavailable')
+				return `<div class="callout" role="status">Relationships unavailable. Resource details are still available. ${button('Retry', 'refresh', 'retry')}</div>`;
+			const external =
+				externalRecord() && ['networks', 'volumes', 'secrets', 'configs'].includes(resource);
+			const owns = external
+				? 'Ownership not established · referenced as external'
+				: link('store', 'stacks', 'Overview');
+			if (resource === 'containers')
+				return section(
+					'Stack resources',
+					linkedRows([
+						['Owning stack', link('store', 'stacks', 'Overview')],
+						['Owning service', link('store_api', 'services', 'Overview')]
+					])
+				);
+			if (resource === 'services')
+				return section(
+					'Linked resources',
+					linkedRows([
+						['Owned by', link('Stack · store', 'stacks', 'Overview')],
+						[
+							'Uses',
+							[
+								link('Volumes', 'services', 'Volumes'),
+								link('Networks', 'services', 'Networks'),
+								link('Secrets', 'services', 'Secrets'),
+								link('Configs', 'services', 'Configs')
+							].join('')
+						],
+						['Runs as', link('Tasks', 'services', 'Tasks')]
+					])
+				);
+			if (resource === 'networks')
+				return section(
+					'Linked resources',
+					linkedRows([
+						['Owned by', owns],
+						[
+							'Used by',
+							link('Services', 'networks', 'Services') + link('Tasks', 'networks', 'Tasks')
+						]
+					])
+				);
+			if (resource === 'volumes')
+				return section(
+					'Linked resources',
+					linkedRows([
+						['Owned by', owns],
+						[
+							'Used by',
+							link('Services', 'volumes', 'Services') + link('Stack · store', 'stacks', 'Volumes')
+						]
+					])
+				);
+			return '';
+		}
+		function overview(resource) {
+			const r = current();
+			switch (resource) {
+				case 'projects':
+					return (
+						section(
+							'Project details',
+							kv([
+								['Name', 'monitoring'],
+								['State', 'Running'],
+								['Node', 'swarm03'],
+								['Source', 'Repository · manual sync'],
+								['Configuration', 'Saved configuration']
+							])
+						) +
+						section(
+							'Linked resources',
+							linkedRows([['Services', link('4 services', 'projects', 'Services')]])
+						)
+					);
+				case 'images':
+					return (
+						section(
+							'Artifact identity',
+							kv([
+								['Repository', 'docker.io/library/nginx'],
+								['Running digest', escape(r.digest || 'sha256:9af…')],
+								['Platform', escape(r.platform || 'linux/amd64')],
+								['Scope', 'Primary Swarm · authorized running consumers'],
+								['Reported size', 'One active copy · storage accounting may differ']
+							])
+						) +
+						section(
+							'Linked resources',
+							linkedRows([
+								['Running consumers', link('Containers', 'images', 'Containers')],
+								['Using services', link('Services', 'images', 'Services')]
+							])
+						) +
+						section(
+							'Report summary',
+							'<p>One report for this artifact/platform. Harbor is preferred. Scan completion time, provider and collection state remain explicit.</p>'
+						)
+					);
+				case 'containers':
+					return (
+						section(
+							'Runtime',
+							kv([
+								['Container ID', 'k7m2…'],
+								['Image', link('nginx:stable', 'images')],
+								['Node', 'swarm03'],
+								['Status', 'Running'],
+								['Started', '2 hours ago'],
+								['Restart policy', 'Always']
+							])
+						) +
+						ownership(resource) +
+						section(
+							'Attached resources',
+							linkedRows([
+								['Networks', link('1 network', 'containers', 'Networks')],
+								['Volumes', link('1 named volume', 'containers', 'Storage')]
+							])
+						)
+					);
+				case 'networks':
+					return (
+						section(
+							'Network details',
+							kv([
+								['ID', escape(current().id || 'network-backend-123')],
+								['Namespace', externalRecord() ? '—' : 'store'],
+								['Driver', 'overlay'],
+								['Scope', 'Swarm'],
+								['Created', '2 days ago'],
+								['Attachable', 'Yes']
+							])
+						) +
+						ownership(resource) +
+						section(
+							'IP address management',
+							kv([
+								['Subnet', '10.20.0.0/24'],
+								['Gateway', '10.20.0.1']
+							])
+						) +
+						section(
+							'Labels and options',
+							'<span class="preview-note">Existing labels and driver options remain available here.</span>'
+						)
+					);
+				case 'volumes':
+					return (
+						section(
+							'Volume details',
+							kv([
+								['Driver', 'rbd'],
+								['Observed on node', 'swarm03'],
+								['Created', '2 days ago'],
+								['Backing filesystem usage', '18 GiB / 50 GiB']
+							])
+						) +
+						ownership(resource) +
+						section(
+							'Containers using this volume',
+							table(
+								['Container', 'Node', 'Status'],
+								[[link('store_api.1.k7m2', 'containers'), 'swarm03', 'Running']]
+							)
+						) +
+						section(
+							'Driver options and labels',
+							'<span class="preview-note">Existing technical details remain here. Driver metadata does not assert cross-node storage identity.</span>'
+						)
+					);
+				case 'services':
+					return (
+						section(
+							'Service details',
+							kv([
+								['Name', escape(current().name)],
+								['Mode', 'Replicated'],
+								[
+									'Replicas',
+									state.record === 'service-db' ? '1 desired / 1 running' : '5 desired / 5 running'
+								],
+								['Image', state.record === 'service-db' ? 'postgres:stable' : 'nginx:stable'],
+								['ID', escape(current().id || 'service-api-123')],
+								['Nodes', 'swarm02, swarm03, swarm04']
+							])
+						) + ownership(resource)
+					);
+				case 'stacks':
+					return (
+						section(
+							'Stack details',
+							kv([
+								['Namespace', 'store'],
+								['State', 'Deployed'],
+								['Services', link('3 services', 'stacks', 'Services')],
+								['Tasks', link('8 running / 10 desired', 'stacks', 'Tasks')],
+								['Source', 'Saved Compose source'],
+								['Cluster', 'Primary Swarm']
+							])
+						) +
+						section(
+							'Linked resources',
+							linkedRows([
+								['Services', link('3 services', 'stacks', 'Services')],
+								['Tasks', link('8 running / 10 desired', 'stacks', 'Tasks')],
+								['Networks', link('1 owned · 1 external reference', 'stacks', 'Networks')],
+								['Volumes', link('1 owned · 1 external reference', 'stacks', 'Volumes')],
+								['Secrets', link('1 secret', 'stacks', 'Secrets')],
+								['Configs', link('1 config', 'stacks', 'Configs')]
+							])
+						)
+					);
+				default:
+					return (
+						section(
+							r.title + ' details',
+							kv([
+								['Name', escape(r.name)],
+								['Status', escape(r.status)]
+							])
+						) +
+						section(
+							'Linked resources',
+							related(resource).broken
+								? '<p>Relationships unavailable.</p>'
+								: linkedRows(
+										related(resource).items.map((x) => [
+											x.label,
+											link(x.subtitle || x.label, x.resource, x.tab)
+										])
+									)
+						)
+					);
+			}
+		}
+		function scoped(resource, tab) {
+			const own = !externalRecord();
+			if (state.relationship === 'unavailable')
+				return `<div class="callout" role="status">Unable to load ${escape(tab.toLowerCase())} for ${escape(resources[resource].name)}. ${button('Retry', 'refresh', 'retry')}</div>`;
+			const context = `<p class="preview-note">${escape(tab)} scoped to ${escape(current().name)}</p>`;
+			if (tab === 'Services')
+				return (
+					context +
+					(resource === 'projects'
+						? listRows('containers', { node: true, cluster: true, parent: resource })
+						: listRows('services', {
+								stack: resource === 'stacks',
+								cluster: true,
+								parent: resource
+							}))
+				);
+			if (tab === 'Tasks')
+				return (
+					context +
+					listRows('tasks', {
+						service: resource === 'services',
+						node: resource === 'nodes',
+						cluster: true,
+						parent: resource,
+						rows:
+							resource === 'nodes'
+								? sampleRows('tasks').filter((row) => row.fields.node === 'swarm03')
+								: sampleRows('tasks')
+					})
+				);
+			if (tab === 'Networks') {
+				const primary = sampleRows('networks')[0];
+				const rows = [
+					{
+						...primary,
+						fields: {
+							...primary.fields,
+							relationship: own ? 'Owned' : 'Referenced · external',
+							aliases: 'backend',
+							vip: '10.20.0.10/24',
+							configuration: 'Attachable'
+						}
+					},
+					{
+						key: 'network-edge',
+						fields: {
+							...primary.fields,
+							id: 'network-edge-456',
+							name: link('shared_edge', 'networks', 'Overview', '', 'network-edge'),
+							source: 'Unknown',
+							network: stacked('overlay', 'Swarm'),
+							addressing: stacked('10.30.0.0/24', 'Gateway 10.30.0.1'),
+							relationship: 'Referenced · external',
+							aliases: 'edge',
+							vip: '10.30.0.10/24',
+							configuration: 'Attachable'
+						}
+					}
+				];
+				return context + listRows('networks', { cluster: true, parent: resource, rows });
+			}
+			if (tab === 'Volumes' || tab === 'Storage') {
+				const primary = sampleRows('volumes')[0];
+				const rows = [
+					{
+						...primary,
+						fields: {
+							...primary.fields,
+							relationship: own ? 'Owned' : 'Referenced · external',
+							target: '/var/lib/app',
+							access: 'Read-write',
+							device: 'Driver-managed'
+						}
+					},
+					{
+						key: 'volume-media',
+						fields: {
+							...primary.fields,
+							id: 'volume-media-456',
+							name: 'shared_media',
+							source: 'Unknown',
+							node: 'No verified attachment',
+							usage: 'Reference only',
+							filesystem: 'Unavailable',
+							size: 'Not measured',
+							relationship: 'Referenced · external',
+							target: '/media',
+							access: 'Read-only',
+							device: 'Unknown',
+							mountpoint: 'Unavailable'
+						}
+					}
+				];
+				return (
+					context +
+					listRows('volumes', { cluster: true, parent: resource, rows }) +
+					(resource === 'services' || resource === 'containers'
+						? section(
+								'Other mounts',
+								table(
+									['Type', 'Source', 'Target', 'Access'],
+									[
+										['Bind', '/etc/store', '/etc/store', 'Read-only'],
+										['tmpfs', '—', '/tmp', 'Read-write']
+									]
+								)
+							)
+						: '')
+				);
+			}
+			if (tab === 'Secrets' || tab === 'Configs') {
+				const type = tab.toLowerCase();
+				const rows = sampleRows(type).map((row) => ({
+					...row,
+					fields: {
+						...row.fields,
+						target: type === 'secrets' ? '/run/secrets/db_password' : '/etc/nginx/nginx.conf',
+						relationship: own ? 'Owned' : 'Referenced · external',
+						permissions: '0 / 0 / 0400'
+					}
+				}));
+				return (
+					context +
+					listRows(type, { cluster: true, parent: resource, rows }) +
+					'<p class="preview-note">Metadata and references only. Secret contents are never shown.</p>'
+				);
+			}
+			if (tab === 'Containers') {
+				const rows = sampleRows('containers');
+				if (resource === 'images') {
+					rows[0].fields.name = stacked(
+						'store_api.1.k7m2',
+						'nginx:stable · ' + escape(current().digest || 'sha256:9af…')
+					);
+					rows[0].fields.node = 'swarm03';
+				}
+				return (
+					context +
+					listRows('containers', { node: resource === 'nodes', parent: resource, rows }) +
+					(resource === 'images'
+						? '<p class="preview-note">Illustrative subset. Implementation must query running consumers of this exact artifact/platform across the authorized scope, with complete counts and pagination.</p>'
+						: '')
+				);
+			}
+			if (tab === 'Resources')
+				return (
+					context +
+					section(
+						'Node-local resources',
+						linkedRows(
+							['Containers', 'Images', 'Networks', 'Volumes'].map((label) => [
+								label,
+								link(label.toLowerCase(), label.toLowerCase())
+							])
+						)
+					)
+				);
+			if (resource === 'images' && tab === 'Services')
+				return (
+					context +
+					listRows('services', { parent: 'images', rows: sampleRows('services').slice(0, 1) }) +
+					'<p class="preview-note">Proposed: resolver includes only services with verified running tasks using the selected artifact and platform. This sample illustrates the layout.</p>'
+				);
+			if (resource === 'images' && tab === 'Vulnerabilities')
+				return (
+					section(
+						'Vulnerabilities',
+						kv([
+							['Artifact', escape(current().digest || 'sha256:9af…')],
+							['Platform', escape(current().platform || 'linux/amd64')],
+							['Provider', 'Harbor'],
+							['Report state', state.record === 'image-nginx-new' ? 'Not scanned' : 'Completed'],
+							['Scan completed', state.record === 'image-nginx-new' ? '—' : '2h ago'],
+							['Last collection attempt', '5m ago']
+						])
+					) +
+					section(
+						'Findings',
+						state.record === 'image-nginx-new'
+							? '<p>Not scanned. No clean result is implied.</p>'
+							: table(
+									['Severity', 'Finding', 'Package', 'Installed → fixed', 'Source'],
+									[['Critical', 'CVE-EXAMPLE', 'example-lib', '1.0 → 1.1', 'Harbor']]
+								)
+					) +
+					'<p class="preview-note">Illustrative findings only. Explicit Scan submits work; opening this tab does not start a scan or collect registry reports.</p>'
+				);
+			if (tab === 'Logs') return '<div class="blank mono">[Sample log output]</div>';
+			if (tab === 'Source' || tab === 'Configuration' || tab === 'Compose')
+				return '<div class="blank mono">Existing configuration / source editor retained.</div>';
+			if (tab === 'Workspace')
+				return '<div class="blank">Existing file workspace retained. Active attachment: swarm03.</div>';
+			if (tab === 'Backups')
+				return '<div class="blank">Existing backup list and controls retained.</div>';
+			return `<div class="blank">Existing ${escape(tab.toLowerCase())} view retained.</div>`;
+		}
+		const contracts = [
+			[
+				'Identity',
+				'Every relationship has a resource type, stable ID, cluster identity and, when node-local, verified node identity. A name is display text, never a join key across nodes or clusters.'
+			],
+			[
+				'Relationship kinds',
+				'Owned by, Uses / References, Used by, and Runs on are separate facts. An external network or volume can be used by a stack without being owned by it.'
+			],
+			[
+				'Resolution',
+				'List menus, overview sections, tabs and contextual lists consume the same relationship definitions and resolution results. Column visibility, pagination and label text do not determine navigation.'
+			],
+			[
+				'Destinations · agreed',
+				'Plural links open a scoped resource list in the current detail context. Create a missing tab when the relationship warrants it. Singular owner links open the identified resource. All resource name and singular owner links open Overview. Explicit plural resource links still open their scoped tabs. Add Overview where absent; Tasks continue using their owning service context rather than a new task detail page.'
+			],
+			[
+				'Headers · agreed',
+				'Name, operational status and actions. IDs, namespaces, driver, scope, node attachment and aggregate counts belong in Overview. No global-volume badge.'
+			],
+			[
+				'Overview sections',
+				'Resource details first; then Linked resources using explicit relationship labels; then existing domain details. Containers get Stack resources for service/stack ownership, distinct from network and mount attachments.'
+			],
+			[
+				'Task list history · proposed',
+				'The main Tasks list excludes only tasks whose desired state and current state are both Shutdown by default. Apply this filter before counts, sorting and pagination. Retain retiring tasks while current state is Running, and retain Failed, Rejected and other diagnostic states even if desired state is Shutdown. Service Tasks retains shutdown history with explicit state filtering; this list preference never changes runtime inventory, scan eligibility or service desired/running counts.'
+			],
+			[
+				'Task container navigation · proposed',
+				'Offer Open container only for a verified currently running container: exact TaskID and container ID, verified node binding, successful current observation and authorization. A task container ID or current Running state alone is insufficient. Apply the same eligibility to the Container cell and Related resources. Missing, removed, stopped, forbidden or unverified containers have no navigation action; show an appropriate plain-text state in the cell. Service and stack links remain available. Revalidate at navigation; if the container disappears, present an inline no-longer-available state with return-to-task context instead of a generic error page.'
+			],
+			[
+				'List contract',
+				'Preserve useful at-a-glance columns. Service retains its Stack link. Task retains Service and Node information; Related resources prioritizes service and stack rather than node.'
+			],
+			[
+				'Column inventory · proposed',
+				'The current preview includes a complete proposed field inventory for its 12 resources. Proposed defaults, All proposed columns and Columns selection render from that same inventory. Columns and cleanup specifies authority, visibility, presentation and sorting/filtering. Other application lists remain outside this column audit. Fixed parent fields are omitted in scoped tables; relationship tables declare their context-specific fields separately.'
+			],
+			[
+				'Density and status · proposed',
+				'Use stacked identity / image text and compact relative timestamps, preserving full identifiers and times in details. Combine complementary metadata, not different kinds of status. Node readiness and scheduling remain distinct. Task current / desired states share a cell but keep separate meaning and filters. Labels are excluded from every resource table, including optional columns. Replica shortage is red, positive target reached is green, zero-target and unknown are neutral; job modes need completion-aware treatment.'
+			],
+			[
+				'Labels · agreed',
+				'Never render raw resource labels in list tables, scoped tables or mobile table equivalents: no default or optional column, stacked summary, badge dump or expandable label cell. Automation can generate large label sets and long values. Keep label inspection/editing in resource details and supported label filters independent of visible columns. Verified metadata-derived ownership/source fields remain valid; do not dump their underlying labels.'
+			],
+			[
+				'Cluster scale · agreed',
+				'No Nodes membership column in Networks. Node filters are independent of visible columns. Labels never appear in resource table cells. No unbounded arrays of nodes, consumers, tags, ports or IPAM entries in table cells, including optional columns. Use a bounded summary and a remainder count; keep full membership in details or a scoped list. Default lists must not trigger per-row cross-cluster fan-out. Enrichments need an explicit budget, query reuse and incomplete / unavailable states. A 200-node cluster must remain readable.'
+			],
+			[
+				'Node roles · proposed',
+				'Worker and Manager are colored tags. The elected manager additionally shows Leader; Role filtering offers Worker, Manager and Leader. Leader is derived from manager election state, never accepted as a new assignable Docker node role.'
+			],
+			[
+				'Networks Source column · proposed',
+				'Add Source rather than Created by: provenance is not a human audit actor. Candidate values are a verified stack name, Docker for built-in engine networks, System for identified system-managed networks, and Unknown when provenance is not established. Stack names link to that exact stack in the correct cluster. External means explicitly referenced as external by a stack. Display it in that stack relationship context; it never means created outside Arcane and does not establish source or ownership.'
+			],
+			[
+				'Menu contract · agreed',
+				'Top-level View details opens Overview. Details submenu contains the resource’s other views. Separate Related resources submenu contains scoped resource lists and identified owners / consumers. Then edit/configuration actions, operational actions and destructive actions last. Omit empty submenus. Icons, accessible labels and ordering are consistent across table, grid and mobile.'
+			],
+			[
+				'Details versus Related resources',
+				'History, metrics, logs, configuration, inspection and image attestations / vulnerabilities belong in Details. Tasks, networks, volumes, services, stacks and other identified resources belong in Related resources. Existing dialogs may remain dialogs, including image release notes. Container release notes and Commit remain removed.'
+			],
+			[
+				'No duplicate navigation · agreed',
+				'Every destination appears once within a row menu. Overview appears only as the top-level View details item and never inside Details. Other destinations appear under either Details or Related resources, never both. Compare canonical resource identity, scope and tab / dialog, not labels. The row name keeps its normal primary navigation; Resource row selection opens Overview. Omit View details for resources without Overview.'
+			],
+			[
+				'Scope and return navigation',
+				'Destination shows the source relationship and preserves selected cluster, node attachment when needed, filters and return path. A scoped list must not silently become a global list.'
+			],
+			[
+				'States',
+				'Resolved, absent, external reference, unavailable and forbidden are distinct. No owner is not a failed request. Failed resolution shows retry; permission-denied destinations are omitted. No guessed fallback links.'
+			],
+			[
+				'Counts and completeness',
+				'Counts come from relation-aware queries, not the current page of a list. Unknown or incomplete results show unavailable / partial, never zero.'
+			],
+			[
+				'Volume identity',
+				'Driver metadata and Docker scope never prove shared physical storage. Workspace and container links use verified active attachments; multiple node records remain distinguishable.'
+			],
+			[
+				'Source and deployment separation · agreed',
+				'Importing, editing and saving update editable configuration only. Deployment is a separate manual action or delegated to GitOps. Sync-from and sync-to use separate repositories; no write-back to the source repository. See Stack source contract for the complete workflow.'
+			],
+			[
+				'Images and security',
+				'Use the Images and security contract as the shared authority across Images, Security, dashboard, node-scoped inventory and service/task warnings. cf.106–108 supersede repository-wide grouping and copy selection. Proposed extensions are explicitly marked.'
+			],
+			[
+				'Change control',
+				'This relationship inventory and layout contract is approved for implementation. New relation links require a defined resolver, destination, permissions and states; no page-local inventions.'
+			]
+		];
+
+		const imageContracts = [
+			[
+				'Established · cf.108',
+				'IMG-01 · Canonical identity',
+				'Within authorized cluster scope, normalize repository and use immutable running registry digest plus OS/architecture/variant. Engine IDs route node-local operations only. A local build without a registry digest uses proven local content identity; do not merge by name/tag or guess cross-engine equivalence.'
+			],
+			[
+				'Established · cf.108',
+				'IMG-02 · Running inventory',
+				'Include actual running containers/tasks, including retiring tasks still running. Exclude stopped history and unused cached copies everywhere: Images, node-linked image lists, manual and scheduled scan targets. A node filter scopes consumers, not an agent registration or repository cache. Missing observations mean incomplete inventory, never zero usage.'
+			],
+			[
+				'Established · cf.108',
+				'IMG-03 · Rows and navigation',
+				'Identical replicas collapse to one artifact row before sorting, filtering and pagination. Different running digests or platforms get separate rows even under the same tag. Tags are bounded aliases, not identity. Row links, refreshes, Overview, History, Attestations and Vulnerabilities remain pinned to that artifact/platform; never select the first repository match.'
+			],
+			[
+				'Established · cf.108',
+				'IMG-04 · Counts and size',
+				'Header counts logical running artifacts in the filtered authorized scope. Show one active copy reported size; no size ranges, version badges or summed replica size. If retaining a physical storage total, label All copies and make its different scope explicit; cached bytes must not be represented as running logical image size. No node-copy controls in ordinary image views.'
+			],
+			[
+				'Proposed extension',
+				'IMG-05 · Related resources',
+				'Image Related resources opens its own scoped Containers and Services tabs using verified runtime observations. Consumers remain tied to this exact artifact/platform across nodes; service links use task ServiceID. No same-tag joins. New tabs/resolvers are required before these menu links are implemented.'
+			],
+			[
+				'Established · cf.108',
+				'IMG-06 · Mixed replicated versions',
+				'Flag replicated services with distinct simultaneously running pinned image references; include retiring running tasks and rolling updates. Equal pinned digests with different tag aliases count once. Preserve Docker task errors; add image warning separately. Clear mixed state after convergence. Existing code compares task-spec references and cannot prove content equality for identical mutable tags.'
+			],
+			[
+				'Proposed extension',
+				'IMG-07 · Service image correctness',
+				'Apply to global and replicated services. Separately evaluate running artifact diversity and conformance to current desired service image. All tasks may agree on one wrong image. Resolve a desired index to the platform manifest for each task platform; valid amd64/arm64 children of one desired index are not a mismatch. Correlate actual container content through verified TaskID, ServiceID, NodeID and running observation; task reference alone is insufficient to prove runtime content.'
+			],
+			[
+				'Proposed extension',
+				'IMG-08 · Consistency states',
+				'Use In sync, Mixed versions, Off target, and Unverified. An active update/rollback annotates divergence as Rollout active; it does not hide it or pretend deployment failed. Missing digest/permission/node observation yields Unverified or partial coverage, not In sync. No current-tag registry lookup can establish what an unresolved mutable tag meant at deployment time. Replica availability remains independent: 5/5 can still be Off target.'
+			],
+			[
+				'Proposed extension',
+				'IMG-09 · Warning surfaces',
+				'Show concise image consistency text below Service Image, separately from replica health. Tasks retain original errors plus image warning and desired/observed reference evidence. Dashboard links to the correctly scoped affected service/task view. Counts and filters come from complete authorized relation-aware queries, never visible rows. No automatic force-update, pull, rollback or remediation.'
+			],
+			[
+				'Established · cf.106/108',
+				'SEC-01 · One target and view',
+				'One scan target/report per canonical running artifact/platform across Images, details and Scan All. Remove host/version/cached-copy selectors and the duplicate Registry vulnerabilities tab. Choose one authorized live observation internally; retain alternatives for routing/failover without asking the user to select a node.'
+			],
+			[
+				'Established · cf.106/107',
+				'SEC-02 · Harbor first',
+				'Resolve direct Harbor artifacts or configured proxy-cache mappings for upstream references. Submit scans and read the exact running platform manifest, not a moving tag or blindly the upstream index. Harbor can trim an index and give it another digest. Preserve upstream identity and resolved Harbor identity as provenance; never scan a different version to obtain a report.'
+			],
+			[
+				'Established · cf.106',
+				'SEC-03 · Local fallback',
+				'Use local Trivy when Harbor cannot obtain or scan the exact artifact, including a local one-off build. Choose an eligible authorized live copy internally. Credential/permission/provider failures stay visible; do not silently replace an error with a clean-looking result from a different scanner. Mark Local Trivy and the fallback reason.'
+			],
+			[
+				'Established · cf.107',
+				'SEC-04 · Read boundary',
+				'Images, Security lists, risk and dashboard reads use stored summaries/findings; no scan submission, per-image registry fetch or finding rewrites during page reads. Detail views show stored matching reports. Explicit scan/refresh and configured background work collect results. Opening or refreshing a page must remain safe with Harbor unavailable.'
+			],
+			[
+				'Established · cf.107',
+				'SEC-05 · Delayed Harbor indexing',
+				'Treat artifact not indexed yet as Not scanned / pending indexing, not a fatal inventory error. Explicit scan work uses bounded retry/cancellation; delayed or unavailable reports cannot crash inventory, Security or dashboard. Preserve prior matching report with its age and collection failure instead of inventing zero findings.'
+			],
+			[
+				'Established + proposed display contract',
+				'SEC-06 · Report provenance',
+				'Display provider, exact artifact/platform, report status, scan completion time and separate collection attempt time. Queued, running, not scanned, failed, unavailable and completed are distinct; never render missing/unscanned as clean. Preserve last successful report with stale/refresh-failed context. Unchanged source/state/completed timestamp must not rewrite findings. Stale threshold still needs an explicit policy.'
+			],
+			[
+				'Proposed shared reporting contract · #256 gap',
+				'SEC-07 · Fleet aggregation',
+				'Deduplicate canonical artifact reports across agents. Report finding instances and unique CVEs with explicit counting semantics; report affected services/tasks/nodes separately as exposure. Two replicas do not create two artifact findings. Missing/stale coverage and denied/unreachable scopes are visible. Totals, filters, list pages and exports use the same snapshot and scope. Current per-agent fleet totals are not yet guaranteed canonical.'
+			],
+			[
+				'Established comparison + proposed presentation',
+				'SEC-08 · Findings and comparisons',
+				'Preserve Harbor severity, CVSS, description, package, installed/fixed versions and source links. Compare exact artifact/platform reports using stable vulnerability plus package identity, with added/persisting/removed findings. Do not compare unrelated platforms or turn missing baseline into zero findings. Show both digests, providers and scan times; exports preserve scope, provenance, coverage and errors. Fleet export format remains to be specified.'
+			],
+			[
+				'Existing operations + proposed handling rules',
+				'IMG-10 · Image actions',
+				'Retain applicable Tag, Pull, Push, Export, Scan and Patch with permission checks and explicit target confirmation where needed. Node-local writes must identify the verified engine target internally; never apply to every replica by accident. No ordinary scan host picker. Pull/tag/push do not change a service desired image or trigger deployment. Deployment-managed workloads change through their service/stack owner.'
+			],
+			[
+				'Proposed patch workflow',
+				'SEC-09 · Remediation boundary',
+				'Patch creates a separately identified output artifact and report linked to its original input. Preview affected workloads and explicit publication destination. Never replace a running image, rewrite editable Compose, publish to a repository or redeploy as a side effect of viewing/scanning/saving. Source save and deployment remain separate manual or GitOps-owned actions. Detailed patch interaction still needs design.'
+			],
+			[
+				'Required architecture · open #256',
+				'SCALE-01 · Bounded work',
+				'Durable manager-coordinated work, digest/platform deduplication, bounded concurrency/queues/retries, cancellation and registry rate limits. No per-cell cross-fleet fan-out. Server-side pagination and bounded replica summaries; filter unused inventory before report queries/transfers. Cross-agent coordination, canonical totals and measured large-swarm/registry capacity remain unproven.'
+			]
+		];
+		const imageAcceptance = [
+			[
+				'A',
+				'Five running copies; two Docker IDs/storage sizes; same repository/digest/platform',
+				'One row, one selected reported size, one report; internal copies do not become UI variants.',
+				'cf.108 captured-inventory replay reported passed'
+			],
+			[
+				'B',
+				'Same tag, two running digests; plus unused and stopped copies',
+				'Two rows/details; unused/stopped copies excluded; retiring actually running task remains.',
+				'cf.108 partition checks reported passed'
+			],
+			[
+				'C',
+				'One desired multi-platform index; legitimate amd64 and arm64 children',
+				'Separate platform image rows; service In sync when each matches its own desired platform manifest.',
+				'Proposed conformance acceptance'
+			],
+			[
+				'D',
+				'Replicated or global service 5/5; one old artifact remains',
+				'Availability 5/5 independent of Mixed / Off target. Rollout annotation only when actually observed.',
+				'Replicated mixed-reference tests reported passed; global/runtime comparison proposed'
+			],
+			[
+				'E',
+				'All 5 tasks use same artifact, different from pinned desired artifact',
+				'Off target without Mixed versions; link affected tasks and exact desired/observed evidence.',
+				'Proposed acceptance'
+			],
+			[
+				'F',
+				'Identical mutable task tags, no resolvable immutable desired baseline',
+				'Unverified; never declare consistency from matching text.',
+				'Known limitation; runtime correlation proposed'
+			],
+			[
+				'G',
+				'Harbor unavailable, credentials denied, or proxy child not indexed',
+				'Inventory stays usable; stored report remains attributable; pending/error explicit. No silent scanner substitution for auth failure.',
+				'cf.106/107 owning tests reported passed; browser stability acceptance not reverified'
+			],
+			[
+				'H',
+				'Scan All sees one artifact through multiple agents',
+				'One artifact target/report; no cached targets; bounded durable coordination across retries/restarts.',
+				'Target dedup implemented; durable fleet coordination open #256'
+			],
+			[
+				'I',
+				'Image detail A opened while list is sorted/paginated/refreshed',
+				'All tabs/report/related consumers stay on A and platform, never another same-name version.',
+				'cf.108 detail-resolution replay reported passed'
+			],
+			[
+				'J',
+				'A report covers one artifact consumed by 200 nodes',
+				'One artifact finding set; separately labeled exposure; paginated consumer details and partial coverage.',
+				'Proposed scale/aggregation acceptance; no load claim'
+			]
+		];
+		function imageContractView() {
+			const base = 'https://gitea.home.prettybaked.com/constructorfleet/arcane';
+			return (
+				'<div class="paper contract"><h1>Images and vulnerability contract</h1><p>Shared rules for Images, Security, dashboard, node-scoped inventory, service/task warnings and image actions. Established rules come from the parent discussion and merged cf.106–108 notes; proposed extensions are not implementation claims.</p>' +
+				table(
+					['Evidence / status', 'Contract ID', 'Specification'],
+					imageContracts.map((row) => row.map(escape))
+				) +
+				'<h2>Acceptance scenarios</h2>' +
+				table(
+					['Case', 'Input', 'Expected result', 'Evidence / outstanding work'],
+					imageAcceptance.map((row) => row.map(escape))
+				) +
+				'<h2>Evidence and implementation limits</h2><p><a href="agent-host-session://ahp-session/d9901a05-f789-4a4d-9962-b5b547736338">Parent: Harbor vulnerability QA</a> · turns 12–17. Local release history reviewed 27 Nov 2026. Earlier repository grouping/copy-selection rules from cf.99 are superseded by cf.108.</p>' +
+				table(
+					['Release / tracking', 'What it establishes', 'Limits'],
+					[
+						[
+							'<a href="' + base + '/releases/tag/v3.0.1-cf.106">cf.106 / PR #253</a>',
+							'Harbor/proxy-first exact running scans; local fallback; one vulnerability tab.',
+							'Release notes retain runtime scan/fallback acceptance under QA #252.'
+						],
+						[
+							'<a href="' + base + '/releases/tag/v3.0.1-cf.107">cf.107 / PR #255</a>',
+							'Stored read boundary; exact proxy platform resolution; indexing pending handling.',
+							'QA #254 browser stability and load validation not closed by release notes.'
+						],
+						[
+							'<a href="' + base + '/releases/tag/v3.0.1-cf.108">cf.108 / PR #259</a>',
+							'Running artifact rows, detail/report identity, replicated mixed-reference flags.',
+							'Parent reports manager/agents rollout and captured five-node replay. QA #257/#258 browser acceptance still open in notes; not rerun here.'
+						],
+						[
+							'<a href="' + base + '/issues/256">#256 · architecture follow-up</a>',
+							'Tracks canonical fleet totals, durable cross-agent collection and measured capacity.',
+							'Open according to reviewed conversation/release evidence; current remote issue status not fetched.'
+						]
+					]
+				) +
+				'<h2>Decisions still needed</h2><p>Report freshness thresholds; exact fleet export format; patch publication/review flow; dedicated cache-maintenance access if wanted. None may reintroduce unused cached images or per-node selectors into the running library/scans. Overview is the agreed site-wide default landing tab.</p></div>'
+			);
+		}
+
+		const sourceContracts = [
+			[
+				'Agreed',
+				'Editable stack source',
+				'A running Swarm stack or a source repository can supply editable Swarm Compose configuration. This remains a stack, not a standalone Compose project.'
+			],
+			[
+				'Proposed feature',
+				'Import stack source',
+				'Reuse saved Compose source when available. Otherwise reconstruct a draft from live service specifications and verified resource relationships. Report missing or unrecoverable inputs; do not claim to recover the original authored source.'
+			],
+			[
+				'Agreed',
+				'Sync from',
+				'An optional source repository imports configuration into the editable working copy. It is an input source; Arcane does not push edits back to it.'
+			],
+			[
+				'Agreed',
+				'Sync to',
+				'A separately configured destination repository receives the editable configuration. Source and destination must be different repositories, not two branches or directories in the same repository.'
+			],
+			[
+				'Agreed',
+				'Independent directions',
+				'Sync-from and sync-to have their own repository, branch and directory settings. Configuring one direction does not enable the other. This is not bidirectional synchronization with the source repository.'
+			],
+			[
+				'Agreed',
+				'Import',
+				'Reads source material and creates or updates editable configuration. It does not deploy, recreate services or alter running resources.'
+			],
+			[
+				'Agreed',
+				'Save',
+				'Persists editable configuration only. It never invokes deployment or redeployment. Existing running state remains unchanged until a deployment owner applies configuration.'
+			],
+			[
+				'Agreed',
+				'After-save feedback',
+				'When saved configuration differs from the deployed revision, show Saved · not deployed and an explicit Deploy changes button for manually managed stacks. A prompt may offer deployment, but dismissal leaves the saved configuration undeployed. No countdown, queued deployment or background redeploy.'
+			],
+			[
+				'Design rule',
+				'Deploy eligibility',
+				'Deploy changes applies a clearly identified saved revision. Unsaved edits require saving first. Keep saved-versus-deployed status visible; a successful save must not imply a successful deployment.'
+			],
+			[
+				'Agreed',
+				'GitOps after-save behavior',
+				'For GitOps-managed stacks, identify GitOps as the deployment owner. Saving does not silently deploy or initiate repository publication. Sync-to remains a separate action or an independently configured policy; any GitOps deployment follows its explicitly configured policy.'
+			],
+			[
+				'Agreed',
+				'Manual deployment',
+				'An explicit Deploy action applies the selected saved configuration to the identified stack and cluster. Deploy is separate from Save and Import.'
+			],
+			[
+				'Agreed',
+				'GitOps deployment',
+				'Deployment may instead be delegated to GitOps. Repository publication and deployment remain distinct responsibilities; the configured GitOps system decides when to apply its repository changes.'
+			],
+			[
+				'Implementation gap',
+				'Current stack save behavior',
+				'The inspected UpdateStackSource operation currently redeploys after persisting source. Implementation must separate saving from deploying before this contract is satisfied. No application behavior has been changed by these wireframes.'
+			],
+			[
+				'Implementation gap',
+				'Stack export support',
+				'Existing GitOps supports repository-to-stack deployment; stack-source export to another repository requires additional functionality. Reuse repository and file-bundle infrastructure where appropriate.'
+			],
+			[
+				'Agreed',
+				'Import conflicts',
+				'Show a diff and require explicit review/replacement before accepting conflicting repository content. Preserve current editable configuration until acceptance; no silent overwrite, automatic merge or deploy.'
+			],
+			[
+				'Agreed',
+				'Sync policy',
+				'Manual sync initially, with explicit destination repository, branch and path. Source and destination repositories remain distinct. Scheduled sync is deferred; no schedule, automatic publishing or deployment is implied. File selection, environment values and commit details belong in the later sync interaction design.'
+			]
+		];
+		function sourceContractView() {
+			return `<div class="paper contract"><h1>Stack source and repository contract</h1><p>Running stack or source repository → editable Swarm Compose → separate destination repository</p>${table(
+				['Status', 'Contract', 'Behavior'],
+				sourceContracts.map((row) => row.map(escape))
+			)}</div>`;
+		}
+		const mappings = [
+			[
+				'Task → service',
+				'Task.ServiceID → service inspect in the same cluster',
+				'Owning service overview / service Tasks',
+				'Existing service relationship; stack lookup must be added to row navigation'
+			],
+			[
+				'Task → stack',
+				'Task.ServiceID → service labels → stack namespace',
+				'Stack Overview',
+				'Do not split the task or service display name'
+			],
+			[
+				'Task → container',
+				'Task/container IDs + verified node binding + matching task label + current running observation + authorization',
+				'Open container only for a verified running target',
+				'Same eligibility in cell and menu. Revalidate navigation; disappearance produces contextual unavailable state.'
+			],
+			[
+				'Container → service / stack',
+				'Swarm service/task labels → same-cluster service lookup → stack namespace',
+				'Service overview / Stack Overview',
+				'Proposed Stack resources section; distinguish from ordinary Compose projects'
+			],
+			[
+				'Service → stack',
+				'Inspected service stack-namespace label',
+				'Stack Overview',
+				'Existing list link; overview link is an addition'
+			],
+			[
+				'Service → tasks',
+				'Exact service ID',
+				'Existing service Tasks tab',
+				'Existing scoped task relationship'
+			],
+			[
+				'Service → networks',
+				'TaskTemplate / endpoint network IDs → inspected network details',
+				'Existing service Networks tab',
+				'Existing ID-based network mapping'
+			],
+			[
+				'Service → volumes',
+				'Declared mounts → running tasks → verified container mounts and node attachments',
+				'Volumes tab, reusing the existing Storage resolution',
+				'Standardize the label; retain bind/tmpfs mounts in a separate Mounts section, not as volume resources'
+			],
+			[
+				'Service → secrets / configs',
+				'ContainerSpec references by SecretID / ConfigID in the same cluster',
+				'Scoped Secrets / Configs lists',
+				'Proposed views; not presently dedicated service tabs'
+			],
+			[
+				'Stack → services / tasks',
+				'Exact namespace-labeled services; tasks joined by ServiceID',
+				'Existing stack Services / Tasks tabs',
+				'Overview is the default; explicit Services / Tasks links retain their scoped destinations'
+			],
+			[
+				'Stack → networks / volumes',
+				'Ownership labels / verified deployment declaration, plus references from its service specs; inspect exact targets',
+				'Proposed stack Networks / Volumes lists',
+				'Separate Owned and Referenced · external; volume rows retain node attachments'
+			],
+			[
+				'Stack → secrets / configs',
+				'Ownership metadata plus exact IDs referenced by stack services',
+				'Proposed stack Secrets / Configs lists',
+				'References do not automatically mean ownership'
+			],
+			[
+				'Network → owner / consumers',
+				'Network namespace label + verified cluster; service/task attachments by exact network ID',
+				'Owning Stack; existing Services / Tasks tabs',
+				'Reuse existing manager/cluster resolution'
+			],
+			[
+				'Volume → owner / consumers',
+				'Volume ownership metadata where available; service mounts and verified task/container attachment',
+				'Owning Stack when proven; using services and existing container list',
+				'Proposed owner/service links; no owner inferred from driver or a name prefix'
+			],
+			[
+				'Node → local resources',
+				'Verified Swarm node ↔ registered connection binding',
+				'Scoped tasks and existing node-local resource views',
+				'Connection registration is transport, not the user-facing resource owner'
+			],
+			[
+				'Secret / config → consumers',
+				'Exact Docker reference IDs, same cluster',
+				'Using services; owning stack only with ownership evidence',
+				'Metadata only; secret payloads never appear'
+			],
+			[
+				'Image → containers / services',
+				'Canonical running artifact and platform → verified live observations → task ServiceID',
+				'Proposed scoped Containers / Services tabs',
+				'Aggregate replicas without node pickers; never resolve by tag alone or include unused cache'
+			],
+			[
+				'Compose project → containers',
+				'Compose project identity and labels in its node context',
+				'Existing project Services view',
+				'A Compose project is not a Swarm stack'
+			],
+			[
+				'Running stack → editable source',
+				'Saved source or exact stack service specifications and verified references',
+				'Stack Source editor',
+				'Import does not deploy; reconstruction is a proposed feature'
+			],
+			[
+				'Source repository → editable source',
+				'Explicit source repository, branch, directory and revision',
+				'Stack Source editor',
+				'Input-only direction; importing does not deploy or write back'
+			],
+			[
+				'Editable source → destination repository',
+				'Separate destination repository identity, branch and directory',
+				'Sync-to destination',
+				'Different repository from the source; deployment is manual or delegated to GitOps'
+			]
+		];
+		const tabChanges = [
+			[
+				'Projects',
+				'Add Overview and make it the default landing tab',
+				'Retain Services, Configuration and Git sync; View details opens Overview.'
+			],
+			[
+				'Stacks',
+				'Add Overview, Networks, Volumes, Secrets and Configs',
+				'Keep Services and Tasks; Overview is the normal landing tab. Move namespace and counts into Overview.'
+			],
+			[
+				'Services',
+				'Add Secrets and Configs; standardize Storage presentation as Volumes plus a Mounts section',
+				'Keep existing task, network and verified-volume resolvers. Add the owning Stack link in Linked resources.'
+			],
+			[
+				'Volumes',
+				'Add Services and Containers as scoped tabs',
+				'Retain a compact consumer summary in Overview and the existing Workspace / Backups. Move node and driver into Overview.'
+			],
+			[
+				'Networks',
+				'No additional tab needed',
+				'Keep Services / Tasks. Add owner in Overview; move ID, namespace and driver out of the title bar.'
+			],
+			[
+				'Containers',
+				'No additional tab needed for this proposal',
+				'Add Stack resources in Overview. Keep actual network and storage attachments in their existing views.'
+			],
+			[
+				'Nodes',
+				'Add Tasks if presented as an in-resource destination',
+				'Keep existing Resources tab; it opens resources through the verified node connection. Agent remains a technical connection tab.'
+			],
+			[
+				'Secrets and Configs',
+				'Propose metadata detail pages with Overview and Services',
+				'Currently edited through dialogs; scoped consumer navigation needs a real destination. Never show secret contents.'
+			],
+			[
+				'Images',
+				'Add scoped Containers and Services tabs',
+				'Pin both to selected running artifact/platform; one Vulnerabilities view, no registry-report duplicate or host/version picker. Services addition is proposed.'
+			],
+			[
+				'Tasks',
+				'No independent task detail page proposed',
+				'Keep Service / Node glance information. Related resources goes to owning service, owning stack and a verified container.'
+			]
+		];
+		const implementationSteps = [
+			[
+				'1 · Audit and scope',
+				'Build a contract-to-code implementation matrix, including PR #243 rebrand. Identify shared files and existing behavior before edits.',
+				'Use the approved resource contract and the rebrand PR together as acceptance inputs.'
+			],
+			[
+				'2 · Reconcile rebrand early',
+				'Refresh and resolve PR #243 against current main before broad resource UI edits. Review branding, translations, shared layout, assets, backend/CLI strings, release/deployment references and tests.',
+				'Application rebrand to HiveMind per the locally available branch. Review conflicts semantically; preserve newer resource/image/security behavior. PR #243 conflicts resolved against cf.109; local format/lint, backend/CLI tests and frontend tests/build pass. Required Gitea checks and release/QA rollout are separate gates.'
+			],
+			[
+				'3 · Validate and integrate branding',
+				'Run relevant checks and authenticated visual QA, then integrate the focused rebrand through Gitea after required checks pass.',
+				'Check login, sidebar, titles, mobile/install assets and operational identity references. Do not combine unrelated resource redesign into the rebrand PR. Verify release publication and normal rollout.'
+			],
+			[
+				'4 · Shared resource rules',
+				'Standardize existing menu, relationship, table and navigation implementations using the integrated branding baseline.',
+				'One contract across list/detail/mobile; Overview default, no labels in tables, verified scoped destinations.'
+			],
+			[
+				'5 · Resource alignment',
+				'Implement approved columns, actions, title bars, Overview sections, missing scoped tabs, task history and container eligibility.',
+				'QA realistic stack → service → related-resource workflows against the matrix, including branding consistency.'
+			],
+			[
+				'6 · Images and Security',
+				'Preserve cf.106–108 behavior; complete global/replicated correctness, shared report semantics and outstanding scale architecture explicitly.',
+				'Distinguish implemented identity/scanning from pending fleet coordination/report aggregation and load acceptance.'
+			],
+			[
+				'7 · Stack source feature',
+				'Implement editable Compose import/reconstruction, conflict review and manual export to a separate repository.',
+				'No deployment on import/save; deployment stays explicit or GitOps-owned.'
+			],
+			[
+				'Throughout · Validation and releases',
+				'Resolve missing validation tooling, run required format/lint and owning tests, record QA and release coherent Gitea PRs.',
+				'Rebrand and resource changes need separate focused PRs; use the new brand consistently in subsequent UI, documentation and acceptance checks.'
+			]
+		];
+		function contractView() {
+			return `<div class="paper contract"><h1>Resource design contract · approved</h1>${table(
+				['Contract', 'Rule'],
+				contracts.map(([a, b]) => [escape(a), escape(b)])
+			)}<h2>Implementation sequence · includes PR #243 rebrand</h2><p><a href="https://gitea.home.prettybaked.com/constructorfleet/arcane/pulls/243">PR #243 · application rebrand</a> is an early dependency to reconcile before broad UI changes.</p>${table(
+				['Stage', 'Work', 'Acceptance / dependency'],
+				implementationSteps.map((row) => row.map(escape))
+			)}<h2>Images and vulnerability contract</h2><p>Choose Images and security contract in Preview for IMG, SEC and SCALE specifications, release evidence, implementation limits and acceptance scenarios.</p><h2>Stack source and repository contract</h2>${table(
+				['Status', 'Contract', 'Behavior'],
+				sourceContracts.map((row) => row.map(escape))
+			)}<h2>Tab inventory and proposed additions</h2>${table(
+				['Resource', 'Change', 'Preserve / clarify'],
+				tabChanges.map((row) => row.map(escape))
+			)}</div>`;
+		}
+		function mappingView() {
+			return `<div class="paper"><h1>Resource relationship inventory · approved</h1><p class="preview-note">Each mapping defines authority, destination and implementation status.</p>${table(
+				['Relationship', 'Resolution authority', 'Destination', 'Current / proposed'],
+				mappings.map((row) => row.map(escape))
+			)}</div>`;
+		}
+		function render() {
+			const r = current();
+			q('design-resource').value = state.resource;
+			q('design-screen').value = state.screen;
+			q('design-state').value = state.relationship;
+			q('design-layout').value = state.layout;
+			q('design-columns').value = state.columnSet;
+			q('design-stage').className = state.layout;
+			if (state.screen === 'contract') {
+				q('design-stage').innerHTML = contractView();
+				return;
+			}
+			if (state.screen === 'mapping') {
+				q('design-stage').innerHTML = mappingView();
+				return;
+			}
+			if (state.screen === 'image-contract') {
+				q('design-stage').innerHTML = imageContractView();
+				return;
+			}
+			if (state.screen === 'source-contract') {
+				q('design-stage').innerHTML = sourceContractView();
+				return;
+			}
+			if (state.screen === 'columns') {
+				q('design-stage').innerHTML = columnContractView();
+				return;
+			}
+			const isList = state.screen === 'list',
+				tab = state.tab || r.default || 'Overview';
+			const title = isList ? r.title : r.name;
+			const header = `<header class="header"><div class="heading"><h1>${escape(title)}</h1>${!isList ? `<span class="status">${escape(r.status)}</span>` : ''}</div><div class="buttons">${isList && r.create ? button(r.create, 'plus', 'preview', 'primary') : ''}${!isList && r.ops.length ? button(r.ops[0], r.ops[0].includes('Edit') ? 'edit' : 'refresh') : ''}${button('Refresh', 'refresh')}${button('Actions', 'list', 'menu')}</div></header>`;
+			let body;
+			if (isList) {
+				const cluster = ['stacks', 'services', 'tasks', 'nodes', 'secrets', 'configs'].includes(
+					state.resource
+				);
+				const node = ['stacks', 'services', 'tasks', 'nodes'].includes(state.resource);
+				const roles =
+					state.resource === 'nodes'
+						? `<select id="role-filter" aria-label="Role"><option value="all">All roles</option><option value="manager" ${state.roleFilter === 'manager' ? 'selected' : ''}>Manager</option><option value="worker" ${state.roleFilter === 'worker' ? 'selected' : ''}>Worker</option><option value="leader" ${state.roleFilter === 'leader' ? 'selected' : ''}>Leader</option></select>`
+						: '';
+				body = `<div class="toolbar"><input aria-label="Search resources" placeholder="Search ${escape(r.title.toLowerCase())}…"><button type="button" data-action="preview">${cluster ? 'Cluster: Primary Swarm' : 'Node: All nodes'} ⌄</button>${node ? '<button type="button" data-action="preview">Node: All nodes ⌄</button>' : ''}${roles}<button type="button" data-action="columns" aria-expanded="${state.columnPicker}">Columns</button></div>${state.resource === 'images' ? '<p>2 running artifacts · same tag, different digests · unused cache and stopped history excluded</p>' : ''}${fieldPicker(state.resource)}${listRows(state.resource)}<p class="preview-note">${escape(cleanupNotes[state.resource])}</p>${rowMenu(state.resource)}`;
+			} else {
+				const tabs = [...r.tabs];
+				if (!tabs.includes(tab)) tabs.push(tab);
+				body =
+					`<nav class="tabs" aria-label="Resource sections">${tabs.map((t) => `<button type="button" data-tab="${escape(t)}" aria-selected="${tab === t}">${escape(t)}</button>`).join('')}</nav>` +
+					(tab === 'Overview' ? overview(state.resource) : scoped(state.resource, tab));
+			}
+			const crumbs = !isList
+				? `<nav class="crumbs" aria-label="Breadcrumb"><button type="button" class="text-link" data-action="back-list">${escape(r.title)}</button><span>/</span><span>${escape(r.name)}</span></nav>`
+				: '';
+			q('design-stage').innerHTML =
+				`<article class="paper" aria-label="${escape(title)} wireframe">${crumbs}${header}${body}</article>`;
+			if (globalThis.lucide) {
+				root.querySelectorAll('[data-lucide]').forEach((e) => (e.textContent = ''));
+				lucide.createIcons({ attrs: { width: 16, height: 16 } });
+			}
+		}
+		root.addEventListener('click', (event) => {
+			const go = event.target.closest('[data-go]');
+			if (go) {
+				Object.assign(state, JSON.parse(go.dataset.go));
+				q('feedback').textContent = 'Preview navigation only.';
+				render();
+				return;
+			}
+			const tab = event.target.closest('[data-tab]');
+			if (tab) {
+				state.tab = tab.dataset.tab;
+				render();
+				return;
+			}
+			const action = event.target.closest('[data-action]');
+			if (!action) return;
+			if (action.dataset.action === 'back-list') {
+				state.screen = 'list';
+				render();
+			} else if (action.dataset.action === 'columns') {
+				state.columnPicker = !state.columnPicker;
+				render();
+			} else if (action.dataset.action === 'retry') {
+				state.relationship = 'resolved';
+				render();
+			} else if (action.dataset.action === 'release-notes') {
+				q('image-notes').showModal();
+			} else if (action.dataset.action === 'menu') {
+				q('feedback').textContent =
+					'The list preview shows the complete menu expanded. No live actions are performed.';
+			} else q('feedback').textContent = 'Operational action preview only; nothing was changed.';
+		});
+		root.addEventListener('change', (event) => {
+			if (event.target.matches('[data-column]')) {
+				state.customColumns[state.resource] = [
+					...root.querySelectorAll('[data-column]:checked')
+				].map((e) => e.dataset.column);
+				render();
+			} else if (event.target.id === 'role-filter') {
+				state.roleFilter = event.target.value;
+				render();
+			}
+		});
+		q('design-resource').addEventListener('change', () => {
+			state.resource = q('design-resource').value;
+			state.record = defaultRecords[state.resource];
+			state.tab = resources[state.resource].default || 'Overview';
+			if (state.screen === 'detail' && state.resource === 'tasks') {
+				state.screen = 'list';
+			}
+			render();
+		});
+		q('design-screen').addEventListener('change', () => {
+			state.screen = q('design-screen').value;
+			state.tab = resources[state.resource].default || 'Overview';
+			if (state.screen === 'detail' && state.resource === 'tasks') {
+				state.resource = 'services';
+				state.record = defaultRecords.services;
+				state.tab = 'Tasks';
+			}
+			render();
+		});
+		q('design-state').addEventListener('change', () => {
+			state.relationship = q('design-state').value;
+			render();
+		});
+		q('design-layout').addEventListener('change', () => {
+			state.layout = q('design-layout').value;
+			render();
+		});
+		q('design-columns').addEventListener('change', () => {
+			state.columnSet = q('design-columns').value;
+			state.customColumns = {};
+			render();
+		});
+		render();
+	})();
+</script>

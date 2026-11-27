@@ -10,7 +10,6 @@
 	import { containerListQuery } from '#lib/query/containers.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import type { ContainerStatusCounts } from '#lib/types/container.js';
-	import { pinViewAction } from '#lib/utils/dashboard-layout.js';
 	import {
 		ENVIRONMENT_FILTER,
 		environmentFilterIds,
@@ -125,7 +124,7 @@
 						href: resolve('/(app)/containers')
 					}
 				: null,
-			pinViewAction('containers', pageState.requestOptions, readableEnvironments('containers:list', data.linkedAgent)),
+
 			{
 				id: 'refresh',
 				action: 'refresh',
