@@ -15,16 +15,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { useEasyJoinCandidates } from '#lib/hooks/use-easy-join-candidates.svelte.js';
-	import {
-		EyeOnIcon,
-		TrashIcon,
-		EnvironmentsIcon,
-		InspectIcon,
-		StatsIcon,
-		EyeOffIcon,
-		TestIcon,
-		ConnectionIcon
-	} from '#lib/icons/index.js';
+	import { EyeOnIcon, TrashIcon, EnvironmentsIcon, StatsIcon, EyeOffIcon, TestIcon, ConnectionIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { environmentManagementService } from '#lib/services/env-mgmt-service.js';
@@ -357,11 +348,6 @@
 				{ value: 'history', label: m.history(), visible: item.enabled && hasPermission('jobs:list', item.id) }
 			]}
 		/>
-
-		<DropdownMenu.Item onclick={() => goto(resolve('/(app)/agents/[id]', { id: item.id }))}>
-			<InspectIcon class="size-4" />
-			{m.common_view_details()}
-		</DropdownMenu.Item>
 
 		{#if canEasyJoin(item)}
 			<DropdownMenu.Item onclick={() => openEasyJoin(item)}>

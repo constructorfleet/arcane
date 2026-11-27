@@ -114,7 +114,7 @@ test.describe('Management', () => {
 				.filter({ has: page.getByRole('button', { name: ROW_ACTIONS_TRIGGER_NAME }) })
 				.first();
 			const menu = await openRowActionsMenu(page, firstRow);
-			await menu.getByRole('menuitem', { name: 'Inspect', exact: true }).click();
+			await menu.getByRole('menuitem', { name: 'View Details', exact: true }).click();
 
 			await expect(page).toHaveURL(/\/containers\/.+/);
 			await expect(page.getByRole('tab', { name: 'Overview', exact: true })).toBeVisible();

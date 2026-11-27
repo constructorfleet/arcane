@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { useQueryClient } from '@tanstack/svelte-query';
 
+	import { actionConfigs } from '#lib/components/arcane-button/index.js';
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
 	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
@@ -11,7 +11,7 @@
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
-	import { CalendarIcon, ContainersIcon, InspectIcon, TrashIcon } from '#lib/icons/index.js';
+	import { CalendarIcon, ContainersIcon, TrashIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { environmentStore } from '#lib/stores/environment.store.svelte.js';
@@ -128,8 +128,8 @@
 			href={resolve(`/(app)/podman/pods/[id]?env=${encodeURIComponent(item.environmentId)}`, { id: encodeURIComponent(item.id) })}
 			tabs={[
 				{ value: 'overview', label: m.common_overview() },
-				{ value: 'containers', label: m.containers() },
-				{ value: 'network', label: m.resource_networks_cap() },
+				{ value: 'containers', label: m.containers(), related: true, icon: ContainersIcon },
+				{ value: 'network', label: m.resource_networks_cap(), related: true },
 				{ value: 'resources', label: m.common_resources() },
 				{ value: 'stats', label: m.containers_nav_metrics() },
 				{ value: 'processes', label: m.containers_processes_title() },
@@ -137,21 +137,13 @@
 			]}
 		/>
 
-		<DropdownMenu.Item
-			onclick={() =>
-				goto(
-					resolve(`/(app)/podman/pods/[id]?env=${encodeURIComponent(item.environmentId)}`, { id: encodeURIComponent(item.id) })
-				)}
-		>
-			<InspectIcon class="size-4" />
-			{m.common_inspect()}
-		</DropdownMenu.Item>
 		{@const allowedActions = lifecycleActions.filter((action) => hasPermission(podActionPermissions[action], item.environmentId))}
 		{#if allowedActions.length > 0}
 			<DropdownMenu.Separator />
 			{#each allowedActions as action (action)}
+				{@const Icon = actionConfigs[action].IconComponent}
 				<DropdownMenu.Item onclick={() => runPodAction(item, action, invalidatePods)}>
-					{podActionLabels[action]()}
+					<Icon class="size-4" />{podActionLabels[action]()}
 				</DropdownMenu.Item>
 			{/each}
 		{/if}

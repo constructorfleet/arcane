@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { useQueryClient } from '@tanstack/svelte-query';
 
+	import { actionConfigs } from '#lib/components/arcane-button/index.js';
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
 	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
@@ -11,7 +11,7 @@
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
-	import { FileTextIcon, InspectIcon, TrashIcon } from '#lib/icons/index.js';
+	import { FileTextIcon, TrashIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { environmentStore } from '#lib/stores/environment.store.svelte.js';
@@ -153,22 +153,11 @@
 			tabs={[
 				{ value: 'overview', label: m.common_overview() },
 				{ value: 'files', label: m.podman_quadlet_files() },
-				{ value: 'containers', label: m.containers() },
+				{ value: 'containers', label: m.containers(), related: true },
 				{ value: 'logs', label: m.common_logs(), visible: hasPermission('containers:logs', item.environmentId) }
 			]}
 		/>
 
-		<DropdownMenu.Item
-			onclick={() =>
-				goto(
-					resolve(`/(app)/podman/quadlets/[name]?env=${encodeURIComponent(item.environmentId)}`, {
-						name: encodeURIComponent(item.name)
-					})
-				)}
-		>
-			<InspectIcon class="size-4" />
-			{m.common_inspect()}
-		</DropdownMenu.Item>
 		{@const allowedActions = item.template
 			? []
 			: quadletActions.filter((action) => hasPermission(quadletActionPermissions[action], item.environmentId))}
@@ -176,12 +165,13 @@
 			{@const status = podmanStatuses[item.environmentId]}
 			<DropdownMenu.Separator />
 			{#each allowedActions as action (action)}
+				{@const Icon = actionConfigs[action].IconComponent}
 				<DropdownMenu.Item
 					disabled={!status?.systemdAvailable}
 					title={status?.systemdAvailable ? undefined : status?.systemdReason}
 					onclick={() => runQuadletAction(item.name, action, item.environmentId, invalidateQuadlets)}
 				>
-					{quadletActionLabels[action]()}
+					<Icon class="size-4" />{quadletActionLabels[action]()}
 				</DropdownMenu.Item>
 			{/each}
 		{/if}

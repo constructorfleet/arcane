@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { useQueryClient } from '@tanstack/svelte-query';
 	import { mode } from 'mode-watcher';
@@ -22,16 +21,7 @@
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
-	import {
-		AlertIcon,
-		ContainersIcon,
-		EditIcon,
-		PlayIcon,
-		RestartIcon,
-		StopIcon,
-		TrashIcon,
-		RedeployIcon
-	} from '#lib/icons/index.js';
+	import { AlertIcon, ContainersIcon, PlayIcon, RestartIcon, StopIcon, TrashIcon, RedeployIcon } from '#lib/icons/index.js';
 	import {
 		FolderOpenIcon,
 		LayersIcon,
@@ -520,7 +510,7 @@
 		<DetailLinksMenu
 			href={resolve(`/(app)/projects/[projectId]?env=${encodeURIComponent(envId)}`, { projectId: item.id })}
 			tabs={[
-				{ value: 'services', label: m.services() },
+				{ value: 'services', label: m.services(), icon: ContainersIcon, related: true },
 				{ value: 'compose', label: m.common_configuration() },
 				{
 					value: 'backup',
@@ -529,14 +519,6 @@
 				}
 			]}
 		/>
-
-		<DropdownMenu.Item
-			onclick={() => goto(resolve(`/(app)/projects/[projectId]?env=${encodeURIComponent(envId)}`, { projectId: item.id }))}
-			disabled={isBulkActionRunning || !!status}
-		>
-			<EditIcon class="size-4" />
-			{m.common_edit()}
-		</DropdownMenu.Item>
 
 		{#if item.gitOpsManagedBy && hasPermission('projects:update', envId)}
 			<ActionMenuItem

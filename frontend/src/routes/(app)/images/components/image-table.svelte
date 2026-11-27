@@ -10,6 +10,7 @@
 	import DigestCell from '#lib/components/arcane-table/cells/digest-cell.svelte';
 	import InUseStatus from '#lib/components/arcane-table/cells/in-use-status.svelte';
 	import UnixCreatedCell from '#lib/components/arcane-table/cells/unix-created-cell.svelte';
+	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import type { ColumnSpec, MobileFieldVisibility, BulkAction } from '#lib/components/arcane-table/index.js';
 	import RowActionsMenu from '#lib/components/arcane-table/row-actions-menu.svelte';
 	import { HardenedImageBadge } from '#lib/components/badges/index.js';
@@ -706,30 +707,42 @@
 
 {#snippet ImageActions(item: ImageActionTarget, targets: ImageActionTarget[])}
 	{@const envId = item.environmentId}
-	{#if hasPermission('images:read', envId)}
-		<DropdownMenu.Item onclick={() => goto(imageHref(item))}><InspectIcon class="size-4" />{m.common_inspect()}</DropdownMenu.Item
-		>
-		<DropdownMenu.Item onclick={() => goto(imageHref(item, 'history'))}
-			><LayersIcon class="size-4" />{m.images_history_title()}</DropdownMenu.Item
-		>
-		<DropdownMenu.Item onclick={() => goto(imageHref(item, 'attestations'))}
-			><InspectIcon class="size-4" />{m.images_attestations_title()}</DropdownMenu.Item
-		>
-		{#if item.hardened}<DropdownMenu.Item onclick={() => goto(imageHref(item, 'hardened'))}
-				><ShieldCheckIcon class="size-4" />{m.docker_hardened_image()}</DropdownMenu.Item
-			>{/if}
-		{#if item.inUse && featureStore.isEnabled('vulnerabilityManagement', envId) && hasPermission('vulnerabilities:read', envId)}
-			<DropdownMenu.Item onclick={() => goto(imageHref(item, 'vulnerabilities'))}
-				><ShieldCheckIcon class="size-4" />{m.vuln_title()}</DropdownMenu.Item
-			>
-		{/if}
-	{/if}
 	{@const releaseTag = item.repoTags.find((tag) => tag !== '<none>:<none>')}
-	{#if releaseTag && hasPermission('image-updates:read', envId)}
-		<DropdownMenu.Item onclick={() => (releaseNotesImage = { environmentId: envId, imageRef: releaseTag })}
-			><FileTextIcon class="size-4" />{m.image_update_release_notes_button()}</DropdownMenu.Item
-		>
-	{/if}
+	{#snippet releaseNotes()}
+		<DropdownMenu.Item onclick={() => (releaseNotesImage = { environmentId: envId, imageRef: releaseTag! })}>
+			<FileTextIcon class="size-4" />{m.image_update_release_notes_button()}
+		</DropdownMenu.Item>
+	{/snippet}
+	<DetailLinksMenu
+		href={imageHref(item)}
+		details={releaseTag && hasPermission('image-updates:read', envId) ? releaseNotes : undefined}
+		tabs={[
+			{ value: 'overview', label: m.common_overview(), visible: hasPermission('images:read', envId) },
+			{ value: 'history', label: m.images_history_title(), icon: LayersIcon, visible: hasPermission('images:read', envId) },
+			{
+				value: 'attestations',
+				label: m.images_attestations_title(),
+				icon: InspectIcon,
+				visible: hasPermission('images:read', envId)
+			},
+			{
+				value: 'hardened',
+				label: m.docker_hardened_image(),
+				icon: ShieldCheckIcon,
+				visible: item.hardened && hasPermission('images:read', envId)
+			},
+			{
+				value: 'vulnerabilities',
+				label: m.vuln_title(),
+				icon: ShieldCheckIcon,
+				visible:
+					item.inUse &&
+					featureStore.isEnabled('vulnerabilityManagement', envId) &&
+					hasPermission('images:read', envId) &&
+					hasPermission('vulnerabilities:read', envId)
+			}
+		]}
+	/>
 	{#if hasPermission('image-updates:check', envId)}
 		<DropdownMenu.Item onclick={() => recheckImage(item)} disabled={isLoading.checking}
 			><RefreshIcon class="size-4" />{m.image_update_recheck_button()}</DropdownMenu.Item

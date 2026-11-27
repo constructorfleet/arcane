@@ -19,7 +19,8 @@
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import {
 		TemplateIcon,
-		InspectIcon,
+		CodeIcon,
+		FileTextIcon,
 		FolderOpenIcon,
 		GlobeIcon,
 		TrashIcon,
@@ -151,23 +152,24 @@
 			? templates.data.find((template) => !template.isRemote && template.metadata?.remoteUrl === item.metadata?.remoteUrl)
 			: undefined}
 	<RowActionsMenu name={item.name}>
-		{#if localVersion}<DropdownMenu.Item
-				onclick={() => goto(resourceDetailHref(resolve('/(app)/projects/templates/[id]', { id: localVersion.id })))}
-				>{m.templates_view_local_version()}</DropdownMenu.Item
-			>{/if}
 		<DetailLinksMenu
 			href={resourceDetailHref(resolve('/(app)/projects/templates/[id]', { id: item.id }))}
 			tabs={[
 				{ value: 'overview', label: m.common_overview() },
-				{ value: 'compose', label: m.compose() },
-				{ value: 'env', label: m.common_environment_variables(), visible: !!item.envContent || !!item.metadata?.envUrl }
+				{ value: 'compose', label: m.compose(), icon: CodeIcon },
+				{
+					value: 'env',
+					label: m.common_environment_variables(),
+					icon: FileTextIcon,
+					visible: !!item.envContent || !!item.metadata?.envUrl
+				}
 			]}
 		/>
-		<DropdownMenu.Item onclick={() => goto(resourceDetailHref(resolve('/(app)/projects/templates/[id]', { id: item.id })))}>
-			<InspectIcon class="size-4" />
-			{m.common_view_details()}
-		</DropdownMenu.Item>
 
+		{#if localVersion}<DropdownMenu.Item
+				onclick={() => goto(resourceDetailHref(resolve('/(app)/projects/templates/[id]', { id: localVersion.id })))}
+				>{m.templates_view_local_version()}</DropdownMenu.Item
+			>{/if}
 		<IfPermitted perm="projects:create">
 			<DropdownMenu.Item onclick={() => goto(resolve(`/(app)/projects/new?templateId=${encodeURIComponent(item.id)}`))}>
 				<MoveToFolderIcon class="size-4" />

@@ -591,7 +591,7 @@ test('administers scoped identities and enforces their browser access immediatel
 				.first();
 			const containerMenu = await openRowActionsMenu(restrictedPage, containerRow);
 			await expect(
-				containerMenu.getByRole('menuitem', { name: 'Inspect', exact: true })
+				containerMenu.getByRole('menuitem', { name: 'View Details', exact: true })
 			).toBeVisible();
 			for (const action of ['Start', 'Stop', 'Restart', 'Remove']) {
 				await expect(

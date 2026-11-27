@@ -45,7 +45,14 @@
 		ZapIcon,
 		AlertIcon,
 		InfoIcon,
-		HealthIcon
+		HealthIcon,
+		StatsIcon,
+		LayoutListIcon,
+		FileTextIcon,
+		TerminalIcon,
+		SettingsIcon,
+		VolumesIcon,
+		CodeIcon
 	} from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
@@ -1036,40 +1043,29 @@
 		{/if}
 		<RowActionsMenu name={getContainerDisplayName(item)}>
 			<DetailLinksMenu
+				disabled={isBulkActionRunning || !!status}
 				href={resourceDetailHref(
 					resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(envId)}`, { containerId: item.id })
 				)}
 				tabs={[
 					{ value: 'overview', label: m.common_overview() },
-					{ value: 'stats', label: m.containers_nav_metrics(), visible: item.state === 'running' },
-					{ value: 'processes', label: m.containers_processes_title() },
-					{ value: 'logs', label: m.common_logs(), visible: hasPermission('containers:logs', envId) },
+					{ value: 'stats', label: m.containers_nav_metrics(), icon: StatsIcon, visible: item.state === 'running' },
+					{ value: 'processes', label: m.containers_processes_title(), icon: LayoutListIcon },
+					{ value: 'logs', label: m.common_logs(), icon: FileTextIcon, visible: hasPermission('containers:logs', envId) },
 					{
 						value: 'shell',
 						label: m.common_shell(),
+						icon: TerminalIcon,
 						visible: item.state === 'running' && hasPermission('containers:exec', envId)
 					},
-					{ value: 'healthcheck', label: m.containers_nav_healthcheck() },
-					{ value: 'config', label: m.common_configuration() },
-					{ value: 'network', label: m.resource_networks_cap() },
-					{ value: 'storage', label: m.storage(), visible: !!item.mounts?.length },
-					{ value: 'compose', label: m.compose(), visible: !!item.labels?.[COMPOSE_PROJECT_LABEL] },
-					{ value: 'inspect', label: m.common_inspect() }
+					{ value: 'healthcheck', label: m.containers_nav_healthcheck(), icon: HealthIcon },
+					{ value: 'config', label: m.common_configuration(), icon: SettingsIcon },
+					{ value: 'network', label: m.resource_networks_cap(), icon: NetworksIcon, related: true },
+					{ value: 'storage', label: m.resource_volumes_cap(), icon: VolumesIcon, related: true, visible: !!item.mounts?.length },
+					{ value: 'compose', label: m.compose(), icon: CodeIcon, visible: !!item.labels?.[COMPOSE_PROJECT_LABEL] },
+					{ value: 'inspect', label: m.common_inspect(), icon: InspectIcon }
 				]}
 			/>
-
-			<DropdownMenu.Item
-				onclick={() =>
-					goto(
-						resourceDetailHref(
-							resolve(`/(app)/containers/[containerId]?env=${encodeURIComponent(envId)}`, { containerId: item.id })
-						)
-					)}
-				disabled={isBulkActionRunning || !!status}
-			>
-				<InspectIcon class="size-4" />
-				{m.common_inspect()}
-			</DropdownMenu.Item>
 
 			{#if hasPermission('containers:update', envId) && !item.redeployDisabled && !item.labels?.[COMPOSE_PROJECT_LABEL]}
 				<DropdownMenu.Item

@@ -296,7 +296,7 @@ test.describe('Management', () => {
 				.filter({ has: page.getByRole('button', { name: ROW_ACTIONS_TRIGGER_NAME }) })
 				.first();
 			const menu = await openRowActionsMenu(page, firstRow);
-			await menu.getByRole('menuitem', { name: 'Inspect' }).click();
+			await menu.getByRole('menuitem', { name: 'View Details' }).click();
 		});
 
 		test('should pull image from dropdown menu', async ({ page }) => {

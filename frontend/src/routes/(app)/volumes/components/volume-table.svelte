@@ -16,7 +16,6 @@
 </script>
 
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import type { ColumnVisibilityState } from '@tanstack/table-core';
 	import { onMount, untrack } from 'svelte';
@@ -25,6 +24,7 @@
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
 	import InUseStatus from '#lib/components/arcane-table/cells/in-use-status.svelte';
+	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
 	import type { ColumnSpec, MobileFieldVisibility, BulkAction } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
@@ -34,7 +34,7 @@
 	import { EmptyState } from '#lib/components/states/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import { TrashIcon, InspectIcon, VolumesIcon, CalendarIcon, EditIcon, FolderOpenIcon } from '#lib/icons/index.js';
+	import { TrashIcon, BackupIcon, VolumesIcon, CalendarIcon, EditIcon, FolderOpenIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import type { APIRequestConfig } from '#lib/services/api-service.js';
@@ -464,20 +464,25 @@
 
 {#snippet RowActions({ item }: { item: VolumeRow })}
 	<RowActionsMenu name={item.name}>
-		<DropdownMenu.Item onclick={() => goto(volumeDetailHref(item))}>
-			<InspectIcon class="size-4" />
-			{m.common_inspect()}
-		</DropdownMenu.Item>
-		{#if hasPermission('volumes:read', item.environmentId)}
-			<DropdownMenu.Item onclick={() => goto(volumeDetailHref(item, 'backups'))}>{m.volumes_nav_backups()}</DropdownMenu.Item>
-			<DropdownMenu.Item
-				disabled={!!item.logicalId && item.workspaceState !== 'active'}
-				onclick={() => goto(volumeDetailHref(item, 'workspace'))}
-			>
-				<FolderOpenIcon class="size-4" />
-				{m.workspace()}
-			</DropdownMenu.Item>
-		{/if}
+		<DetailLinksMenu
+			href={volumeDetailHref(item)}
+			tabs={[
+				{ value: 'overview', label: m.common_overview() },
+				{
+					value: 'backups',
+					label: m.volumes_nav_backups(),
+					icon: BackupIcon,
+					visible: hasPermission('volumes:read', item.environmentId)
+				},
+				{
+					value: 'workspace',
+					label: m.workspace(),
+					icon: FolderOpenIcon,
+					visible: hasPermission('volumes:read', item.environmentId),
+					disabled: !!item.logicalId && item.workspaceState !== 'active'
+				}
+			]}
+		/>
 
 		{#if canRenameVolume || canDeleteVolume}
 			<DropdownMenu.Separator />

@@ -20,7 +20,6 @@
 </script>
 
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { useQueryClient } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
 
@@ -35,7 +34,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import { DEFAULT_NETWORK_NAMES } from '#lib/constants.js';
-	import { NetworksIcon, GlobeIcon, InspectIcon, TrashIcon } from '#lib/icons/index.js';
+	import { NetworksIcon, GlobeIcon, TrashIcon, LayersIcon, JobsIcon } from '#lib/icons/index.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
 	import { networkService } from '#lib/services/network-service.js';
@@ -322,18 +321,14 @@
 {#snippet RowActions({ item }: { item: NetworkRow })}
 	<RowActionsMenu name={item.name}>
 		<DetailLinksMenu
+			disabled={isAnyLoading}
 			href={networkDetailHref(item)}
 			tabs={[
 				{ value: 'overview', label: m.common_overview() },
-				{ value: 'services', label: m.services(), visible: item.scope === 'swarm' },
-				{ value: 'tasks', label: m.view_tasks(), visible: item.scope === 'swarm' }
+				{ value: 'services', label: m.services(), icon: LayersIcon, related: true, visible: item.scope === 'swarm' },
+				{ value: 'tasks', label: m.tasks(), icon: JobsIcon, related: true, visible: item.scope === 'swarm' }
 			]}
 		/>
-
-		<DropdownMenu.Item onclick={() => goto(networkDetailHref(item))} disabled={isAnyLoading}>
-			<InspectIcon class="size-4" />
-			{m.common_inspect()}
-		</DropdownMenu.Item>
 
 		{#if hasPermission('networks:delete', item.environmentId)}
 			<DropdownMenu.Separator />

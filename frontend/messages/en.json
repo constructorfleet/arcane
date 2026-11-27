@@ -4869,5 +4869,7 @@
   "filesystem_usage_ratio": "{used} / {total}",
   "active_mount_information": "Active mount information",
   "no_active_mounts": "No active mounts",
-  "all_nodes": "All Nodes"
+  "all_nodes": "All Nodes",
+  "details": "Details",
+  "related_resources": "Related resources"
 }

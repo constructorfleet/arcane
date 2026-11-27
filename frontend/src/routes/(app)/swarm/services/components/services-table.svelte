@@ -5,6 +5,7 @@
 	import { toast } from 'svelte-sonner';
 
 	import ArcaneTable from '#lib/components/arcane-table/arcane-table.svelte';
+	import DetailLinksMenu from '#lib/components/arcane-table/detail-links-menu.svelte';
 	import { environmentColumns } from '#lib/components/arcane-table/environment-column.js';
 	import type { ColumnSpec, MobileFieldVisibility } from '#lib/components/arcane-table/index.js';
 	import { UniversalMobileCard } from '#lib/components/arcane-table/index.js';
@@ -19,7 +20,8 @@
 		GlobeIcon,
 		TrashIcon,
 		NetworksIcon,
-		InspectIcon,
+		SettingsIcon,
+		FileTextIcon,
 		RestartIcon,
 		EditIcon,
 		VolumesIcon,
@@ -78,17 +80,10 @@
 
 	const isAnyLoading = $derived(Object.values(isLoading).some(Boolean));
 
-	function openService(
-		service: ServiceRow,
-		action?: App.PageState['swarmServiceAction'],
-		tab?: 'tasks' | 'network' | 'storage' | 'logs' | 'config'
-	) {
+	function openService(service: ServiceRow, action?: App.PageState['swarmServiceAction']) {
 		goto(
 			resourceTableHref(
-				environmentHref(
-					resolve('/(app)/swarm/services/[serviceId]', { serviceId: service.id }) + (tab ? `?tab=${tab}` : ''),
-					service.environmentId
-				),
+				environmentHref(resolve('/(app)/swarm/services/[serviceId]', { serviceId: service.id }), service.environmentId),
 				requestOptions.pagination?.page
 			),
 			{ state: { swarmServiceAction: action } }
@@ -245,29 +240,33 @@
 
 {#snippet RowActions({ item }: { item: ServiceRow })}
 	<RowActionsMenu name={item.name}>
-		<DropdownMenu.Item onclick={() => openService(item)}>
-			<InspectIcon class="size-4" />
-			{m.common_inspect()}
-		</DropdownMenu.Item>
 		<IfPermitted perm="swarm-services:read" envId={item.environmentId}>
-			<DropdownMenu.Item onclick={() => openService(item, undefined, 'config')}>{m.common_configuration()}</DropdownMenu.Item>
-			{#if hasPermission('swarm-services:logs', item.environmentId)}<DropdownMenu.Item
-					onclick={() => openService(item, undefined, 'logs')}>{m.common_logs()}</DropdownMenu.Item
-				>{/if}
-			<DropdownMenu.Item onclick={() => openService(item, undefined, 'tasks')}
-				><ContainersIcon />{m.view_tasks()}</DropdownMenu.Item
-			>
-			<DropdownMenu.Item onclick={() => openService(item, undefined, 'network')}
-				><NetworksIcon />{m.resource_view_networks()}</DropdownMenu.Item
-			>
-			<DropdownMenu.Item onclick={() => openService(item, undefined, 'storage')}
-				><VolumesIcon />{m.resource_view_volumes()}</DropdownMenu.Item
-			>
+			<DetailLinksMenu
+				href={resourceTableHref(
+					environmentHref(resolve('/(app)/swarm/services/[serviceId]', { serviceId: item.id }), item.environmentId),
+					requestOptions.pagination?.page
+				)}
+				tabs={[
+					{ value: 'overview', label: m.common_overview() },
+					{ value: 'config', label: m.common_configuration(), icon: SettingsIcon },
+					{
+						value: 'logs',
+						label: m.common_logs(),
+						icon: FileTextIcon,
+						visible: hasPermission('swarm-services:logs', item.environmentId)
+					},
+					{ value: 'tasks', label: m.tasks(), icon: ContainersIcon, related: true },
+					{ value: 'network', label: m.resource_networks_cap(), icon: NetworksIcon, related: true },
+					{ value: 'storage', label: m.resource_volumes_cap(), icon: VolumesIcon, related: true }
+				]}
+			/>
 		</IfPermitted>
 		<IfPermitted perm="swarm-services:update" envId={item.environmentId}>
 			<DropdownMenu.Separator />
 			<IfPermitted perm="swarm-services:read" envId={item.environmentId}>
-				<DropdownMenu.Item onclick={() => openService(item, 'rollback')}>{m.swarm_service_rollback()}</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={() => openService(item, 'rollback')}
+					><RestartIcon class="size-4" />{m.swarm_service_rollback()}</DropdownMenu.Item
+				>
 				<DropdownMenu.Item onclick={() => openService(item, 'edit')}>
 					<EditIcon class="size-4" />
 					{m.common_edit()}

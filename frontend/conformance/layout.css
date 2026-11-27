@@ -1,0 +1,5 @@
+@import '../src/routes/layout.css';
+
+/* The isolated Vite root must also scan the real components and button variants. */
+@source '../src';
+@source '.';
