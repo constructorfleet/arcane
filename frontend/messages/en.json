@@ -4866,5 +4866,9 @@
   "mixed_image_versions": "Multiple image versions are running in this replicated service",
   "service_running_mixed_images": "{name} is running multiple image versions",
   "in_use_images": "In-use Images",
-  "image_storage_all_copies": "Image Storage (All Copies)"
+  "image_storage_all_copies": "Image Storage (All Copies)",
+  "filesystem_disk_usage": "Filesystem disk usage",
+  "filesystem_usage_ratio": "{used} / {total}",
+  "active_mount_information": "Active mount information",
+  "no_active_mounts": "No active mounts"
 }

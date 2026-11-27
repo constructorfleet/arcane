@@ -9,15 +9,13 @@
 	const storage = createQuery(() => volumeWorkspaceStorageQuery(environmentId, volumeName));
 </script>
 
-{#if storage.isError}
-	<span class="text-sm text-muted-foreground">{m.common_unavailable()}</span>
-{:else if storage.data}
-	<span class="text-sm tabular-nums">
-		{m.filesystem_used_of_total({
-			used: bytes.format(storage.data.usedBytes, { unitSeparator: ' ' }) ?? m.common_unavailable(),
-			total: bytes.format(storage.data.totalBytes, { unitSeparator: ' ' }) ?? m.common_unavailable()
+{#if storage.data && !storage.isError}
+	<span class="text-sm whitespace-nowrap tabular-nums">
+		{m.filesystem_usage_ratio({
+			used: bytes.format(storage.data.usedBytes, { unitSeparator: '' }) ?? '-',
+			total: bytes.format(storage.data.totalBytes, { unitSeparator: '' }) ?? '-'
 		})}
 	</span>
 {:else}
-	<span class="text-sm text-muted-foreground">{storage.isPending ? m.common_loading() : m.common_unavailable()}</span>
+	<span class="text-sm text-muted-foreground">-</span>
 {/if}

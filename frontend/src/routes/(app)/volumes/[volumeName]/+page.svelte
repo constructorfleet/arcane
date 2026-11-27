@@ -34,7 +34,7 @@
 	import TabbedPageLayout from '#lib/layouts/tabbed-page-layout.svelte';
 	import { m } from '#lib/paraglide/messages.js';
 	import { queryKeys } from '#lib/query/query-keys.js';
-	import { volumeWorkspaceFolderQuery } from '#lib/query/volumes.js';
+	import { volumeWorkspaceFolderQuery, volumeWorkspaceStorageQuery } from '#lib/query/volumes.js';
 	import { volumeBackupService } from '#lib/services/volume-backup-service.js';
 	import { volumeService } from '#lib/services/volume-service.js';
 	import { volumeWorkspaceService } from '#lib/services/volume-workspace-service.js';
@@ -101,6 +101,15 @@
 		defaultTab: () => 'overview'
 	});
 	const selectedTab = $derived(urlTab.value);
+	const filesystemStorage = createQuery(() => ({
+		...volumeWorkspaceStorageQuery(currentEnvId, volume?.name ?? ''),
+		enabled:
+			!!volume?.name &&
+			selectedTab === 'overview' &&
+			canReadVolume &&
+			(!logicalVolume || logicalVolume.workspaceState === 'active')
+	}));
+
 	const queryClient = useQueryClient();
 
 	let workspaceRequested = $state(false);
@@ -1124,7 +1133,7 @@
 				<ArcaneButton action="refresh" customLabel={m.common_retry()} onclick={() => workspaceFolders.root?.refetch()} />
 				{#if volume.scope === 'global'}
 					<ArcaneButton action="base" tone="outline" onclick={stopWorkspaceLoad}>
-						{m.volume_agent_records_show()}
+						{m.active_mount_information()}
 					</ArcaneButton>
 				{/if}
 				<ArcaneButton action="base" tone="outline" href={resolve('/(app)/volumes')}>{m.resource_volumes_cap()}</ArcaneButton>
@@ -1185,22 +1194,16 @@
 	<DetailSection title={m.common_details_title({ resource: m.resource_volume_cap() })} class="border-t-0 pt-0">
 		<KeyValueGrid>
 			<KeyValueCard label={m.common_created()} valueFormat="text">{createdDate}</KeyValueCard>
-			<KeyValueCard label={m.common_mountpoint()}>{volume.mountpoint ?? m.common_unknown()}</KeyValueCard>
+			{#if filesystemStorage.data && !filesystemStorage.isError}
+				<KeyValueCard label={m.filesystem_disk_usage()}
+					>{m.filesystem_usage_ratio({
+						used: bytes.format(filesystemStorage.data.usedBytes, { unitSeparator: '' }) ?? '-',
+						total: bytes.format(filesystemStorage.data.totalBytes, { unitSeparator: '' }) ?? '-'
+					})}</KeyValueCard
+				>
+			{/if}
 		</KeyValueGrid>
 	</DetailSection>
-
-	{@render volumeContainers(volume)}
-	<VolumeAgentRecords volume={logicalVolume ?? volume} environmentId={currentEnvId} {hasWorkspaceChanges} />
-
-	{#if volume.labels && Object.keys(volume.labels).length > 0}
-		<DetailSection title={m.common_labels()} icon={TagIcon}>
-			<KeyValueGrid>
-				{#each Object.entries(volume.labels) as [key, value] (key)}
-					<KeyValueCard label={key} valueTitle={m.common_click_to_select()}>{value}</KeyValueCard>
-				{/each}
-			</KeyValueGrid>
-		</DetailSection>
-	{/if}
 
 	{#if volume.options && Object.keys(volume.options).length > 0}
 		<DetailSection title={m.common_driver_options()} icon={VolumesIcon}>
@@ -1212,9 +1215,18 @@
 		</DetailSection>
 	{/if}
 
-	{#if (!volume.labels || Object.keys(volume.labels).length === 0) && (!volume.options || Object.keys(volume.options).length === 0)}
-		<p class="border-t pt-6 text-center text-muted-foreground">{m.volumes_no_labels_or_options()}</p>
+	{#if volume.labels && Object.keys(volume.labels).length > 0}
+		<DetailSection title={m.common_labels()} icon={TagIcon}>
+			<KeyValueGrid>
+				{#each Object.entries(volume.labels) as [key, value] (key)}
+					<KeyValueCard label={key} valueTitle={m.common_click_to_select()}>{value}</KeyValueCard>
+				{/each}
+			</KeyValueGrid>
+		</DetailSection>
 	{/if}
+
+	<VolumeAgentRecords volume={logicalVolume ?? volume} environmentId={currentEnvId} />
+	{@render volumeContainers(volume)}
 {/snippet}
 
 {#if volume}
@@ -1232,14 +1244,6 @@
 					<Badge variant="purple" minWidth="20">{volume.scope}</Badge>
 				{/if}
 			</div>
-		{/snippet}
-
-		{#snippet subHeader()}
-			{#if logicalVolume?.workspaceState === 'active'}
-				<p class="mt-1 truncate text-xs text-muted-foreground">
-					{m.workspace_uses_active_attachment({ agent: logicalVolume.environmentName ?? currentEnvId })}
-				</p>
-			{/if}
 		{/snippet}
 
 		{#snippet headerActions()}

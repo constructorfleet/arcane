@@ -331,7 +331,7 @@
 		{ accessorKey: 'name', title: m.common_name(), sortable: true, cell: NameCell },
 		{ accessorKey: 'inUse', title: m.common_status(), sortable: true, cell: StatusCell },
 		{ accessorKey: 'size', title: m.common_size(), sortable: true, cell: SizeCell, align: 'right' },
-		{ id: 'filesystemUsage', title: m.backing_filesystem(), cell: FilesystemUsageCell, align: 'right' },
+		{ id: 'filesystemUsage', title: m.filesystem_disk_usage(), cell: FilesystemUsageCell, align: 'right' },
 		{ accessorKey: 'createdAt', title: m.common_created(), sortable: true, cell: CreatedCell },
 		{ accessorKey: 'driver', title: m.common_driver(), sortable: true }
 	] satisfies ColumnSpec<VolumeRow>[]);
@@ -340,7 +340,7 @@
 		{ id: 'id', label: m.common_id(), defaultVisible: false },
 		{ id: 'inUse', label: m.common_status(), defaultVisible: true },
 		{ id: 'size', label: m.common_size(), defaultVisible: true },
-		{ id: 'filesystemUsage', label: m.backing_filesystem(), defaultVisible: true },
+		{ id: 'filesystemUsage', label: m.filesystem_disk_usage(), defaultVisible: true },
 		{ id: 'createdAt', label: m.common_created(), defaultVisible: true },
 		{ id: 'driver', label: m.common_driver(), defaultVisible: true }
 	];
@@ -365,29 +365,6 @@
 
 {#snippet NameCell({ item }: { item: VolumeRow })}
 	<ResourceName name={item.name} href={volumeDetailHref(item)} class="font-mono text-xs-plus leading-5 font-medium" />
-	{#if item.nodes?.length}
-		<details class="mt-1 text-xs text-muted-foreground">
-			<summary class="cursor-pointer"
-				>{item.nodes.length === 1
-					? m.swarm_global_volume_one_node()
-					: m.swarm_global_volume_nodes({ count: item.nodes.length })}</summary
-			>
-			<ul class="mt-2 space-y-1">
-				{#each item.nodes as node (node.id)}
-					<li>
-						<a
-							class="text-primary-text hover:underline"
-							href={volumeDetailHref({ ...item, logicalId: undefined, name: node.volumeName, environmentId: node.id })}
-							>{node.name}</a
-						>
-						{#if item.workspaceState === 'active' && node.id === item.environmentId}
-							<span> · {m.active_attachment()}</span>
-						{/if}
-					</li>
-				{/each}
-			</ul>
-		</details>
-	{/if}
 {/snippet}
 
 {#snippet StatusCell({ item }: { item: VolumeRow })}
@@ -396,7 +373,11 @@
 
 {#snippet SizeCell({ item }: { item: VolumeRow })}
 	{@const sizeInfo = sizesMap.get(rowKey({ id: item.name, environmentId: item.environmentId, environmentTagged: true }))}
-	{#if sizeInfo && sizeInfo.size >= 0}
+	{#if item.options?.['size']?.trim()}
+		<span class="text-sm tabular-nums">{item.options['size'].trim()}</span>
+	{:else if item.driver !== 'local'}
+		<span class="text-sm text-muted-foreground">-</span>
+	{:else if sizeInfo && sizeInfo.size >= 0}
 		<span class="text-sm tabular-nums">{bytes.format(sizeInfo.size, { unitSeparator: ' ' })}</span>
 	{:else if sizesLoading && sizesMap.size === 0}
 		{#if item.size > 0}
@@ -411,8 +392,7 @@
 	{:else if sizesEnabled && sizesQuery.isError}
 		<span
 			class="text-sm text-muted-foreground"
-			title={m.volumes_size_calculation_failed({ error: extractApiErrorMessage(sizesQuery.error) })}
-			>{m.common_unavailable()}</span
+			title={m.volumes_size_calculation_failed({ error: extractApiErrorMessage(sizesQuery.error) })}>-</span
 		>
 	{:else}
 		<span class="text-sm text-muted-foreground" title={sizesEnabled ? m.volumes_size_not_reported() : undefined}>-</span>
@@ -424,14 +404,10 @@
 {/snippet}
 
 {#snippet FilesystemUsageCell({ item }: { item: VolumeRow })}
-	{#if hasPermission('volumes:read', item.environmentId) && (!item.logicalId || item.workspaceState === 'active')}
-		{#if (item.runningHelpers ?? 0) > 0}
-			<VolumeFilesystemUsage environmentId={item.environmentId} volumeName={item.name} />
-		{:else}
-			<a class="text-sm text-primary-text hover:underline" href={volumeDetailHref(item, 'workspace')}>{m.open_workspace()}</a>
-		{/if}
+	{#if hasPermission('volumes:read', item.environmentId) && (!item.logicalId || item.workspaceState === 'active') && (item.runningHelpers ?? 0) > 0}
+		<VolumeFilesystemUsage environmentId={item.environmentId} volumeName={item.name} />
 	{:else}
-		<span class="text-sm text-muted-foreground">{m.common_unavailable()}</span>
+		<span class="text-sm text-muted-foreground">-</span>
 	{/if}
 {/snippet}
 
@@ -460,7 +436,14 @@
 				show: mobileFieldVisibility['driver'] ?? true
 			},
 			{
-				label: m.backing_filesystem(),
+				label: m.common_size(),
+				getValue: (item: VolumeRow) => ({ item }),
+				type: 'component',
+				component: SizeCell,
+				show: mobileFieldVisibility['size'] ?? true
+			},
+			{
+				label: m.filesystem_disk_usage(),
 				getValue: (item: VolumeRow) => ({ item }),
 				type: 'component',
 				component: FilesystemUsageCell,
